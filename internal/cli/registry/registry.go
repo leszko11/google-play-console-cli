@@ -1,5 +1,16 @@
 package registry
 
-import "github.com/peterbourgon/ff/v3/ffcli"
+import (
+	"github.com/leszko11/google-play-console-cli/internal/cli/apps"
+	"github.com/leszko11/google-play-console-cli/internal/cli/auth"
+	"github.com/leszko11/google-play-console-cli/internal/cli/completion"
+	"github.com/peterbourgon/ff/v3/ffcli"
+)
 
-func Register(_ *ffcli.Command) {}
+func Register(root *ffcli.Command) {
+	root.Subcommands = []*ffcli.Command{
+		auth.NewCommand(auth.Deps{}),
+		apps.NewCommand(apps.Deps{}),
+		completion.NewCommand(),
+	}
+}
