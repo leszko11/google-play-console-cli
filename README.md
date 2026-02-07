@@ -22,6 +22,14 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 go build -o build/gpc .
 ```
 
+## Testing
+
+```bash
+make dev
+```
+
+Detailed smoke tests: `docs/TESTING.md`.
+
 ## Quickstart
 
 ```bash

@@ -1,0 +1,23 @@
+package registry
+
+import (
+	"testing"
+
+	"github.com/peterbourgon/ff/v3/ffcli"
+)
+
+func TestRegisterAddsPhaseOneCommands(t *testing.T) {
+	root := &ffcli.Command{Name: "gpc"}
+	Register(root)
+
+	got := map[string]bool{}
+	for _, c := range root.Subcommands {
+		got[c.Name] = true
+	}
+
+	for _, name := range []string{"auth", "apps", "completion"} {
+		if !got[name] {
+			t.Fatalf("expected subcommand %q, got %#v", name, got)
+		}
+	}
+}
