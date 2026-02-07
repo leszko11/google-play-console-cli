@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const envConfigPath = "GPC_CONFIG_PATH"
@@ -45,6 +46,9 @@ func Load() (Config, error) {
 			return Config{}, nil
 		}
 		return Config{}, err
+	}
+	if strings.TrimSpace(string(raw)) == "" {
+		return Config{}, nil
 	}
 
 	var cfg Config
