@@ -19,6 +19,10 @@ gpc apps list --output json
 gpc apps list --verify
 gpc apps get --package-name com.example.app --output json
 gpc apps remove-package --package-name com.example.app
+gpc edits create --package-name com.example.app
+gpc edits get --package-name com.example.app --edit-id <edit-id>
+gpc edits validate --package-name com.example.app --edit-id <edit-id>
+gpc edits delete --package-name com.example.app --edit-id <edit-id>
 ```
 
 ## Expected Outcomes
@@ -31,3 +35,4 @@ gpc apps remove-package --package-name com.example.app
 - Valid credentials:
   - `gpc auth init --service-account <valid-file>` should succeed.
   - `gpc apps get --package-name <valid-package>` should return app JSON with `packageName`.
+  - `gpc edits create --package-name <valid-package>` should return a JSON edit object with `id`.

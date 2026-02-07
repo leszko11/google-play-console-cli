@@ -6,7 +6,7 @@ import (
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
-func TestRegisterAddsPhaseOneCommands(t *testing.T) {
+func TestRegisterAddsCoreCommands(t *testing.T) {
 	root := &ffcli.Command{Name: "gpc"}
 	Register(root)
 
@@ -15,7 +15,7 @@ func TestRegisterAddsPhaseOneCommands(t *testing.T) {
 		got[c.Name] = true
 	}
 
-	for _, name := range []string{"auth", "apps", "completion"} {
+	for _, name := range []string{"auth", "apps", "edits", "completion"} {
 		if !got[name] {
 			t.Fatalf("expected subcommand %q, got %#v", name, got)
 		}

@@ -47,6 +47,9 @@ gpc apps list --output json
 
 # Fetch app details for one package
 gpc apps get --package-name com.example.app --output json
+
+# Start an edit transaction
+gpc edits create --package-name com.example.app
 ```
 
 ## Command Discovery
@@ -55,4 +58,5 @@ gpc apps get --package-name com.example.app --output json
 gpc --help
 gpc auth --help
 gpc apps --help
+gpc edits --help
 ```
