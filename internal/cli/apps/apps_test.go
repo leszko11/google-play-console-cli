@@ -122,3 +122,53 @@ func TestAppsGet_ReturnsClearAPIError(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestAppsAddPackage_PersistsToConfig(t *testing.T) {
+	stored := config.Config{
+		Packages: []string{"com.example.one"},
+	}
+
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return stored, nil },
+		SaveConfig: func(cfg config.Config) error {
+			stored = cfg
+			return nil
+		},
+	}
+
+	out, err := runApps(t, deps, "add-package", "--package-name", "com.example.two")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"action":"added"`) {
+		t.Fatalf("expected added action, got: %s", out)
+	}
+	if len(stored.Packages) != 2 {
+		t.Fatalf("expected 2 packages, got %v", stored.Packages)
+	}
+}
+
+func TestAppsRemovePackage_RemovesFromConfig(t *testing.T) {
+	stored := config.Config{
+		Packages: []string{"com.example.one", "com.example.two"},
+	}
+
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return stored, nil },
+		SaveConfig: func(cfg config.Config) error {
+			stored = cfg
+			return nil
+		},
+	}
+
+	out, err := runApps(t, deps, "remove-package", "--package-name", "com.example.one")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"action":"removed"`) {
+		t.Fatalf("expected removed action, got: %s", out)
+	}
+	if len(stored.Packages) != 1 || stored.Packages[0] != "com.example.two" {
+		t.Fatalf("unexpected packages after remove: %v", stored.Packages)
+	}
+}
