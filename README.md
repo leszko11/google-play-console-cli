@@ -39,6 +39,9 @@ gpc auth init --service-account /path/to/service-account.json
 # Show current auth profile
 gpc auth status
 
+# Store package for reusable list/verify flows
+gpc apps add-package --package-name com.example.app
+
 # List configured packages
 gpc apps list --output json
 

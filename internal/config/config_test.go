@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -39,5 +40,26 @@ func TestSaveAndLoad_WithConfigPathOverride(t *testing.T) {
 
 	if got.Profiles["default"].ServiceAccountPath != "/tmp/sa.json" {
 		t.Fatalf("profile mismatch: %+v", got.Profiles["default"])
+	}
+}
+
+func TestLoad_EmptyConfigFileReturnsZeroConfig(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("GPC_CONFIG_PATH", cfgPath)
+
+	if err := os.WriteFile(cfgPath, nil, 0o600); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	got, err := Load()
+	if err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+
+	if got.ActiveProfile != "" {
+		t.Fatalf("expected empty active profile, got %q", got.ActiveProfile)
+	}
+	if len(got.Packages) != 0 {
+		t.Fatalf("expected no packages, got %v", got.Packages)
 	}
 }

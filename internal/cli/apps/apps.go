@@ -21,6 +21,7 @@ type Client interface {
 
 type Deps struct {
 	LoadConfig func() (config.Config, error)
+	SaveConfig func(config.Config) error
 	NewClient  func(context.Context, gpc.CredentialInput) (Client, error)
 	LookupEnv  func(string) string
 	Stdout     io.Writer
@@ -37,6 +38,8 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			NewListCommand(deps),
 			NewGetCommand(deps),
+			NewAddPackageCommand(deps),
+			NewRemovePackageCommand(deps),
 		},
 	}
 }
@@ -44,6 +47,9 @@ func NewCommand(deps Deps) *ffcli.Command {
 func withDefaults(deps Deps) Deps {
 	if deps.LoadConfig == nil {
 		deps.LoadConfig = config.Load
+	}
+	if deps.SaveConfig == nil {
+		deps.SaveConfig = config.Save
 	}
 	if deps.NewClient == nil {
 		deps.NewClient = func(ctx context.Context, creds gpc.CredentialInput) (Client, error) {
@@ -74,4 +80,13 @@ func resolveServiceAccountPath(cfg config.Config, lookupEnv func(string) string)
 	}
 
 	return "", fmt.Errorf("no service account configured")
+}
+
+func writeJSON(out io.Writer, v any) error {
+	b, err := shared.RenderJSON(v, false)
+	if err != nil {
+		return err
+	}
+	_, err = out.Write(b)
+	return err
 }

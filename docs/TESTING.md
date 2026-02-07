@@ -14,8 +14,11 @@ make dev
 gpc --help
 gpc auth init --service-account /path/to/service-account.json
 gpc auth status
+gpc apps add-package --package-name com.example.app
 gpc apps list --output json
+gpc apps list --verify
 gpc apps get --package-name com.example.app --output json
+gpc apps remove-package --package-name com.example.app
 ```
 
 ## Expected Outcomes
