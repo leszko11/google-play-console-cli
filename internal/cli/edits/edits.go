@@ -22,6 +22,8 @@ type Client interface {
 	ValidateEdit(ctx context.Context, packageName, editID string) error
 	CommitEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
 	DeleteEdit(ctx context.Context, packageName, editID string) error
+	GetListing(ctx context.Context, packageName, editID, language string) (gpc.ListingInfo, error)
+	UpdateListing(ctx context.Context, packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
 }
 
 type Deps struct {
@@ -44,6 +46,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newValidateCommand(deps),
 			newCommitCommand(deps),
 			newDeleteCommand(deps),
+			newListingsCommand(deps),
 		},
 	}
 }
@@ -225,6 +228,104 @@ func newDeleteCommand(deps Deps) *ffcli.Command {
 				"packageName": pkg,
 				"editId":      editID,
 				"status":      "deleted",
+			})
+		},
+	}
+}
+
+func newListingsCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "listings",
+		ShortHelp: "Manage listing changes inside an edit",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newListingsGetCommand(deps),
+			newListingsUpdateCommand(deps),
+		},
+	}
+}
+
+func newListingsGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, locale string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&locale, "locale", "", "Listing locale (BCP-47, e.g. en-US)")
+
+	return &ffcli.Command{
+		Name:      "get",
+		ShortHelp: "Get listing in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			locale = strings.TrimSpace(locale)
+			if locale == "" {
+				return fmt.Errorf("--locale is required")
+			}
+			listing, err := client.GetListing(ctx, pkg, editID, locale)
+			if err != nil {
+				return fmt.Errorf("failed to get listing: %w", err)
+			}
+			return writeJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"listing":     listing,
+			})
+		},
+	}
+}
+
+func newListingsUpdateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("update", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, locale, title, shortDescription, fullDescription string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&locale, "locale", "", "Listing locale (BCP-47, e.g. en-US)")
+	fs.StringVar(&title, "title", "", "Localized app title")
+	fs.StringVar(&shortDescription, "short-description", "", "Localized short description")
+	fs.StringVar(&fullDescription, "full-description", "", "Localized full description")
+
+	return &ffcli.Command{
+		Name:      "update",
+		ShortHelp: "Update listing fields in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			locale = strings.TrimSpace(locale)
+			if locale == "" {
+				return fmt.Errorf("--locale is required")
+			}
+			listing, err := client.UpdateListing(ctx, pkg, editID, locale, gpc.ListingUpdate{
+				Title:            title,
+				ShortDescription: shortDescription,
+				FullDescription:  fullDescription,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to update listing: %w", err)
+			}
+			return writeJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"listing":     listing,
+				"status":      "updated",
 			})
 		},
 	}

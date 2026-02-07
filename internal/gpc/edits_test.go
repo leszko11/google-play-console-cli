@@ -58,3 +58,29 @@ func TestEditInfoFromAppEdit(t *testing.T) {
 		t.Fatalf("unexpected mapped edit: %+v", got)
 	}
 }
+
+func TestListingMethods_ValidateArgs(t *testing.T) {
+	c := &Client{}
+
+	if _, err := c.GetListing(context.Background(), "com.example.app", "", "en-US"); err == nil || !strings.Contains(err.Error(), "edit id is required") {
+		t.Fatalf("unexpected GetListing error: %v", err)
+	}
+	if _, err := c.GetListing(context.Background(), "com.example.app", "edit-1", ""); err == nil || !strings.Contains(err.Error(), "language is required") {
+		t.Fatalf("unexpected GetListing error: %v", err)
+	}
+	if _, err := c.UpdateListing(context.Background(), "com.example.app", "edit-1", "en-US", ListingUpdate{}); err == nil || !strings.Contains(err.Error(), "at least one listing field must be provided") {
+		t.Fatalf("unexpected UpdateListing error: %v", err)
+	}
+}
+
+func TestListingInfoFromListing(t *testing.T) {
+	got := listingInfoFromListing(&androidpublisher.Listing{
+		Language:         "en-US",
+		Title:            "PeakMe",
+		ShortDescription: "Short",
+		FullDescription:  "Full",
+	})
+	if got.Language != "en-US" || got.Title != "PeakMe" {
+		t.Fatalf("unexpected listing map: %+v", got)
+	}
+}
