@@ -104,11 +104,45 @@ func TestEditsCommit_ReturnsAPIError(t *testing.T) {
 		},
 	}
 
-	_, err := runEdits(t, deps, "commit", "--package-name", "com.example.app", "--edit-id", "edit-1")
+	_, err := runEdits(t, deps, "commit", "--package-name", "com.example.app", "--edit-id", "edit-1", "--confirm")
 	if err == nil {
 		t.Fatal("expected error")
 	}
 	if !strings.Contains(err.Error(), "failed to commit edit") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEditsCommit_RequiresConfirm(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{commit: gpc.EditInfo{ID: "edit-1"}}, nil
+		},
+	}
+
+	_, err := runEdits(t, deps, "commit", "--package-name", "com.example.app", "--edit-id", "edit-1")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--confirm is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEditsDelete_RequiresConfirm(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(t, deps, "delete", "--package-name", "com.example.app", "--edit-id", "edit-1")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--confirm is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

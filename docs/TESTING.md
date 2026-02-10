@@ -24,7 +24,8 @@ gpc edits get --package-name com.example.app --edit-id <edit-id>
 gpc edits listings get --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings update --package-name com.example.app --edit-id <edit-id> --locale en-US --title "My App Test"
 gpc edits validate --package-name com.example.app --edit-id <edit-id>
-gpc edits delete --package-name com.example.app --edit-id <edit-id>
+gpc edits commit --package-name com.example.app --edit-id <edit-id> --confirm
+gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
 ```
 
 ## Expected Outcomes
@@ -39,3 +40,4 @@ gpc edits delete --package-name com.example.app --edit-id <edit-id>
   - `gpc apps get --package-name <valid-package>` should return app JSON with `packageName`.
   - `gpc edits create --package-name <valid-package>` should return a JSON edit object with `id`.
   - `gpc edits listings update ...` should return `status: updated` inside an edit.
+  - `gpc edits commit ... --confirm` should be required for publishing changes.

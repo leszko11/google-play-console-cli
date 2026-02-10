@@ -170,8 +170,10 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("commit", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, editID string
+	var confirm bool
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm committing the edit (required)")
 
 	return &ffcli.Command{
 		Name:      "commit",
@@ -186,6 +188,9 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
 				return fmt.Errorf("--edit-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to commit edit %q", editID)
 			}
 			edit, err := client.CommitEdit(ctx, pkg, editID)
 			if err != nil {
@@ -204,8 +209,10 @@ func newDeleteCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, editID string
+	var confirm bool
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deleting the edit (required)")
 
 	return &ffcli.Command{
 		Name:      "delete",
@@ -220,6 +227,9 @@ func newDeleteCommand(deps Deps) *ffcli.Command {
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
 				return fmt.Errorf("--edit-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to delete edit %q", editID)
 			}
 			if err := client.DeleteEdit(ctx, pkg, editID); err != nil {
 				return fmt.Errorf("failed to delete edit: %w", err)
