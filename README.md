@@ -47,6 +47,16 @@ gpc apps list --output json
 
 # Fetch app details for one package
 gpc apps get --package-name com.example.app --output json
+
+# Start an edit transaction
+gpc edits create --package-name com.example.app
+
+# Update listing title in an edit (publish with edits commit)
+gpc edits listings update \
+  --package-name com.example.app \
+  --edit-id <edit-id> \
+  --locale en-US \
+  --title "My App Title"
 ```
 
 ## Command Discovery
@@ -55,4 +65,5 @@ gpc apps get --package-name com.example.app --output json
 gpc --help
 gpc auth --help
 gpc apps --help
+gpc edits --help
 ```
