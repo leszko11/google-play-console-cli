@@ -57,6 +57,10 @@ gpc edits listings update \
   --edit-id <edit-id> \
   --locale en-US \
   --title "My App Title"
+
+# Commit or delete edits are destructive and require explicit confirmation
+gpc edits commit --package-name com.example.app --edit-id <edit-id> --confirm
+gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
 ```
 
 ## Command Discovery
