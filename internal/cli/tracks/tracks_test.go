@@ -12,24 +12,47 @@ import (
 )
 
 type fakeClient struct {
-	list      []gpc.TrackInfo
-	listErr   error
-	get       gpc.TrackInfo
-	getErr    error
-	update    gpc.TrackInfo
-	updateErr error
+	list         []gpc.TrackInfo
+	listErr      error
+	get          gpc.TrackInfo
+	getErr       error
+	getByName    map[string]gpc.TrackInfo
+	getErrMap    map[string]error
+	update       gpc.TrackInfo
+	updateErr    error
+	updateByName map[string]gpc.TrackInfo
+	updateErrMap map[string]error
+	updateFn     func(packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error)
 }
 
 func (f fakeClient) ListTracks(_ context.Context, _, _ string) ([]gpc.TrackInfo, error) {
 	return f.list, f.listErr
 }
 
-func (f fakeClient) GetTrack(_ context.Context, _, _, _ string) (gpc.TrackInfo, error) {
+func (f fakeClient) GetTrack(_ context.Context, _, _, trackName string) (gpc.TrackInfo, error) {
+	if err := f.getErrMap[trackName]; err != nil {
+		return gpc.TrackInfo{}, err
+	}
+	if track, ok := f.getByName[trackName]; ok {
+		return track, nil
+	}
 	return f.get, f.getErr
 }
 
-func (f fakeClient) UpdateTrack(_ context.Context, _, _, _ string, _ gpc.TrackUpdate) (gpc.TrackInfo, error) {
-	return f.update, f.updateErr
+func (f fakeClient) UpdateTrack(_ context.Context, packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error) {
+	if f.updateFn != nil {
+		return f.updateFn(packageName, editID, trackName, update)
+	}
+	if err := f.updateErrMap[trackName]; err != nil {
+		return gpc.TrackInfo{}, err
+	}
+	if track, ok := f.updateByName[trackName]; ok {
+		return track, nil
+	}
+	if f.updateErr != nil {
+		return gpc.TrackInfo{}, f.updateErr
+	}
+	return f.update, nil
 }
 
 func runTracks(t *testing.T, deps Deps, args ...string) (string, error) {
@@ -188,5 +211,159 @@ func TestTracksUpdate_ReturnsAPIError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "failed to update track") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestTracksPromote_RequiresFromAndToTracks(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runTracks(t, deps, "promote", "--package-name", "com.example.app", "--edit-id", "edit-1", "--to-track", "production")
+	if err == nil || !strings.Contains(err.Error(), "--from-track is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = runTracks(t, deps, "promote", "--package-name", "com.example.app", "--edit-id", "edit-1", "--from-track", "internal")
+	if err == nil || !strings.Contains(err.Error(), "--to-track is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestTracksPromote_RequiresDifferentTracks(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runTracks(t, deps, "promote", "--package-name", "com.example.app", "--edit-id", "edit-1", "--from-track", "internal", "--to-track", "internal")
+	if err == nil || !strings.Contains(err.Error(), "must be different") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestTracksPromote_FailsWhenSourceTrackHasNoReleases(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				getByName: map[string]gpc.TrackInfo{
+					"internal": {Name: "internal"},
+				},
+			}, nil
+		},
+	}
+
+	_, err := runTracks(t, deps, "promote", "--package-name", "com.example.app", "--edit-id", "edit-1", "--from-track", "internal", "--to-track", "production")
+	if err == nil || !strings.Contains(err.Error(), "has no releases") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestTracksPromote_FailsWhenReadingSourceTrackFails(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				getErrMap: map[string]error{
+					"internal": errors.New("forbidden"),
+				},
+			}, nil
+		},
+	}
+
+	_, err := runTracks(t, deps, "promote", "--package-name", "com.example.app", "--edit-id", "edit-1", "--from-track", "internal", "--to-track", "production")
+	if err == nil || !strings.Contains(err.Error(), "failed to read source track") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestTracksPromote_FailsWhenUpdateFails(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				getByName: map[string]gpc.TrackInfo{
+					"internal": {
+						Name: "internal",
+						Releases: []gpc.TrackReleaseInfo{
+							{
+								Status:       "draft",
+								VersionCodes: []int64{1},
+							},
+						},
+					},
+				},
+				updateErrMap: map[string]error{
+					"production": errors.New("conflict"),
+				},
+			}, nil
+		},
+	}
+
+	_, err := runTracks(t, deps, "promote", "--package-name", "com.example.app", "--edit-id", "edit-1", "--from-track", "internal", "--to-track", "production")
+	if err == nil || !strings.Contains(err.Error(), "failed to promote track") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestTracksPromote_ReturnsPromotedStatus(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				getByName: map[string]gpc.TrackInfo{
+					"internal": {
+						Name: "internal",
+						Releases: []gpc.TrackReleaseInfo{
+							{
+								Name:           "1 (1.0)",
+								Status:         "draft",
+								VersionCodes:   []int64{1},
+								UpdatePriority: 2,
+							},
+						},
+					},
+				},
+				updateFn: func(_, _, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error) {
+					if trackName != "production" {
+						t.Fatalf("expected promote target to be production, got %q", trackName)
+					}
+					if update.Status != "completed" {
+						t.Fatalf("expected overridden status completed, got %q", update.Status)
+					}
+					if update.ReleaseName != "Promoted 1.0" {
+						t.Fatalf("expected overridden release name, got %q", update.ReleaseName)
+					}
+					if len(update.VersionCodes) != 1 || update.VersionCodes[0] != 1 {
+						t.Fatalf("unexpected version codes: %+v", update.VersionCodes)
+					}
+					return gpc.TrackInfo{Name: "production"}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runTracks(
+		t,
+		deps,
+		"promote",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--from-track", "internal",
+		"--to-track", "production",
+		"--status", "completed",
+		"--release-name", "Promoted 1.0",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"promoted"`) || !strings.Contains(out, `"toTrack":"production"`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
