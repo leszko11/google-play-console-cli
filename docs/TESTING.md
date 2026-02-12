@@ -29,6 +29,7 @@ gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
 gpc tracks get --package-name com.example.app --edit-id <edit-id> --track production
 gpc tracks update --package-name com.example.app --edit-id <edit-id> --track internal --status completed --version-codes 123456
+gpc tracks promote --package-name com.example.app --edit-id <edit-id> --from-track internal --to-track production
 ```
 
 ## Expected Outcomes
@@ -45,3 +46,4 @@ gpc tracks update --package-name com.example.app --edit-id <edit-id> --track int
   - `gpc edits listings update ...` should return `status: updated` inside an edit.
   - `gpc edits commit ... --confirm` should be required for publishing changes.
   - `gpc tracks list ...` should return track JSON for the given edit.
+  - `gpc tracks promote ...` should copy release metadata from source track to target track within the edit.

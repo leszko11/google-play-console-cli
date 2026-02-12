@@ -9,7 +9,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Authentication bootstrap with Google service account credentials
 - Basic app visibility commands (`apps list`, `apps get`)
 - Edit transactions and listing updates (`edits`)
-- Track management inside edits (`tracks list/get/update`)
+- Track management inside edits (`tracks list/get/update/promote`)
 - CI quality gates for format, lint, test, and build
 
 ## Not Yet Implemented
@@ -68,6 +68,7 @@ gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
 # Inspect tracks inside an edit
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
 gpc tracks get --package-name com.example.app --edit-id <edit-id> --track production
+gpc tracks promote --package-name com.example.app --edit-id <edit-id> --from-track internal --to-track production
 ```
 
 ## Command Discovery

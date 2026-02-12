@@ -41,6 +41,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newListCommand(deps),
 			newGetCommand(deps),
 			newUpdateCommand(deps),
+			newPromoteCommand(deps),
 		},
 	}
 }
@@ -193,6 +194,88 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 				"editId":      eid,
 				"track":       track,
 				"status":      "updated",
+			})
+		},
+	}
+}
+
+func newPromoteCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("promote", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, fromTrack, toTrack, status, releaseName string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&fromTrack, "from-track", "", "Source track name")
+	fs.StringVar(&toTrack, "to-track", "", "Target track name")
+	fs.StringVar(&status, "status", "", "Override release status")
+	fs.StringVar(&releaseName, "release-name", "", "Override release name")
+
+	return &ffcli.Command{
+		Name:      "promote",
+		ShortHelp: "Promote a release from one track to another in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, eid, err := buildClient(ctx, deps, packageName, editID)
+			if err != nil {
+				return err
+			}
+
+			fromTrack = strings.TrimSpace(fromTrack)
+			if fromTrack == "" {
+				return fmt.Errorf("--from-track is required")
+			}
+			toTrack = strings.TrimSpace(toTrack)
+			if toTrack == "" {
+				return fmt.Errorf("--to-track is required")
+			}
+			if fromTrack == toTrack {
+				return fmt.Errorf("--from-track and --to-track must be different")
+			}
+
+			sourceTrack, err := client.GetTrack(ctx, pkg, eid, fromTrack)
+			if err != nil {
+				return fmt.Errorf("failed to read source track: %w", err)
+			}
+			if len(sourceTrack.Releases) == 0 {
+				return fmt.Errorf("source track %q has no releases to promote", fromTrack)
+			}
+
+			sourceRelease := sourceTrack.Releases[0]
+			if len(sourceRelease.VersionCodes) == 0 {
+				return fmt.Errorf("source track %q has no version codes to promote", fromTrack)
+			}
+
+			promotedStatus := strings.TrimSpace(status)
+			if promotedStatus == "" {
+				promotedStatus = sourceRelease.Status
+			}
+			promotedReleaseName := strings.TrimSpace(releaseName)
+			if promotedReleaseName == "" {
+				promotedReleaseName = sourceRelease.Name
+			}
+
+			targetTrack, err := client.UpdateTrack(ctx, pkg, eid, toTrack, gpc.TrackUpdate{
+				Status:         promotedStatus,
+				ReleaseName:    promotedReleaseName,
+				UserFraction:   sourceRelease.UserFraction,
+				VersionCodes:   sourceRelease.VersionCodes,
+				UpdatePriority: sourceRelease.UpdatePriority,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to promote track: %w", err)
+			}
+
+			return writeJSON(deps.Stdout, map[string]any{
+				"packageName":   pkg,
+				"editId":        eid,
+				"fromTrack":     fromTrack,
+				"toTrack":       toTrack,
+				"sourceTrack":   sourceTrack,
+				"targetTrack":   targetTrack,
+				"releaseName":   promotedReleaseName,
+				"releaseStatus": promotedStatus,
+				"status":        "promoted",
 			})
 		},
 	}
