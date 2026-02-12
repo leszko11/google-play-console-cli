@@ -26,3 +26,24 @@ type ListingUpdate struct {
 	ShortDescription string
 	FullDescription  string
 }
+
+type TrackInfo struct {
+	Name     string             `json:"name"`
+	Releases []TrackReleaseInfo `json:"releases,omitempty"`
+}
+
+type TrackReleaseInfo struct {
+	Name           string  `json:"name,omitempty"`
+	Status         string  `json:"status,omitempty"`
+	UserFraction   float64 `json:"userFraction,omitempty"`
+	VersionCodes   []int64 `json:"versionCodes,omitempty"`
+	UpdatePriority int64   `json:"updatePriority,omitempty"`
+}
+
+type TrackUpdate struct {
+	Status         string
+	ReleaseName    string
+	UserFraction   float64
+	VersionCodes   []int64
+	UpdatePriority int64
+}
