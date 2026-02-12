@@ -47,3 +47,15 @@ type TrackUpdate struct {
 	VersionCodes   []int64
 	UpdatePriority int64
 }
+
+type BundleInfo struct {
+	VersionCode int64  `json:"versionCode,omitempty"`
+	SHA1        string `json:"sha1,omitempty"`
+	SHA256      string `json:"sha256,omitempty"`
+}
+
+type APKInfo struct {
+	VersionCode int64  `json:"versionCode,omitempty"`
+	SHA1        string `json:"sha1,omitempty"`
+	SHA256      string `json:"sha256,omitempty"`
+}

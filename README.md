@@ -10,11 +10,12 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Basic app visibility commands (`apps list`, `apps get`)
 - Edit transactions and listing updates (`edits`)
 - Track management inside edits (`tracks list/get/update/promote`)
+- Binary uploads in edits (`apks list/upload`, `bundles list/upload`)
 - CI quality gates for format, lint, test, and build
 
 ## Not Yet Implemented
 
-- Upload workflows (`apks`, `bundles`, deobfuscation mappings)
+- Deobfuscation mapping uploads
 - End-to-end submit orchestration
 - Store listing/image management
 - Monetization and reporting commands
@@ -69,6 +70,12 @@ gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
 gpc tracks get --package-name com.example.app --edit-id <edit-id> --track production
 gpc tracks promote --package-name com.example.app --edit-id <edit-id> --from-track internal --to-track production
+
+# List/upload binaries in an edit
+gpc bundles list --package-name com.example.app --edit-id <edit-id>
+gpc bundles upload --package-name com.example.app --edit-id <edit-id> --file /path/to/app.aab
+gpc apks list --package-name com.example.app --edit-id <edit-id>
+gpc apks upload --package-name com.example.app --edit-id <edit-id> --file /path/to/app.apk
 ```
 
 ## Command Discovery
@@ -79,4 +86,6 @@ gpc auth --help
 gpc apps --help
 gpc edits --help
 gpc tracks --help
+gpc bundles --help
+gpc apks --help
 ```
