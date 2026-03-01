@@ -14,8 +14,6 @@ import (
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
-const envServiceAccountPath = "GPC_SERVICE_ACCOUNT_PATH"
-
 type Client interface {
 	CreateEdit(ctx context.Context, packageName string) (gpc.EditInfo, error)
 	GetEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
@@ -84,15 +82,16 @@ func newCreateCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, err := buildClient(ctx, deps, packageName)
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
 			if err != nil {
 				return err
 			}
-			edit, err := client.CreateEdit(ctx, pkg)
+			defer cancel()
+			edit, err := client.CreateEdit(requestCtx, pkg)
 			if err != nil {
 				return fmt.Errorf("failed to create edit: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"edit":        edit,
 			})
@@ -113,19 +112,20 @@ func newGetCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, err := buildClient(ctx, deps, packageName)
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
 				return fmt.Errorf("--edit-id is required")
 			}
-			edit, err := client.GetEdit(ctx, pkg, editID)
+			edit, err := client.GetEdit(requestCtx, pkg, editID)
 			if err != nil {
 				return fmt.Errorf("failed to get edit: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"edit":        edit,
 			})
@@ -146,18 +146,19 @@ func newValidateCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, err := buildClient(ctx, deps, packageName)
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
 				return fmt.Errorf("--edit-id is required")
 			}
-			if err := client.ValidateEdit(ctx, pkg, editID); err != nil {
+			if err := client.ValidateEdit(requestCtx, pkg, editID); err != nil {
 				return fmt.Errorf("failed to validate edit: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      editID,
 				"status":      "validated",
@@ -181,10 +182,11 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, err := buildClient(ctx, deps, packageName)
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
 				return fmt.Errorf("--edit-id is required")
@@ -192,11 +194,11 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 			if !confirm {
 				return fmt.Errorf("--confirm is required to commit edit %q", editID)
 			}
-			edit, err := client.CommitEdit(ctx, pkg, editID)
+			edit, err := client.CommitEdit(requestCtx, pkg, editID)
 			if err != nil {
 				return fmt.Errorf("failed to commit edit: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"edit":        edit,
 				"status":      "committed",
@@ -220,10 +222,11 @@ func newDeleteCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, err := buildClient(ctx, deps, packageName)
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
 				return fmt.Errorf("--edit-id is required")
@@ -231,10 +234,10 @@ func newDeleteCommand(deps Deps) *ffcli.Command {
 			if !confirm {
 				return fmt.Errorf("--confirm is required to delete edit %q", editID)
 			}
-			if err := client.DeleteEdit(ctx, pkg, editID); err != nil {
+			if err := client.DeleteEdit(requestCtx, pkg, editID); err != nil {
 				return fmt.Errorf("failed to delete edit: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      editID,
 				"status":      "deleted",
@@ -269,10 +272,11 @@ func newListingsGetCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, err := buildClient(ctx, deps, packageName)
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
 				return fmt.Errorf("--edit-id is required")
@@ -281,11 +285,11 @@ func newListingsGetCommand(deps Deps) *ffcli.Command {
 			if locale == "" {
 				return fmt.Errorf("--locale is required")
 			}
-			listing, err := client.GetListing(ctx, pkg, editID, locale)
+			listing, err := client.GetListing(requestCtx, pkg, editID, locale)
 			if err != nil {
 				return fmt.Errorf("failed to get listing: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      editID,
 				"listing":     listing,
@@ -311,10 +315,11 @@ func newListingsUpdateCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, err := buildClient(ctx, deps, packageName)
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
 				return fmt.Errorf("--edit-id is required")
@@ -323,7 +328,7 @@ func newListingsUpdateCommand(deps Deps) *ffcli.Command {
 			if locale == "" {
 				return fmt.Errorf("--locale is required")
 			}
-			listing, err := client.UpdateListing(ctx, pkg, editID, locale, gpc.ListingUpdate{
+			listing, err := client.UpdateListing(requestCtx, pkg, editID, locale, gpc.ListingUpdate{
 				Title:            title,
 				ShortDescription: shortDescription,
 				FullDescription:  fullDescription,
@@ -331,7 +336,7 @@ func newListingsUpdateCommand(deps Deps) *ffcli.Command {
 			if err != nil {
 				return fmt.Errorf("failed to update listing: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      editID,
 				"listing":     listing,
@@ -341,43 +346,21 @@ func newListingsUpdateCommand(deps Deps) *ffcli.Command {
 	}
 }
 
-func buildClient(ctx context.Context, deps Deps, packageName string) (Client, string, error) {
-	packageName = strings.TrimSpace(packageName)
-	if packageName == "" {
-		return nil, "", fmt.Errorf("--package-name is required")
-	}
-	cfg, err := deps.LoadConfig()
+func buildClient(ctx context.Context, deps Deps, packageName string, upload bool) (Client, string, context.Context, context.CancelFunc, error) {
+	pkg, err := shared.ResolvePackageName(packageName)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, nil, err
 	}
-	serviceAccountPath, err := resolveServiceAccountPath(cfg, deps.LookupEnv)
-	if err != nil {
-		return nil, "", err
-	}
-	client, err := deps.NewClient(ctx, gpc.CredentialInput{ServiceAccountPath: serviceAccountPath})
-	if err != nil {
-		return nil, "", err
-	}
-	return client, packageName, nil
-}
 
-func resolveServiceAccountPath(cfg config.Config, lookupEnv func(string) string) (string, error) {
-	if cfg.ActiveProfile != "" && cfg.Profiles != nil {
-		if profile, ok := cfg.Profiles[cfg.ActiveProfile]; ok && profile.ServiceAccountPath != "" {
-			return profile.ServiceAccountPath, nil
-		}
-	}
-	if envPath := strings.TrimSpace(lookupEnv(envServiceAccountPath)); envPath != "" {
-		return envPath, nil
-	}
-	return "", fmt.Errorf("no service account configured")
-}
-
-func writeJSON(out io.Writer, v any) error {
-	b, err := shared.RenderJSON(v, false)
+	client, requestCtx, cancel, err := shared.BuildClient[Client](ctx, shared.BuildClientDeps[Client]{
+		LoadConfig: deps.LoadConfig,
+		LookupEnv:  deps.LookupEnv,
+		NewClient:  deps.NewClient,
+		Upload:     upload,
+	})
 	if err != nil {
-		return err
+		return nil, "", nil, nil, err
 	}
-	_, err = out.Write(b)
-	return err
+
+	return client, pkg, requestCtx, cancel, nil
 }

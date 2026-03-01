@@ -6,12 +6,21 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/auth"
 	"github.com/leszko11/google-play-console-cli/internal/cli/bundles"
 	"github.com/leszko11/google-play-console-cli/internal/cli/completion"
+	"github.com/leszko11/google-play-console-cli/internal/cli/deobfuscation"
+	"github.com/leszko11/google-play-console-cli/internal/cli/deploy"
 	"github.com/leszko11/google-play-console-cli/internal/cli/edits"
+	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/cli/tracks"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
-func Register(root *ffcli.Command) {
+type Deps struct {
+	GlobalFlags *shared.GlobalFlags
+}
+
+func Register(root *ffcli.Command, deps Deps) {
+	_ = deps
+
 	root.Subcommands = []*ffcli.Command{
 		auth.NewCommand(auth.Deps{}),
 		apps.NewCommand(apps.Deps{}),
@@ -19,6 +28,8 @@ func Register(root *ffcli.Command) {
 		tracks.NewCommand(tracks.Deps{}),
 		apks.NewCommand(apks.Deps{}),
 		bundles.NewCommand(bundles.Deps{}),
+		deobfuscation.NewCommand(deobfuscation.Deps{}),
+		deploy.NewCommand(deploy.Deps{}),
 		completion.NewCommand(),
 	}
 }

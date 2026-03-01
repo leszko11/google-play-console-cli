@@ -2,7 +2,6 @@ package apps
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 
@@ -11,8 +10,6 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
-
-const envServiceAccountPath = "GPC_SERVICE_ACCOUNT_PATH"
 
 type Client interface {
 	VerifyPackageAccess(ctx context.Context, packageName string) error
@@ -66,27 +63,4 @@ func withDefaults(deps Deps) Deps {
 		deps.Stderr = os.Stderr
 	}
 	return deps
-}
-
-func resolveServiceAccountPath(cfg config.Config, lookupEnv func(string) string) (string, error) {
-	if cfg.ActiveProfile != "" && cfg.Profiles != nil {
-		if profile, ok := cfg.Profiles[cfg.ActiveProfile]; ok && profile.ServiceAccountPath != "" {
-			return profile.ServiceAccountPath, nil
-		}
-	}
-
-	if envPath := lookupEnv(envServiceAccountPath); envPath != "" {
-		return envPath, nil
-	}
-
-	return "", fmt.Errorf("no service account configured")
-}
-
-func writeJSON(out io.Writer, v any) error {
-	b, err := shared.RenderJSON(v, false)
-	if err != nil {
-		return err
-	}
-	_, err = out.Write(b)
-	return err
 }

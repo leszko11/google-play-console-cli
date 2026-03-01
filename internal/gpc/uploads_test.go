@@ -24,6 +24,9 @@ func TestUploadMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.UploadAPK(context.Background(), "com.example.app", "edit-1", "/tmp/app.apk"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from UploadAPK, got %v", err)
 	}
+	if _, err := c.UploadDeobfuscationFile(context.Background(), "com.example.app", "edit-1", 1, "proguard", "/tmp/mapping.txt"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from UploadDeobfuscationFile, got %v", err)
+	}
 }
 
 func TestUploadMethods_ValidateArgs(t *testing.T) {
@@ -47,6 +50,15 @@ func TestUploadMethods_ValidateArgs(t *testing.T) {
 	if _, err := c.UploadAPK(context.Background(), "com.example.app", "edit-1", ""); err == nil || !strings.Contains(err.Error(), "apk path is required") {
 		t.Fatalf("unexpected UploadAPK error: %v", err)
 	}
+	if _, err := c.UploadDeobfuscationFile(context.Background(), "com.example.app", "edit-1", 0, "proguard", "/tmp/mapping.txt"); err == nil || !strings.Contains(err.Error(), "version code must be greater than zero") {
+		t.Fatalf("unexpected UploadDeobfuscationFile version code error: %v", err)
+	}
+	if _, err := c.UploadDeobfuscationFile(context.Background(), "com.example.app", "edit-1", 1, "unsupported", "/tmp/mapping.txt"); err == nil || !strings.Contains(err.Error(), "unsupported deobfuscation file type") {
+		t.Fatalf("unexpected UploadDeobfuscationFile type error: %v", err)
+	}
+	if _, err := c.UploadDeobfuscationFile(context.Background(), "com.example.app", "edit-1", 1, "proguard", ""); err == nil || !strings.Contains(err.Error(), "deobfuscation file path is required") {
+		t.Fatalf("unexpected UploadDeobfuscationFile path error: %v", err)
+	}
 }
 
 func TestUploadMethods_FileErrors(t *testing.T) {
@@ -57,6 +69,9 @@ func TestUploadMethods_FileErrors(t *testing.T) {
 	}
 	if _, err := c.UploadAPK(context.Background(), "com.example.app", "edit-1", "/path/does/not/exist.apk"); err == nil || !strings.Contains(err.Error(), "failed to open apk file") {
 		t.Fatalf("unexpected UploadAPK file error: %v", err)
+	}
+	if _, err := c.UploadDeobfuscationFile(context.Background(), "com.example.app", "edit-1", 1, "proguard", "/path/does/not/exist.txt"); err == nil || !strings.Contains(err.Error(), "failed to open deobfuscation file") {
+		t.Fatalf("unexpected UploadDeobfuscationFile file error: %v", err)
 	}
 }
 
@@ -90,5 +105,16 @@ func TestAPKInfoFromAPK_NilBinary(t *testing.T) {
 	})
 	if got.VersionCode != 11 || got.SHA1 != "" || got.SHA256 != "" {
 		t.Fatalf("unexpected apk map for nil binary: %+v", got)
+	}
+}
+
+func TestDeobfuscationInfoFromResponse(t *testing.T) {
+	got := deobfuscationInfoFromResponse(&androidpublisher.DeobfuscationFilesUploadResponse{
+		DeobfuscationFile: &androidpublisher.DeobfuscationFile{
+			SymbolType: "proguard",
+		},
+	})
+	if got.SymbolType != "proguard" {
+		t.Fatalf("unexpected deobfuscation mapping: %+v", got)
 	}
 }

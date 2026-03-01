@@ -4,9 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
@@ -27,7 +27,7 @@ func NewListCommand(deps Deps) *ffcli.Command {
 		output string
 	)
 	fs.BoolVar(&verify, "verify", false, "Verify API access for each configured package")
-	fs.StringVar(&output, "output", "json", "Output format: json, table, markdown")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown")
 
 	return &ffcli.Command{
 		Name:      "list",
@@ -46,18 +46,21 @@ func NewListCommand(deps Deps) *ffcli.Command {
 			}
 
 			if verify && len(items) > 0 {
-				serviceAccountPath, err := resolveServiceAccountPath(cfg, deps.LookupEnv)
+				serviceAccountPath, err := shared.ResolveServiceAccountPath(cfg, deps.LookupEnv)
 				if err != nil {
 					return err
 				}
 
-				client, err := deps.NewClient(ctx, credential(serviceAccountPath))
+				requestCtx, cancel := shared.ContextWithTimeout(ctx, shared.ActiveGlobalFlags().Timeout)
+				defer cancel()
+
+				client, err := deps.NewClient(requestCtx, gpc.CredentialInput{ServiceAccountPath: serviceAccountPath})
 				if err != nil {
 					return err
 				}
 
 				for i := range items {
-					if err := client.VerifyPackageAccess(ctx, items[i].PackageName); err != nil {
+					if err := client.VerifyPackageAccess(requestCtx, items[i].PackageName); err != nil {
 						items[i].Status = "error"
 						items[i].Error = err.Error()
 						continue
@@ -66,7 +69,7 @@ func NewListCommand(deps Deps) *ffcli.Command {
 				}
 			}
 
-			return writeListOutput(deps, strings.ToLower(output), items)
+			return writeListOutput(deps, shared.ResolveOutput(output), items)
 		},
 	}
 }
@@ -74,12 +77,7 @@ func NewListCommand(deps Deps) *ffcli.Command {
 func writeListOutput(deps Deps, output string, items []listItem) error {
 	switch output {
 	case "json":
-		out, err := shared.RenderJSON(items, false)
-		if err != nil {
-			return err
-		}
-		_, err = deps.Stdout.Write(out)
-		return err
+		return shared.WriteJSON(deps.Stdout, items)
 	case "table":
 		if _, err := fmt.Fprintln(deps.Stdout, "PACKAGE\tSTATUS"); err != nil {
 			return err

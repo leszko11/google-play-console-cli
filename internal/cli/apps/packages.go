@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/peterbourgon/ff/v3/ffcli"
@@ -25,9 +24,9 @@ func NewAddPackageCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(context.Context, []string) error {
-			packageName = strings.TrimSpace(packageName)
-			if packageName == "" {
-				return fmt.Errorf("--package-name is required")
+			pkg, err := shared.ResolvePackageName(packageName)
+			if err != nil {
+				return err
 			}
 
 			cfg, err := deps.LoadConfig()
@@ -35,24 +34,24 @@ func NewAddPackageCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 
-			for _, pkg := range cfg.Packages {
-				if pkg == packageName {
-					return writeJSON(deps.Stdout, map[string]any{
+			for _, configured := range cfg.Packages {
+				if configured == pkg {
+					return shared.WriteJSON(deps.Stdout, map[string]any{
 						"action":      "already-present",
-						"packageName": packageName,
+						"packageName": pkg,
 						"packages":    cfg.Packages,
 					})
 				}
 			}
 
-			cfg.Packages = append(cfg.Packages, packageName)
+			cfg.Packages = append(cfg.Packages, pkg)
 			if err := deps.SaveConfig(cfg); err != nil {
 				return err
 			}
 
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"action":      "added",
-				"packageName": packageName,
+				"packageName": pkg,
 				"packages":    cfg.Packages,
 			})
 		},
@@ -74,9 +73,9 @@ func NewRemovePackageCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(context.Context, []string) error {
-			packageName = strings.TrimSpace(packageName)
-			if packageName == "" {
-				return fmt.Errorf("--package-name is required")
+			pkg, err := shared.ResolvePackageName(packageName)
+			if err != nil {
+				return err
 			}
 
 			cfg, err := deps.LoadConfig()
@@ -86,15 +85,15 @@ func NewRemovePackageCommand(deps Deps) *ffcli.Command {
 
 			filtered := make([]string, 0, len(cfg.Packages))
 			removed := false
-			for _, pkg := range cfg.Packages {
-				if pkg == packageName {
+			for _, configured := range cfg.Packages {
+				if configured == pkg {
 					removed = true
 					continue
 				}
-				filtered = append(filtered, pkg)
+				filtered = append(filtered, configured)
 			}
 			if !removed {
-				return fmt.Errorf("package %q not configured", packageName)
+				return fmt.Errorf("package %q not configured", pkg)
 			}
 
 			cfg.Packages = filtered
@@ -102,9 +101,9 @@ func NewRemovePackageCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"action":      "removed",
-				"packageName": packageName,
+				"packageName": pkg,
 				"packages":    cfg.Packages,
 			})
 		},

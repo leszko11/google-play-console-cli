@@ -14,8 +14,6 @@ import (
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
-const envServiceAccountPath = "GPC_SERVICE_ACCOUNT_PATH"
-
 type Client interface {
 	ListBundles(ctx context.Context, packageName, editID string) ([]gpc.BundleInfo, error)
 	UploadBundle(ctx context.Context, packageName, editID, bundlePath string) (gpc.BundleInfo, error)
@@ -76,15 +74,16 @@ func newListCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, eid, err := buildClient(ctx, deps, packageName, editID)
+			client, pkg, eid, requestCtx, cancel, err := buildClient(ctx, deps, packageName, editID, false)
 			if err != nil {
 				return err
 			}
-			bundles, err := client.ListBundles(ctx, pkg, eid)
+			defer cancel()
+			bundles, err := client.ListBundles(requestCtx, pkg, eid)
 			if err != nil {
 				return fmt.Errorf("failed to list bundles: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      eid,
 				"bundles":     bundles,
@@ -107,19 +106,20 @@ func newUploadCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, eid, err := buildClient(ctx, deps, packageName, editID)
+			client, pkg, eid, requestCtx, cancel, err := buildClient(ctx, deps, packageName, editID, true)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			bundlePath = strings.TrimSpace(bundlePath)
 			if bundlePath == "" {
 				return fmt.Errorf("--file is required")
 			}
-			bundle, err := client.UploadBundle(ctx, pkg, eid, bundlePath)
+			bundle, err := client.UploadBundle(requestCtx, pkg, eid, bundlePath)
 			if err != nil {
 				return fmt.Errorf("failed to upload bundle: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      eid,
 				"bundle":      bundle,
@@ -129,51 +129,25 @@ func newUploadCommand(deps Deps) *ffcli.Command {
 	}
 }
 
-func buildClient(ctx context.Context, deps Deps, packageName, editID string) (Client, string, string, error) {
-	packageName = strings.TrimSpace(packageName)
-	if packageName == "" {
-		return nil, "", "", fmt.Errorf("--package-name is required")
+func buildClient(ctx context.Context, deps Deps, packageName, editID string, upload bool) (Client, string, string, context.Context, context.CancelFunc, error) {
+	pkg, err := shared.ResolvePackageName(packageName)
+	if err != nil {
+		return nil, "", "", nil, nil, err
 	}
 	editID = strings.TrimSpace(editID)
 	if editID == "" {
-		return nil, "", "", fmt.Errorf("--edit-id is required")
+		return nil, "", "", nil, nil, fmt.Errorf("--edit-id is required")
 	}
 
-	cfg, err := deps.LoadConfig()
+	client, requestCtx, cancel, err := shared.BuildClient[Client](ctx, shared.BuildClientDeps[Client]{
+		LoadConfig: deps.LoadConfig,
+		LookupEnv:  deps.LookupEnv,
+		NewClient:  deps.NewClient,
+		Upload:     upload,
+	})
 	if err != nil {
-		return nil, "", "", err
-	}
-	serviceAccountPath, err := resolveServiceAccountPath(cfg, deps.LookupEnv)
-	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", nil, nil, err
 	}
 
-	client, err := deps.NewClient(ctx, gpc.CredentialInput{ServiceAccountPath: serviceAccountPath})
-	if err != nil {
-		return nil, "", "", err
-	}
-	return client, packageName, editID, nil
-}
-
-func resolveServiceAccountPath(cfg config.Config, lookupEnv func(string) string) (string, error) {
-	if cfg.ActiveProfile != "" && cfg.Profiles != nil {
-		if profile, ok := cfg.Profiles[cfg.ActiveProfile]; ok && profile.ServiceAccountPath != "" {
-			return profile.ServiceAccountPath, nil
-		}
-	}
-
-	if envPath := strings.TrimSpace(lookupEnv(envServiceAccountPath)); envPath != "" {
-		return envPath, nil
-	}
-
-	return "", fmt.Errorf("no service account configured")
-}
-
-func writeJSON(out io.Writer, v any) error {
-	b, err := shared.RenderJSON(v, false)
-	if err != nil {
-		return err
-	}
-	_, err = out.Write(b)
-	return err
+	return client, pkg, editID, requestCtx, cancel, nil
 }

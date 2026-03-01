@@ -15,8 +15,6 @@ import (
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
-const envServiceAccountPath = "GPC_SERVICE_ACCOUNT_PATH"
-
 type Client interface {
 	ListTracks(ctx context.Context, packageName, editID string) ([]gpc.TrackInfo, error)
 	GetTrack(ctx context.Context, packageName, editID, trackName string) (gpc.TrackInfo, error)
@@ -80,15 +78,16 @@ func newListCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, eid, err := buildClient(ctx, deps, packageName, editID)
+			client, pkg, eid, requestCtx, cancel, err := buildClient(ctx, deps, packageName, editID, false)
 			if err != nil {
 				return err
 			}
-			tracks, err := client.ListTracks(ctx, pkg, eid)
+			defer cancel()
+			tracks, err := client.ListTracks(requestCtx, pkg, eid)
 			if err != nil {
 				return fmt.Errorf("failed to list tracks: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      eid,
 				"tracks":      tracks,
@@ -111,20 +110,21 @@ func newGetCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, eid, err := buildClient(ctx, deps, packageName, editID)
+			client, pkg, eid, requestCtx, cancel, err := buildClient(ctx, deps, packageName, editID, false)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 			trackName = strings.TrimSpace(trackName)
 			if trackName == "" {
 				return fmt.Errorf("--track is required")
 			}
 
-			track, err := client.GetTrack(ctx, pkg, eid, trackName)
+			track, err := client.GetTrack(requestCtx, pkg, eid, trackName)
 			if err != nil {
 				return fmt.Errorf("failed to get track: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      eid,
 				"track":       track,
@@ -154,10 +154,11 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, eid, err := buildClient(ctx, deps, packageName, editID)
+			client, pkg, eid, requestCtx, cancel, err := buildClient(ctx, deps, packageName, editID, false)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 
 			trackName = strings.TrimSpace(trackName)
 			if trackName == "" {
@@ -179,7 +180,7 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 				return fmt.Errorf("--update-priority must be between 0 and 5")
 			}
 
-			track, err := client.UpdateTrack(ctx, pkg, eid, trackName, gpc.TrackUpdate{
+			track, err := client.UpdateTrack(requestCtx, pkg, eid, trackName, gpc.TrackUpdate{
 				Status:         status,
 				ReleaseName:    releaseName,
 				UserFraction:   userFraction,
@@ -189,7 +190,7 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 			if err != nil {
 				return fmt.Errorf("failed to update track: %w", err)
 			}
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      eid,
 				"track":       track,
@@ -216,10 +217,11 @@ func newPromoteCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			client, pkg, eid, err := buildClient(ctx, deps, packageName, editID)
+			client, pkg, eid, requestCtx, cancel, err := buildClient(ctx, deps, packageName, editID, false)
 			if err != nil {
 				return err
 			}
+			defer cancel()
 
 			fromTrack = strings.TrimSpace(fromTrack)
 			if fromTrack == "" {
@@ -233,7 +235,7 @@ func newPromoteCommand(deps Deps) *ffcli.Command {
 				return fmt.Errorf("--from-track and --to-track must be different")
 			}
 
-			sourceTrack, err := client.GetTrack(ctx, pkg, eid, fromTrack)
+			sourceTrack, err := client.GetTrack(requestCtx, pkg, eid, fromTrack)
 			if err != nil {
 				return fmt.Errorf("failed to read source track: %w", err)
 			}
@@ -255,7 +257,7 @@ func newPromoteCommand(deps Deps) *ffcli.Command {
 				promotedReleaseName = sourceRelease.Name
 			}
 
-			targetTrack, err := client.UpdateTrack(ctx, pkg, eid, toTrack, gpc.TrackUpdate{
+			targetTrack, err := client.UpdateTrack(requestCtx, pkg, eid, toTrack, gpc.TrackUpdate{
 				Status:         promotedStatus,
 				ReleaseName:    promotedReleaseName,
 				UserFraction:   sourceRelease.UserFraction,
@@ -266,7 +268,7 @@ func newPromoteCommand(deps Deps) *ffcli.Command {
 				return fmt.Errorf("failed to promote track: %w", err)
 			}
 
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName":   pkg,
 				"editId":        eid,
 				"fromTrack":     fromTrack,
@@ -281,45 +283,27 @@ func newPromoteCommand(deps Deps) *ffcli.Command {
 	}
 }
 
-func buildClient(ctx context.Context, deps Deps, packageName, editID string) (Client, string, string, error) {
-	packageName = strings.TrimSpace(packageName)
-	if packageName == "" {
-		return nil, "", "", fmt.Errorf("--package-name is required")
+func buildClient(ctx context.Context, deps Deps, packageName, editID string, upload bool) (Client, string, string, context.Context, context.CancelFunc, error) {
+	pkg, err := shared.ResolvePackageName(packageName)
+	if err != nil {
+		return nil, "", "", nil, nil, err
 	}
 	editID = strings.TrimSpace(editID)
 	if editID == "" {
-		return nil, "", "", fmt.Errorf("--edit-id is required")
+		return nil, "", "", nil, nil, fmt.Errorf("--edit-id is required")
 	}
 
-	cfg, err := deps.LoadConfig()
+	client, requestCtx, cancel, err := shared.BuildClient[Client](ctx, shared.BuildClientDeps[Client]{
+		LoadConfig: deps.LoadConfig,
+		LookupEnv:  deps.LookupEnv,
+		NewClient:  deps.NewClient,
+		Upload:     upload,
+	})
 	if err != nil {
-		return nil, "", "", err
-	}
-	serviceAccountPath, err := resolveServiceAccountPath(cfg, deps.LookupEnv)
-	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", nil, nil, err
 	}
 
-	client, err := deps.NewClient(ctx, gpc.CredentialInput{ServiceAccountPath: serviceAccountPath})
-	if err != nil {
-		return nil, "", "", err
-	}
-
-	return client, packageName, editID, nil
-}
-
-func resolveServiceAccountPath(cfg config.Config, lookupEnv func(string) string) (string, error) {
-	if cfg.ActiveProfile != "" && cfg.Profiles != nil {
-		if profile, ok := cfg.Profiles[cfg.ActiveProfile]; ok && profile.ServiceAccountPath != "" {
-			return profile.ServiceAccountPath, nil
-		}
-	}
-
-	if envPath := strings.TrimSpace(lookupEnv(envServiceAccountPath)); envPath != "" {
-		return envPath, nil
-	}
-
-	return "", fmt.Errorf("no service account configured")
+	return client, pkg, editID, requestCtx, cancel, nil
 }
 
 func parseVersionCodes(raw string) ([]int64, error) {
@@ -346,13 +330,4 @@ func parseVersionCodes(raw string) ([]int64, error) {
 		return nil, fmt.Errorf("--version-codes must include at least one valid integer")
 	}
 	return versionCodes, nil
-}
-
-func writeJSON(out io.Writer, v any) error {
-	b, err := shared.RenderJSON(v, false)
-	if err != nil {
-		return err
-	}
-	_, err = out.Write(b)
-	return err
 }
