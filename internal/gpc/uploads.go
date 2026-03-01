@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"google.golang.org/api/androidpublisher/v3"
+	"google.golang.org/api/googleapi"
 )
 
 func (c *Client) ListBundles(ctx context.Context, packageName, editID string) ([]BundleInfo, error) {
@@ -57,7 +58,10 @@ func (c *Client) UploadBundle(ctx context.Context, packageName, editID, bundlePa
 	}
 	defer f.Close()
 
-	bundle, err := c.service.Edits.Bundles.Upload(packageName, editID).Media(f).Context(ctx).Do()
+	bundle, err := c.service.Edits.Bundles.Upload(packageName, editID).
+		Media(f, googleapi.ContentType("application/octet-stream")).
+		Context(ctx).
+		Do()
 	if err != nil {
 		return BundleInfo{}, mapGoogleAPIError(err)
 	}
@@ -112,7 +116,10 @@ func (c *Client) UploadAPK(ctx context.Context, packageName, editID, apkPath str
 	}
 	defer f.Close()
 
-	apk, err := c.service.Edits.Apks.Upload(packageName, editID).Media(f).Context(ctx).Do()
+	apk, err := c.service.Edits.Apks.Upload(packageName, editID).
+		Media(f, googleapi.ContentType("application/octet-stream")).
+		Context(ctx).
+		Do()
 	if err != nil {
 		return APKInfo{}, mapGoogleAPIError(err)
 	}
