@@ -1,0 +1,112 @@
+name: Smoke Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_phase3:
+        description: "Run phase 3 deploy smoke"
+        required: false
+        default: false
+        type: boolean
+      aab_path:
+        description: "Path to test .aab artifact (required when run_phase3=true and apk_path is empty)"
+        required: false
+        default: ""
+        type: string
+      apk_path:
+        description: "Path to test .apk artifact (required when run_phase3=true and aab_path is empty)"
+        required: false
+        default: ""
+        type: string
+      expected_version_code:
+        description: "Optional expected version code for phase 3"
+        required: false
+        default: ""
+        type: string
+      mapping_file:
+        description: "Optional mapping file path for phase 3"
+        required: false
+        default: ""
+        type: string
+      mapping_type:
+        description: "Optional mapping type (proguard/nativeCode)"
+        required: false
+        default: ""
+        type: string
+  workflow_call:
+    inputs:
+      run_phase3:
+        required: false
+        default: false
+        type: boolean
+      aab_path:
+        required: false
+        default: ""
+        type: string
+      apk_path:
+        required: false
+        default: ""
+        type: string
+      expected_version_code:
+        required: false
+        default: ""
+        type: string
+      mapping_file:
+        required: false
+        default: ""
+        type: string
+      mapping_type:
+        required: false
+        default: ""
+        type: string
+    secrets:
+      GPC_SERVICE_ACCOUNT_JSON:
+        required: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      GPC_TEST_PACKAGE: ${{ vars.GPC_TEST_PACKAGE }}
+      GPC_TEST_TRACK: internal
+      GPC_RELEASE_STATUS: completed
+      GPC_ENABLE_PHASE3: ${{ inputs.run_phase3 && '1' || '0' }}
+      GPC_TEST_AAB: ${{ inputs.aab_path }}
+      GPC_TEST_APK: ${{ inputs.apk_path }}
+      GPC_EXPECT_VERSION_CODE: ${{ inputs.expected_version_code }}
+      GPC_MAPPING_FILE: ${{ inputs.mapping_file }}
+      GPC_MAPPING_TYPE: ${{ inputs.mapping_type }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate smoke configuration
+        env:
+          GPC_SERVICE_ACCOUNT_JSON: ${{ secrets.GPC_SERVICE_ACCOUNT_JSON }}
+        run: |
+          [[ -n "${GPC_SERVICE_ACCOUNT_JSON:-}" ]] || { echo "Missing required secret: GPC_SERVICE_ACCOUNT_JSON"; exit 1; }
+          [[ -n "${GPC_TEST_PACKAGE:-}" ]] || { echo "Missing required repository variable: GPC_TEST_PACKAGE"; exit 1; }
+
+      - name: Write service account file
+        env:
+          GPC_SERVICE_ACCOUNT_JSON: ${{ secrets.GPC_SERVICE_ACCOUNT_JSON }}
+        run: |
+          echo "$GPC_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/gpc-sa.json"
+          chmod 600 "$RUNNER_TEMP/gpc-sa.json"
+          echo "GPC_SERVICE_ACCOUNT=$RUNNER_TEMP/gpc-sa.json" >> "$GITHUB_ENV"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build gpc
+        run: go build -o build/gpc .
+
+      - name: Run smoke test harness
+        env:
+          GPC_BIN: ${{ github.workspace }}/build/gpc
+          GPC_CONFIG_PATH: ${{ runner.temp }}/gpc-smoke-config.json
+        run: scripts/smoke-test-all.sh
