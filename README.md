@@ -34,6 +34,8 @@ make dev
 
 Detailed smoke tests: `docs/TESTING.md`.
 
+GitHub smoke workflow: `.github/workflows/smoke-tests.yml`.
+
 ## Quickstart
 
 ```bash

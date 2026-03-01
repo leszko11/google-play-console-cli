@@ -8,6 +8,59 @@ Run full local checks:
 make dev
 ```
 
+## Smoke Harness Scripts
+
+Phase scripts:
+
+```bash
+scripts/smoke-test-phase1.sh
+scripts/smoke-test-phase2.sh
+scripts/smoke-test-phase3.sh
+scripts/smoke-test-all.sh
+```
+
+Required environment variables:
+
+- `GPC_SERVICE_ACCOUNT`: absolute path to service-account JSON file.
+- `GPC_TEST_PACKAGE`: package used for verification.
+
+Optional environment variables:
+
+- `GPC_BIN`: compiled `gpc` binary path. If unset, scripts use `mise x go@1.24 -- go run .`.
+- `GPC_CONFIG_PATH`: config path for isolated smoke runs.
+- `GPC_ENABLE_PHASE3=1`: enables phase 3 in `smoke-test-all.sh`.
+- `GPC_TEST_AAB` or `GPC_TEST_APK`: exactly one is required for phase 3.
+- `GPC_EXPECT_VERSION_CODE`: optional assertion for phase-3 version code.
+- `GPC_MAPPING_FILE`, `GPC_MAPPING_TYPE`: optional mapping upload in phase 3.
+
+Example:
+
+```bash
+export GPC_SERVICE_ACCOUNT=/absolute/path/to/sa.json
+export GPC_TEST_PACKAGE=com.example.app
+export GPC_ENABLE_PHASE3=0
+scripts/smoke-test-all.sh
+```
+
+## GitHub Smoke Workflow
+
+Workflow: `.github/workflows/smoke-tests.yml`
+
+CI secret and variable contract:
+
+- Secret `GPC_SERVICE_ACCOUNT_JSON`: full JSON content (not path).
+- Variable `GPC_TEST_PACKAGE`: dedicated test package name.
+
+The workflow writes credentials to a temp file and exports:
+
+```bash
+echo "$GPC_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/gpc-sa.json"
+chmod 600 "$RUNNER_TEMP/gpc-sa.json"
+export GPC_SERVICE_ACCOUNT="$RUNNER_TEMP/gpc-sa.json"
+```
+
+Phase 3 can be enabled via workflow-dispatch input `run_phase3=true`, with `aab_path` or `apk_path`. Use `expected_version_code` when your test artifact is built with CI-derived monotonic version code.
+
 ## CLI Smoke Commands
 
 ```bash
