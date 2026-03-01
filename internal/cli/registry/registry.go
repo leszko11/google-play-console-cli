@@ -1,8 +1,10 @@
 package registry
 
 import (
+	"github.com/leszko11/google-play-console-cli/internal/cli/apks"
 	"github.com/leszko11/google-play-console-cli/internal/cli/apps"
 	"github.com/leszko11/google-play-console-cli/internal/cli/auth"
+	"github.com/leszko11/google-play-console-cli/internal/cli/bundles"
 	"github.com/leszko11/google-play-console-cli/internal/cli/completion"
 	"github.com/leszko11/google-play-console-cli/internal/cli/edits"
 	"github.com/leszko11/google-play-console-cli/internal/cli/tracks"
@@ -15,6 +17,8 @@ func Register(root *ffcli.Command) {
 		apps.NewCommand(apps.Deps{}),
 		edits.NewCommand(edits.Deps{}),
 		tracks.NewCommand(tracks.Deps{}),
+		apks.NewCommand(apks.Deps{}),
+		bundles.NewCommand(bundles.Deps{}),
 		completion.NewCommand(),
 	}
 }
