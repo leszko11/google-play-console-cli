@@ -159,7 +159,10 @@ func (c *Client) UploadDeobfuscationFile(ctx context.Context, packageName, editI
 	}
 	defer f.Close()
 
-	resp, err := c.service.Edits.Deobfuscationfiles.Upload(packageName, editID, versionCode, fileType).Media(f).Context(ctx).Do()
+	resp, err := c.service.Edits.Deobfuscationfiles.Upload(packageName, editID, versionCode, fileType).
+		Media(f, googleapi.ContentType("application/octet-stream")).
+		Context(ctx).
+		Do()
 	if err != nil {
 		return DeobfuscationFileInfo{}, mapGoogleAPIError(err)
 	}
