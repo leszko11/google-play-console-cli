@@ -21,7 +21,7 @@ func NewStatusCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 
-			return writeJSON(deps.Stdout, buildStatus(cfg))
+			return shared.WriteJSON(deps.Stdout, buildStatus(cfg))
 		},
 	}
 }

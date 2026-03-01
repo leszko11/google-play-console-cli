@@ -59,3 +59,7 @@ type APKInfo struct {
 	SHA1        string `json:"sha1,omitempty"`
 	SHA256      string `json:"sha256,omitempty"`
 }
+
+type DeobfuscationFileInfo struct {
+	SymbolType string `json:"symbolType,omitempty"`
+}

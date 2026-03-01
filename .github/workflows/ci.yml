@@ -35,4 +35,9 @@ jobs:
         run: go test ./...
 
       - name: Build
-        run: go build ./...
+        run: |
+          VERSION="dev"
+          COMMIT="${GITHUB_SHA::7}"
+          DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          LDFLAGS="-X 'github.com/leszko11/google-play-console-cli/cmd.Version=${VERSION}' -X 'github.com/leszko11/google-play-console-cli/cmd.Commit=${COMMIT}' -X 'github.com/leszko11/google-play-console-cli/cmd.Date=${DATE}'"
+          go build -ldflags "$LDFLAGS" ./...

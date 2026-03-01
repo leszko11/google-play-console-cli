@@ -119,6 +119,46 @@ func (c *Client) UploadAPK(ctx context.Context, packageName, editID, apkPath str
 	return apkInfoFromAPK(apk), nil
 }
 
+func (c *Client) UploadDeobfuscationFile(ctx context.Context, packageName, editID string, versionCode int64, fileType, filePath string) (DeobfuscationFileInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return DeobfuscationFileInfo{}, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return DeobfuscationFileInfo{}, fmt.Errorf("edit id is required")
+	}
+	if versionCode <= 0 {
+		return DeobfuscationFileInfo{}, fmt.Errorf("version code must be greater than zero")
+	}
+	fileType = strings.TrimSpace(fileType)
+	if fileType == "" {
+		return DeobfuscationFileInfo{}, fmt.Errorf("deobfuscation file type is required")
+	}
+	if fileType != "proguard" && fileType != "nativeCode" {
+		return DeobfuscationFileInfo{}, fmt.Errorf("unsupported deobfuscation file type %q", fileType)
+	}
+	filePath = strings.TrimSpace(filePath)
+	if filePath == "" {
+		return DeobfuscationFileInfo{}, fmt.Errorf("deobfuscation file path is required")
+	}
+	if c == nil || c.service == nil {
+		return DeobfuscationFileInfo{}, ErrInvalidCredentials
+	}
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return DeobfuscationFileInfo{}, fmt.Errorf("failed to open deobfuscation file: %w", err)
+	}
+	defer f.Close()
+
+	resp, err := c.service.Edits.Deobfuscationfiles.Upload(packageName, editID, versionCode, fileType).Media(f).Context(ctx).Do()
+	if err != nil {
+		return DeobfuscationFileInfo{}, mapGoogleAPIError(err)
+	}
+	return deobfuscationInfoFromResponse(resp), nil
+}
+
 func bundleInfoFromBundle(bundle *androidpublisher.Bundle) BundleInfo {
 	if bundle == nil {
 		return BundleInfo{}
@@ -144,5 +184,14 @@ func apkInfoFromAPK(apk *androidpublisher.Apk) APKInfo {
 		VersionCode: apk.VersionCode,
 		SHA1:        sha1,
 		SHA256:      sha256,
+	}
+}
+
+func deobfuscationInfoFromResponse(resp *androidpublisher.DeobfuscationFilesUploadResponse) DeobfuscationFileInfo {
+	if resp == nil || resp.DeobfuscationFile == nil {
+		return DeobfuscationFileInfo{}
+	}
+	return DeobfuscationFileInfo{
+		SymbolType: resp.DeobfuscationFile.SymbolType,
 	}
 }

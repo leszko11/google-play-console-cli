@@ -11,9 +11,11 @@ make dev
 ## CLI Smoke Commands
 
 ```bash
+gpc --version
 gpc --help
 gpc auth init --service-account /path/to/service-account.json
 gpc auth status
+gpc --package-name com.example.app --service-account /path/to/service-account.json --pretty apps get
 gpc apps add-package --package-name com.example.app
 gpc apps list --output json
 gpc apps list --verify
@@ -34,6 +36,9 @@ gpc bundles list --package-name com.example.app --edit-id <edit-id>
 gpc bundles upload --package-name com.example.app --edit-id <edit-id> --file /path/to/app.aab
 gpc apks list --package-name com.example.app --edit-id <edit-id>
 gpc apks upload --package-name com.example.app --edit-id <edit-id> --file /path/to/app.apk
+gpc deobfuscation upload --package-name com.example.app --edit-id <edit-id> --version-code <version-code> --type proguard --file /path/to/mapping.txt
+gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --confirm
+gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --dry-run
 ```
 
 ## Expected Outcomes
@@ -53,3 +58,7 @@ gpc apks upload --package-name com.example.app --edit-id <edit-id> --file /path/
   - `gpc tracks promote ...` should copy release metadata from source track to target track within the edit.
   - `gpc bundles list ...` and `gpc apks list ...` should return version code arrays for the edit.
   - `gpc bundles upload ...` and `gpc apks upload ...` should return `status: uploaded` when upload succeeds.
+  - `gpc deobfuscation upload ...` should return `status: uploaded` with the uploaded mapping `symbolType`.
+  - `gpc deploy ... --confirm` should return `status: committed` and include deterministic `steps`.
+  - `gpc deploy ... --dry-run` should return `status: dry-run` and delete the temporary edit.
+  - `gpc deploy --track production` should fail unless `--allow-production` is set.

@@ -1,0 +1,109 @@
+package shared
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+
+	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
+	"github.com/leszko11/google-play-console-cli/internal/config"
+	"github.com/leszko11/google-play-console-cli/internal/gpc"
+)
+
+func ResolvePackageName(localValue string) (string, error) {
+	if pkg := strings.TrimSpace(localValue); pkg != "" {
+		return pkg, nil
+	}
+	if pkg := strings.TrimSpace(ActiveGlobalFlags().PackageName); pkg != "" {
+		return pkg, nil
+	}
+	return "", fmt.Errorf("--package-name is required")
+}
+
+func ResolveOutput(localValue string) string {
+	if out := strings.TrimSpace(localValue); out != "" {
+		return strings.ToLower(out)
+	}
+	if out := strings.TrimSpace(ActiveGlobalFlags().Output); out != "" {
+		return strings.ToLower(out)
+	}
+	return "json"
+}
+
+func ResolveServiceAccountPath(cfg config.Config, lookupEnv func(string) string) (string, error) {
+	if lookupEnv == nil {
+		lookupEnv = os.Getenv
+	}
+
+	var cfgPath string
+	if cfg.ActiveProfile != "" && cfg.Profiles != nil {
+		if profile, ok := cfg.Profiles[cfg.ActiveProfile]; ok {
+			cfgPath = strings.TrimSpace(profile.ServiceAccountPath)
+		}
+	}
+
+	source, err := authresolver.ResolveCredentialSource(authresolver.Input{
+		FlagPath:   strings.TrimSpace(ActiveGlobalFlags().ServiceAccount),
+		EnvPath:    strings.TrimSpace(lookupEnv(EnvServiceAccountPath)),
+		ConfigPath: cfgPath,
+	})
+	if err != nil {
+		if errors.Is(err, authresolver.ErrNoCredentialSources) {
+			return "", fmt.Errorf("no service account configured")
+		}
+		return "", err
+	}
+	return source.Path, nil
+}
+
+func WriteJSON(out io.Writer, v any) error {
+	if out == nil {
+		out = os.Stdout
+	}
+	b, err := RenderJSON(v, ActiveGlobalFlags().Pretty)
+	if err != nil {
+		return err
+	}
+	_, err = out.Write(b)
+	return err
+}
+
+type BuildClientDeps[T any] struct {
+	LoadConfig func() (config.Config, error)
+	LookupEnv  func(string) string
+	NewClient  func(context.Context, gpc.CredentialInput) (T, error)
+	Upload     bool
+}
+
+func BuildClient[T any](ctx context.Context, deps BuildClientDeps[T]) (T, context.Context, context.CancelFunc, error) {
+	var zero T
+	noopCancel := func() {}
+
+	requestCtx, cancel := ContextWithTimeout(ctx, ActiveGlobalFlags().Timeout)
+	if deps.Upload {
+		requestCtx, cancel = ContextWithUploadTimeout(ctx, ActiveGlobalFlags().UploadTimeout)
+	}
+
+	cfg, err := deps.LoadConfig()
+	if err != nil {
+		cancel()
+		return zero, nil, noopCancel, err
+	}
+
+	serviceAccountPath, err := ResolveServiceAccountPath(cfg, deps.LookupEnv)
+	if err != nil {
+		cancel()
+		return zero, nil, noopCancel, err
+	}
+
+	client, err := deps.NewClient(requestCtx, gpc.CredentialInput{ServiceAccountPath: serviceAccountPath})
+	if err != nil {
+		cancel()
+		return zero, nil, noopCancel, err
+	}
+
+	return client, requestCtx, cancel, nil
+}

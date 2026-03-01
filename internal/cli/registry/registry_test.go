@@ -8,14 +8,14 @@ import (
 
 func TestRegisterAddsCoreCommands(t *testing.T) {
 	root := &ffcli.Command{Name: "gpc"}
-	Register(root)
+	Register(root, Deps{})
 
 	got := map[string]bool{}
 	for _, c := range root.Subcommands {
 		got[c.Name] = true
 	}
 
-	for _, name := range []string{"auth", "apps", "edits", "tracks", "apks", "bundles", "completion"} {
+	for _, name := range []string{"auth", "apps", "edits", "tracks", "apks", "bundles", "deobfuscation", "deploy", "completion"} {
 		if !got[name] {
 			t.Fatalf("expected subcommand %q, got %#v", name, got)
 		}

@@ -11,12 +11,12 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Edit transactions and listing updates (`edits`)
 - Track management inside edits (`tracks list/get/update/promote`)
 - Binary uploads in edits (`apks list/upload`, `bundles list/upload`)
+- Deobfuscation mapping upload (`deobfuscation upload`)
+- End-to-end deploy orchestration (`deploy`)
 - CI quality gates for format, lint, test, and build
 
 ## Not Yet Implemented
 
-- Deobfuscation mapping uploads
-- End-to-end submit orchestration
 - Store listing/image management
 - Monetization and reporting commands
 
@@ -37,11 +37,17 @@ Detailed smoke tests: `docs/TESTING.md`.
 ## Quickstart
 
 ```bash
+# Check build metadata
+gpc --version
+
 # Initialize credentials
 gpc auth init --service-account /path/to/service-account.json
 
 # Show current auth profile
 gpc auth status
+
+# Global flags are available from root and apply to all commands
+gpc --package-name com.example.app --service-account /path/to/service-account.json --timeout 90s --pretty apps get
 
 # Store package for reusable list/verify flows
 gpc apps add-package --package-name com.example.app
@@ -76,7 +82,41 @@ gpc bundles list --package-name com.example.app --edit-id <edit-id>
 gpc bundles upload --package-name com.example.app --edit-id <edit-id> --file /path/to/app.aab
 gpc apks list --package-name com.example.app --edit-id <edit-id>
 gpc apks upload --package-name com.example.app --edit-id <edit-id> --file /path/to/app.apk
+
+# Upload deobfuscation mapping (proguard/nativeCode)
+gpc deobfuscation upload \
+  --package-name com.example.app \
+  --edit-id <edit-id> \
+  --version-code <version-code> \
+  --type proguard \
+  --file /path/to/mapping.txt
+
+# Deploy in one flow (create edit -> upload -> track update -> validate -> commit)
+gpc deploy \
+  --package-name com.example.app \
+  --aab /path/to/app.aab \
+  --track internal \
+  --status completed \
+  --confirm
+
+# Dry-run deploy (deletes edit instead of commit)
+gpc deploy \
+  --package-name com.example.app \
+  --aab /path/to/app.aab \
+  --track internal \
+  --status completed \
+  --dry-run
 ```
+
+## Global Flags
+
+- `--package-name`: default package for commands that support package-level operations.
+- `--service-account`: credential path override (`flag > env > config`).
+- `--output`: default output format for commands that support output variants.
+- `--pretty`: pretty-print JSON output.
+- `--timeout`: timeout for standard API requests.
+- `--upload-timeout`: timeout for upload API requests.
+- `--paginate`: fetch all pages on paginated endpoints (enabled per-command where supported).
 
 ## Command Discovery
 
@@ -88,4 +128,6 @@ gpc edits --help
 gpc tracks --help
 gpc bundles --help
 gpc apks --help
+gpc deobfuscation --help
+gpc deploy --help
 ```

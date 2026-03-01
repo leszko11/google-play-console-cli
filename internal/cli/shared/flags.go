@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const EnvServiceAccountPath = "GPC_SERVICE_ACCOUNT_PATH"
+
 type GlobalFlags struct {
 	PackageName    string
 	ServiceAccount string
@@ -16,7 +18,14 @@ type GlobalFlags struct {
 	Paginate       bool
 }
 
+var boundGlobalFlags *GlobalFlags
+
 func BindGlobalFlags(fs *flag.FlagSet, cfg *GlobalFlags) {
+	if cfg == nil {
+		cfg = &GlobalFlags{}
+	}
+	boundGlobalFlags = cfg
+
 	fs.StringVar(&cfg.PackageName, "package-name", "", "App package name")
 	fs.StringVar(&cfg.ServiceAccount, "service-account", "", "Path to service account JSON")
 	fs.StringVar(&cfg.Output, "output", "json", "Output format: json, table, markdown")
@@ -25,4 +34,14 @@ func BindGlobalFlags(fs *flag.FlagSet, cfg *GlobalFlags) {
 	fs.StringVar(&cfg.Debug, "debug", "", "Enable debug logging")
 	fs.BoolVar(&cfg.Pretty, "pretty", false, "Pretty print JSON output")
 	fs.BoolVar(&cfg.Paginate, "paginate", false, "Fetch all paginated API responses")
+}
+
+func ActiveGlobalFlags() GlobalFlags {
+	if boundGlobalFlags == nil {
+		return GlobalFlags{Output: "json"}
+	}
+	if boundGlobalFlags.Output == "" {
+		boundGlobalFlags.Output = "json"
+	}
+	return *boundGlobalFlags
 }

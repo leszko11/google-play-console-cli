@@ -36,10 +36,13 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
 			if strings.TrimSpace(serviceAccountPath) == "" {
-				serviceAccountPath = strings.TrimSpace(deps.LookupEnv(envServiceAccountPath))
+				serviceAccountPath = strings.TrimSpace(shared.ActiveGlobalFlags().ServiceAccount)
 			}
 			if strings.TrimSpace(serviceAccountPath) == "" {
-				return fmt.Errorf("--service-account is required or set %s", envServiceAccountPath)
+				serviceAccountPath = strings.TrimSpace(deps.LookupEnv(shared.EnvServiceAccountPath))
+			}
+			if strings.TrimSpace(serviceAccountPath) == "" {
+				return fmt.Errorf("--service-account is required or set %s", shared.EnvServiceAccountPath)
 			}
 
 			cfg, err := deps.LoadConfig()
@@ -51,11 +54,14 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 			}
 
 			if strings.TrimSpace(packageName) != "" {
-				client, err := deps.NewClient(ctx, gpc.CredentialInput{ServiceAccountPath: serviceAccountPath})
+				requestCtx, cancel := shared.ContextWithTimeout(ctx, shared.ActiveGlobalFlags().Timeout)
+				defer cancel()
+
+				client, err := deps.NewClient(requestCtx, gpc.CredentialInput{ServiceAccountPath: serviceAccountPath})
 				if err != nil {
 					return err
 				}
-				if err := client.VerifyPackageAccess(ctx, packageName); err != nil {
+				if err := client.VerifyPackageAccess(requestCtx, packageName); err != nil {
 					return fmt.Errorf("failed to verify package access: %w", err)
 				}
 			}
@@ -70,7 +76,7 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"activeProfile":      cfg.ActiveProfile,
 				"serviceAccountPath": serviceAccountPath,
 			})

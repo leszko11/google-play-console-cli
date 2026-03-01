@@ -47,7 +47,7 @@ func NewSwitchCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 
-			return writeJSON(deps.Stdout, map[string]any{
+			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"activeProfile": profile,
 			})
 		},

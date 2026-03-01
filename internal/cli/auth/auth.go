@@ -12,8 +12,6 @@ import (
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
-const envServiceAccountPath = "GPC_SERVICE_ACCOUNT_PATH"
-
 type PackageVerifier interface {
 	VerifyPackageAccess(ctx context.Context, packageName string) error
 }
@@ -70,13 +68,4 @@ func withDefaults(deps Deps) Deps {
 	}
 
 	return deps
-}
-
-func writeJSON(w io.Writer, v any) error {
-	out, err := shared.RenderJSON(v, false)
-	if err != nil {
-		return err
-	}
-	_, err = w.Write(out)
-	return err
 }
