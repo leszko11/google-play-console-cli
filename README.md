@@ -152,6 +152,11 @@ gpc products offers activate --package-name com.example.app --product-id coins_1
 gpc products offers deactivate --package-name com.example.app --product-id coins_100 --purchase-option-id buy --offer-id offer_intro --confirm
 gpc products offers cancel --package-name com.example.app --product-id coins_100 --purchase-option-id buy --offer-id offer_preorder --confirm
 
+# One-time product purchase option state management
+gpc products purchase-options activate --package-name com.example.app --product-id coins_100 --purchase-option-id buy
+gpc products purchase-options deactivate --package-name com.example.app --product-id coins_100 --purchase-option-id buy --confirm
+gpc products purchase-options delete --package-name com.example.app --product-id coins_100 --purchase-option-id buy --confirm
+
 # Legacy in-app product management
 gpc iap list --package-name com.example.app --max-results 100
 gpc iap get --package-name com.example.app --sku coins_100

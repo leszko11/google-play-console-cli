@@ -34,6 +34,15 @@ type fakeClient struct {
 	activateOfferErr error
 	deactivateErr    error
 	cancelErr        error
+
+	purchaseOptions          []gpc.OneTimeProductInfo
+	activatePurchaseOptErr   error
+	deactivatePurchaseOptErr error
+	deletePurchaseOptErr     error
+
+	activatePurchaseOptFn   func(packageName, productID, purchaseOptionID string) ([]gpc.OneTimeProductInfo, error)
+	deactivatePurchaseOptFn func(packageName, productID, purchaseOptionID string) ([]gpc.OneTimeProductInfo, error)
+	deletePurchaseOptFn     func(packageName, productID, purchaseOptionID string, force bool) error
 }
 
 func (f fakeClient) ListOneTimeProducts(_ context.Context, _ string, _ int64, _ string, _ bool) (gpc.OneTimeProductsListInfo, error) {
@@ -70,6 +79,24 @@ func (f fakeClient) DeactivateOneTimeProductOffer(_ context.Context, _, _, _, _ 
 }
 func (f fakeClient) CancelOneTimeProductOffer(_ context.Context, _, _, _, _ string) (gpc.OneTimeProductOfferInfo, error) {
 	return f.offer, f.cancelErr
+}
+func (f fakeClient) ActivateOneTimeProductPurchaseOption(_ context.Context, packageName, productID, purchaseOptionID string) ([]gpc.OneTimeProductInfo, error) {
+	if f.activatePurchaseOptFn != nil {
+		return f.activatePurchaseOptFn(packageName, productID, purchaseOptionID)
+	}
+	return f.purchaseOptions, f.activatePurchaseOptErr
+}
+func (f fakeClient) DeactivateOneTimeProductPurchaseOption(_ context.Context, packageName, productID, purchaseOptionID string) ([]gpc.OneTimeProductInfo, error) {
+	if f.deactivatePurchaseOptFn != nil {
+		return f.deactivatePurchaseOptFn(packageName, productID, purchaseOptionID)
+	}
+	return f.purchaseOptions, f.deactivatePurchaseOptErr
+}
+func (f fakeClient) DeleteOneTimeProductPurchaseOption(_ context.Context, packageName, productID, purchaseOptionID string, force bool) error {
+	if f.deletePurchaseOptFn != nil {
+		return f.deletePurchaseOptFn(packageName, productID, purchaseOptionID, force)
+	}
+	return f.deletePurchaseOptErr
 }
 
 func runProducts(t *testing.T, deps Deps, args ...string) (string, error) {
