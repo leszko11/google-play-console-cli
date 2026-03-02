@@ -63,6 +63,13 @@ gpc apps get --package-name com.example.app --output json
 # Start an edit transaction
 gpc edits create --package-name com.example.app
 
+# Read or update app details in an edit
+gpc edits details get --package-name com.example.app --edit-id <edit-id>
+gpc edits details update \
+  --package-name com.example.app \
+  --edit-id <edit-id> \
+  --contact-email support@example.com
+
 # Update listing title in an edit (publish with edits commit)
 gpc edits listings update \
   --package-name com.example.app \

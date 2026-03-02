@@ -76,6 +76,8 @@ gpc apps get --package-name com.example.app --output json
 gpc apps remove-package --package-name com.example.app
 gpc edits create --package-name com.example.app
 gpc edits get --package-name com.example.app --edit-id <edit-id>
+gpc edits details get --package-name com.example.app --edit-id <edit-id>
+gpc edits details update --package-name com.example.app --edit-id <edit-id> --contact-email support@example.com
 gpc edits listings list --package-name com.example.app --edit-id <edit-id>
 gpc edits listings get --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings update --package-name com.example.app --edit-id <edit-id> --locale en-US --title "My App Test"
@@ -108,6 +110,8 @@ gpc deploy --package-name com.example.app --aab /path/to/app.aab --track interna
   - `gpc auth init --service-account <valid-file>` should succeed.
   - `gpc apps get --package-name <valid-package>` should return app JSON with `packageName`.
   - `gpc edits create --package-name <valid-package>` should return a JSON edit object with `id`.
+  - `gpc edits details get ...` should return app details for the edit.
+  - `gpc edits details update ...` should return `status: updated` inside an edit.
   - `gpc edits listings list ...` should return localized listings for the edit.
   - `gpc edits listings update ...` should return `status: updated` inside an edit.
   - `gpc edits listings delete ...` should return `status: deleted`.

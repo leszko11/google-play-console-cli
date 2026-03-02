@@ -189,6 +189,59 @@ func (c *Client) UpdateListing(ctx context.Context, packageName, editID, languag
 	return listingInfoFromListing(listing), nil
 }
 
+func (c *Client) GetAppDetails(ctx context.Context, packageName, editID string) (AppDetailsInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return AppDetailsInfo{}, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return AppDetailsInfo{}, fmt.Errorf("edit id is required")
+	}
+	if c == nil || c.service == nil {
+		return AppDetailsInfo{}, ErrInvalidCredentials
+	}
+
+	details, err := c.service.Edits.Details.Get(packageName, editID).Context(ctx).Do()
+	if err != nil {
+		return AppDetailsInfo{}, mapGoogleAPIError(err)
+	}
+	return appDetailsInfoFromDetails(details), nil
+}
+
+func (c *Client) UpdateAppDetails(ctx context.Context, packageName, editID string, update AppDetailsUpdate) (AppDetailsInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return AppDetailsInfo{}, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return AppDetailsInfo{}, fmt.Errorf("edit id is required")
+	}
+	update.DefaultLanguage = strings.TrimSpace(update.DefaultLanguage)
+	update.ContactEmail = strings.TrimSpace(update.ContactEmail)
+	update.ContactPhone = strings.TrimSpace(update.ContactPhone)
+	update.ContactWebsite = strings.TrimSpace(update.ContactWebsite)
+	if update.DefaultLanguage == "" && update.ContactEmail == "" && update.ContactPhone == "" && update.ContactWebsite == "" {
+		return AppDetailsInfo{}, fmt.Errorf("at least one app detail field must be provided")
+	}
+	if c == nil || c.service == nil {
+		return AppDetailsInfo{}, ErrInvalidCredentials
+	}
+
+	req := &androidpublisher.AppDetails{
+		DefaultLanguage: update.DefaultLanguage,
+		ContactEmail:    update.ContactEmail,
+		ContactPhone:    update.ContactPhone,
+		ContactWebsite:  update.ContactWebsite,
+	}
+	details, err := c.service.Edits.Details.Patch(packageName, editID, req).Context(ctx).Do()
+	if err != nil {
+		return AppDetailsInfo{}, mapGoogleAPIError(err)
+	}
+	return appDetailsInfoFromDetails(details), nil
+}
+
 func (c *Client) DeleteListing(ctx context.Context, packageName, editID, language string) error {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -229,6 +282,18 @@ func (c *Client) DeleteAllListings(ctx context.Context, packageName, editID stri
 		return mapGoogleAPIError(err)
 	}
 	return nil
+}
+
+func appDetailsInfoFromDetails(details *androidpublisher.AppDetails) AppDetailsInfo {
+	if details == nil {
+		return AppDetailsInfo{}
+	}
+	return AppDetailsInfo{
+		DefaultLanguage: details.DefaultLanguage,
+		ContactEmail:    details.ContactEmail,
+		ContactPhone:    details.ContactPhone,
+		ContactWebsite:  details.ContactWebsite,
+	}
 }
 
 func editInfoFromAppEdit(edit *androidpublisher.AppEdit) EditInfo {

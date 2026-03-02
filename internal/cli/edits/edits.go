@@ -20,6 +20,8 @@ type Client interface {
 	ValidateEdit(ctx context.Context, packageName, editID string) error
 	CommitEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
 	DeleteEdit(ctx context.Context, packageName, editID string) error
+	GetAppDetails(ctx context.Context, packageName, editID string) (gpc.AppDetailsInfo, error)
+	UpdateAppDetails(ctx context.Context, packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
 	GetListing(ctx context.Context, packageName, editID, language string) (gpc.ListingInfo, error)
 	ListListings(ctx context.Context, packageName, editID string) ([]gpc.ListingInfo, error)
 	UpdateListing(ctx context.Context, packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
@@ -47,6 +49,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newValidateCommand(deps),
 			newCommitCommand(deps),
 			newDeleteCommand(deps),
+			newDetailsCommand(deps),
 			newListingsCommand(deps),
 		},
 	}
@@ -260,6 +263,99 @@ func newListingsCommand(deps Deps) *ffcli.Command {
 			newListingsUpdateCommand(deps),
 			newListingsDeleteCommand(deps),
 			newListingsDeleteAllCommand(deps),
+		},
+	}
+}
+
+func newDetailsCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "details",
+		ShortHelp: "Manage app details inside an edit",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newDetailsGetCommand(deps),
+			newDetailsUpdateCommand(deps),
+		},
+	}
+}
+
+func newDetailsGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+
+	return &ffcli.Command{
+		Name:      "get",
+		ShortHelp: "Get app details in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			details, err := client.GetAppDetails(requestCtx, pkg, editID)
+			if err != nil {
+				return fmt.Errorf("failed to get app details: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"details":     details,
+			})
+		},
+	}
+}
+
+func newDetailsUpdateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("update", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID string
+	var defaultLanguage, contactEmail, contactPhone, contactWebsite string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&defaultLanguage, "default-language", "", "Default listing language (BCP-47, e.g. en-US)")
+	fs.StringVar(&contactEmail, "contact-email", "", "Contact email address")
+	fs.StringVar(&contactPhone, "contact-phone", "", "Contact phone number")
+	fs.StringVar(&contactWebsite, "contact-website", "", "Contact website URL")
+
+	return &ffcli.Command{
+		Name:      "update",
+		ShortHelp: "Update app details in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			details, err := client.UpdateAppDetails(requestCtx, pkg, editID, gpc.AppDetailsUpdate{
+				DefaultLanguage: defaultLanguage,
+				ContactEmail:    contactEmail,
+				ContactPhone:    contactPhone,
+				ContactWebsite:  contactWebsite,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to update app details: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"details":     details,
+				"status":      "updated",
+			})
 		},
 	}
 }
