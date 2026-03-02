@@ -27,6 +27,13 @@ type fakeClient struct {
 
 	createFn func(packageName string, product *androidpublisher.OneTimeProduct) (gpc.OneTimeProductInfo, error)
 	updateFn func(packageName, productID string, product *androidpublisher.OneTimeProduct, updateMask string) (gpc.OneTimeProductInfo, error)
+
+	offers           gpc.OneTimeProductOffersListInfo
+	offer            gpc.OneTimeProductOfferInfo
+	offersErr        error
+	activateOfferErr error
+	deactivateErr    error
+	cancelErr        error
 }
 
 func (f fakeClient) ListOneTimeProducts(_ context.Context, _ string, _ int64, _ string, _ bool) (gpc.OneTimeProductsListInfo, error) {
@@ -52,6 +59,18 @@ func (f fakeClient) UpdateOneTimeProduct(_ context.Context, packageName, product
 }
 
 func (f fakeClient) DeleteOneTimeProduct(_ context.Context, _, _ string) error { return f.deleteErr }
+func (f fakeClient) ListOneTimeProductOffers(_ context.Context, _, _, _ string, _ int64, _ string, _ bool) (gpc.OneTimeProductOffersListInfo, error) {
+	return f.offers, f.offersErr
+}
+func (f fakeClient) ActivateOneTimeProductOffer(_ context.Context, _, _, _, _ string) (gpc.OneTimeProductOfferInfo, error) {
+	return f.offer, f.activateOfferErr
+}
+func (f fakeClient) DeactivateOneTimeProductOffer(_ context.Context, _, _, _, _ string) (gpc.OneTimeProductOfferInfo, error) {
+	return f.offer, f.deactivateErr
+}
+func (f fakeClient) CancelOneTimeProductOffer(_ context.Context, _, _, _, _ string) (gpc.OneTimeProductOfferInfo, error) {
+	return f.offer, f.cancelErr
+}
 
 func runProducts(t *testing.T, deps Deps, args ...string) (string, error) {
 	t.Helper()

@@ -129,6 +129,21 @@ type IAPsListInfo struct {
 	NextPageToken string    `json:"nextPageToken,omitempty"`
 }
 
+type OneTimeProductOfferInfo struct {
+	PackageName         string `json:"packageName,omitempty"`
+	ProductID           string `json:"productId,omitempty"`
+	PurchaseOptionID    string `json:"purchaseOptionId,omitempty"`
+	OfferID             string `json:"offerId,omitempty"`
+	State               string `json:"state,omitempty"`
+	OfferTagCount       int    `json:"offerTagCount,omitempty"`
+	RegionalConfigCount int    `json:"regionalConfigCount,omitempty"`
+}
+
+type OneTimeProductOffersListInfo struct {
+	Offers        []OneTimeProductOfferInfo `json:"offers,omitempty"`
+	NextPageToken string                    `json:"nextPageToken,omitempty"`
+}
+
 type SubscriptionInfo struct {
 	PackageName   string `json:"packageName,omitempty"`
 	ProductID     string `json:"productId,omitempty"`

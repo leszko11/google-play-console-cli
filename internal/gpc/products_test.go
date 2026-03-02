@@ -28,6 +28,18 @@ func TestOneTimeProductMethods_RejectMissingClient(t *testing.T) {
 	if err := c.DeleteOneTimeProduct(context.Background(), "com.example.app", "coins_100"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from DeleteOneTimeProduct, got %v", err)
 	}
+	if _, err := c.ListOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", 0, "", false); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from ListOneTimeProductOffers, got %v", err)
+	}
+	if _, err := c.ActivateOneTimeProductOffer(context.Background(), "com.example.app", "coins_100", "buy", "offer_intro"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from ActivateOneTimeProductOffer, got %v", err)
+	}
+	if _, err := c.DeactivateOneTimeProductOffer(context.Background(), "com.example.app", "coins_100", "buy", "offer_intro"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from DeactivateOneTimeProductOffer, got %v", err)
+	}
+	if _, err := c.CancelOneTimeProductOffer(context.Background(), "com.example.app", "coins_100", "buy", "offer_intro"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from CancelOneTimeProductOffer, got %v", err)
+	}
 }
 
 func TestOneTimeProductMethods_ValidateArgs(t *testing.T) {
@@ -59,6 +71,24 @@ func TestOneTimeProductMethods_ValidateArgs(t *testing.T) {
 	}
 	if err := c.DeleteOneTimeProduct(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "product id is required") {
 		t.Fatalf("unexpected DeleteOneTimeProduct product id error: %v", err)
+	}
+	if _, err := c.ListOneTimeProductOffers(context.Background(), "com.example.app", "", "buy", 0, "", false); err == nil || !strings.Contains(err.Error(), "product id is required") {
+		t.Fatalf("unexpected ListOneTimeProductOffers product id error: %v", err)
+	}
+	if _, err := c.ListOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "", 0, "", false); err == nil || !strings.Contains(err.Error(), "purchase option id is required") {
+		t.Fatalf("unexpected ListOneTimeProductOffers purchase option error: %v", err)
+	}
+	if _, err := c.ListOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", -1, "", false); err == nil || !strings.Contains(err.Error(), "page size must be greater than or equal to zero") {
+		t.Fatalf("unexpected ListOneTimeProductOffers page size error: %v", err)
+	}
+	if _, err := c.ActivateOneTimeProductOffer(context.Background(), "com.example.app", "coins_100", "buy", ""); err == nil || !strings.Contains(err.Error(), "offer id is required") {
+		t.Fatalf("unexpected ActivateOneTimeProductOffer offer id error: %v", err)
+	}
+	if _, err := c.DeactivateOneTimeProductOffer(context.Background(), "com.example.app", "coins_100", "buy", ""); err == nil || !strings.Contains(err.Error(), "offer id is required") {
+		t.Fatalf("unexpected DeactivateOneTimeProductOffer offer id error: %v", err)
+	}
+	if _, err := c.CancelOneTimeProductOffer(context.Background(), "com.example.app", "coins_100", "buy", ""); err == nil || !strings.Contains(err.Error(), "offer id is required") {
+		t.Fatalf("unexpected CancelOneTimeProductOffer offer id error: %v", err)
 	}
 }
 
@@ -98,5 +128,53 @@ func TestOneTimeProductInfoFromProduct(t *testing.T) {
 	}
 	if got.ListingCount != 2 || got.PurchaseOptionCount != 1 || got.OfferTagCount != 2 {
 		t.Fatalf("unexpected one-time product info counts: %+v", got)
+	}
+}
+
+func TestOneTimeProductOffersListInfoFromResponse(t *testing.T) {
+	resp := &androidpublisher.ListOneTimeProductOffersResponse{
+		NextPageToken: "next",
+		OneTimeProductOffers: []*androidpublisher.OneTimeProductOffer{
+			{
+				PackageName:      "com.example.app",
+				ProductId:        "coins_100",
+				PurchaseOptionId: "buy",
+				OfferId:          "offer_intro",
+				State:            "ACTIVE",
+				OfferTags:        []*androidpublisher.OfferTag{{Tag: "sale"}},
+				RegionalPricingAndAvailabilityConfigs: []*androidpublisher.OneTimeProductOfferRegionalPricingAndAvailabilityConfig{
+					{},
+				},
+			},
+		},
+	}
+
+	got := oneTimeProductOffersListInfoFromResponse(resp)
+	if got.NextPageToken != "next" || len(got.Offers) != 1 {
+		t.Fatalf("unexpected one-time product offers list map: %+v", got)
+	}
+	if got.Offers[0].OfferID != "offer_intro" || got.Offers[0].OfferTagCount != 1 {
+		t.Fatalf("unexpected one-time product offer map: %+v", got.Offers[0])
+	}
+}
+
+func TestOneTimeProductOfferInfoFromOffer(t *testing.T) {
+	got := oneTimeProductOfferInfoFromOffer(&androidpublisher.OneTimeProductOffer{
+		PackageName:      "com.example.app",
+		ProductId:        "coins_100",
+		PurchaseOptionId: "buy",
+		OfferId:          "offer_intro",
+		State:            "DRAFT",
+		OfferTags:        []*androidpublisher.OfferTag{{Tag: "sale"}, {Tag: "new"}},
+		RegionalPricingAndAvailabilityConfigs: []*androidpublisher.OneTimeProductOfferRegionalPricingAndAvailabilityConfig{
+			{},
+			{},
+		},
+	})
+	if got.PackageName != "com.example.app" || got.OfferID != "offer_intro" {
+		t.Fatalf("unexpected one-time product offer info map: %+v", got)
+	}
+	if got.OfferTagCount != 2 || got.RegionalConfigCount != 2 {
+		t.Fatalf("unexpected one-time product offer info counts: %+v", got)
 	}
 }
