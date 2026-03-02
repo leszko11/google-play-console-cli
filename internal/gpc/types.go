@@ -86,6 +86,21 @@ type SubscriptionsListInfo struct {
 	NextPageToken string             `json:"nextPageToken,omitempty"`
 }
 
+type SubscriptionOfferInfo struct {
+	PackageName string `json:"packageName,omitempty"`
+	ProductID   string `json:"productId,omitempty"`
+	BasePlanID  string `json:"basePlanId,omitempty"`
+	OfferID     string `json:"offerId,omitempty"`
+	State       string `json:"state,omitempty"`
+	PhaseCount  int    `json:"phaseCount,omitempty"`
+	TagCount    int    `json:"tagCount,omitempty"`
+}
+
+type SubscriptionOffersListInfo struct {
+	Offers        []SubscriptionOfferInfo `json:"offers,omitempty"`
+	NextPageToken string                  `json:"nextPageToken,omitempty"`
+}
+
 type ProductPurchaseInfo struct {
 	OrderID              string `json:"orderId,omitempty"`
 	ProductID            string `json:"productId,omitempty"`

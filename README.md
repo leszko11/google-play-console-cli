@@ -15,7 +15,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Deobfuscation mapping upload (`deobfuscation upload`)
 - End-to-end deploy orchestration (`deploy`)
 - Reviews management (`reviews list/get/reply`)
-- Monetization subscription commands (`subscriptions list/get/create/update/delete/archive`)
+- Monetization subscription commands (`subscriptions ...` including offers)
 - Purchase lifecycle commands (`purchases ...`)
 - CI quality gates for format, lint, test, and build
 
@@ -111,6 +111,13 @@ gpc subscriptions update --package-name com.example.app --product-id premium_mon
 # Delete/archive subscriptions (explicit confirmation required)
 gpc subscriptions delete --package-name com.example.app --product-id premium_monthly --confirm
 gpc subscriptions archive --package-name com.example.app --product-id premium_monthly --confirm
+
+# Manage subscription offers
+gpc subscriptions offers list --package-name com.example.app --product-id premium_monthly --base-plan-id monthly
+gpc subscriptions offers get --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro
+gpc subscriptions offers create --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --input /path/to/offer.json
+gpc subscriptions offers update --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --input /path/to/offer.json --update-mask phases,regionalConfigs
+gpc subscriptions offers delete --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --confirm
 
 # Purchase management
 gpc purchases products get --package-name com.example.app --product-id premium --token <purchase-token>
