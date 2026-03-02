@@ -11,6 +11,7 @@ import (
 )
 
 func TestProductsOffersList_ReturnsOffers(t *testing.T) {
+	bindGlobalPaginate(t, false)
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
@@ -36,6 +37,33 @@ func TestProductsOffersList_ReturnsOffers(t *testing.T) {
 	}
 	if !strings.Contains(out, `"offerId":"offer_intro"`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestProductsOffersList_UsesGlobalPaginate(t *testing.T) {
+	bindGlobalPaginate(t, true)
+	capture := &paginateCapture{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{capture: capture}, nil
+		},
+	}
+
+	_, err := runProducts(
+		t,
+		deps,
+		"offers",
+		"list",
+		"--package-name", "com.example.app",
+		"--product-id", "coins_100",
+		"--purchase-option-id", "buy",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !capture.offersPaginate {
+		t.Fatal("expected paginate=true from global flags")
 	}
 }
 

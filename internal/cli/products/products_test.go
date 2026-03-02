@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"flag"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"google.golang.org/api/androidpublisher/v3"
@@ -43,9 +45,16 @@ type fakeClient struct {
 	activatePurchaseOptFn   func(packageName, productID, purchaseOptionID string) ([]gpc.OneTimeProductInfo, error)
 	deactivatePurchaseOptFn func(packageName, productID, purchaseOptionID string) ([]gpc.OneTimeProductInfo, error)
 	deletePurchaseOptFn     func(packageName, productID, purchaseOptionID string, force bool) error
+
+	capture *paginateCapture
 }
 
-func (f fakeClient) ListOneTimeProducts(_ context.Context, _ string, _ int64, _ string, _ bool) (gpc.OneTimeProductsListInfo, error) {
+func (f fakeClient) ListOneTimeProducts(_ context.Context, _ string, pageSize int64, pageToken string, paginate bool) (gpc.OneTimeProductsListInfo, error) {
+	if f.capture != nil {
+		f.capture.productsPageSize = pageSize
+		f.capture.productsPageTok = pageToken
+		f.capture.productsPaginate = paginate
+	}
 	return f.list, f.listErr
 }
 
@@ -68,7 +77,12 @@ func (f fakeClient) UpdateOneTimeProduct(_ context.Context, packageName, product
 }
 
 func (f fakeClient) DeleteOneTimeProduct(_ context.Context, _, _ string) error { return f.deleteErr }
-func (f fakeClient) ListOneTimeProductOffers(_ context.Context, _, _, _ string, _ int64, _ string, _ bool) (gpc.OneTimeProductOffersListInfo, error) {
+func (f fakeClient) ListOneTimeProductOffers(_ context.Context, _, _, _ string, pageSize int64, pageToken string, paginate bool) (gpc.OneTimeProductOffersListInfo, error) {
+	if f.capture != nil {
+		f.capture.offersPageSize = pageSize
+		f.capture.offersPageTok = pageToken
+		f.capture.offersPaginate = paginate
+	}
 	return f.offers, f.offersErr
 }
 func (f fakeClient) ActivateOneTimeProductOffer(_ context.Context, _, _, _, _ string) (gpc.OneTimeProductOfferInfo, error) {
@@ -118,7 +132,25 @@ func defaultConfig() config.Config {
 	}
 }
 
+type paginateCapture struct {
+	productsPageSize int64
+	productsPageTok  string
+	productsPaginate bool
+	offersPageSize   int64
+	offersPageTok    string
+	offersPaginate   bool
+}
+
+func bindGlobalPaginate(t *testing.T, paginate bool) {
+	t.Helper()
+	fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
+	cfg := &shared.GlobalFlags{}
+	shared.BindGlobalFlags(fs, cfg)
+	cfg.Paginate = paginate
+}
+
 func TestProductsList_ReturnsProducts(t *testing.T) {
+	bindGlobalPaginate(t, false)
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
@@ -136,6 +168,26 @@ func TestProductsList_ReturnsProducts(t *testing.T) {
 	}
 	if !strings.Contains(out, `"productId":"coins_100"`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestProductsList_UsesGlobalPaginate(t *testing.T) {
+	bindGlobalPaginate(t, true)
+	capture := &paginateCapture{}
+	fc := fakeClient{capture: capture}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	_, err := runProducts(t, deps, "list", "--package-name", "com.example.app")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !capture.productsPaginate {
+		t.Fatal("expected paginate=true from global flags")
 	}
 }
 
