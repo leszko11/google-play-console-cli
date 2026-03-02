@@ -17,6 +17,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - End-to-end deploy orchestration (`deploy`)
 - Reviews management (`reviews list/get/reply`)
 - Monetization subscription commands (`subscriptions ...` including offers)
+- Monetization one-time product commands (`products ...`)
 - Purchase lifecycle commands (`purchases ...`)
 - Account users management (`users list/create/update/delete`)
 - Per-app grants management (`grants create/update/delete`)
@@ -25,7 +26,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 
 ## Not Yet Implemented
 
-- One-time products and legacy in-app-products command groups
+- Legacy in-app-products command group
 - Reporting surfaces
 
 ## Build
@@ -138,6 +139,13 @@ gpc subscriptions offers create --package-name com.example.app --product-id prem
 gpc subscriptions offers update --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --input /path/to/offer.json --update-mask phases,regionalConfigs
 gpc subscriptions offers delete --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --confirm
 
+# One-time product management
+gpc products list --package-name com.example.app --page-size 100
+gpc products get --package-name com.example.app --product-id coins_100
+gpc products create --package-name com.example.app --input /path/to/one-time-product.json
+gpc products update --package-name com.example.app --product-id coins_100 --input /path/to/one-time-product.json --update-mask listings,purchaseOptions
+gpc products delete --package-name com.example.app --product-id coins_100 --confirm
+
 # Purchase management
 gpc purchases products get --package-name com.example.app --product-id premium --token <purchase-token>
 gpc purchases products acknowledge --package-name com.example.app --product-id premium --token <purchase-token>
@@ -231,6 +239,7 @@ gpc deobfuscation --help
 gpc deploy --help
 gpc reviews --help
 gpc subscriptions --help
+gpc products --help
 gpc purchases --help
 gpc users --help
 gpc grants --help
