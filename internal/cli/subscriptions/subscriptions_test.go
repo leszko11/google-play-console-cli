@@ -36,6 +36,10 @@ type fakeClient struct {
 	offerUpdate        gpc.SubscriptionOfferInfo
 	offerUpdateErr     error
 	offerDeleteErr     error
+	basePlanUpdates    []gpc.SubscriptionInfo
+	basePlanActErr     error
+	basePlanDeactErr   error
+	basePlanDeleteErr  error
 	capturedInput      *androidpublisher.Subscription
 	capturedOfferInput *androidpublisher.SubscriptionOffer
 	captured           struct {
@@ -80,6 +84,24 @@ func (f *fakeClient) DeleteSubscription(_ context.Context, _, productID string) 
 func (f *fakeClient) ArchiveSubscription(_ context.Context, _, productID string) error {
 	f.productID = productID
 	return f.archiveErr
+}
+
+func (f *fakeClient) ActivateSubscriptionBasePlan(_ context.Context, _ string, productID, basePlanID string) ([]gpc.SubscriptionInfo, error) {
+	f.productID = productID
+	f.basePlanID = basePlanID
+	return f.basePlanUpdates, f.basePlanActErr
+}
+
+func (f *fakeClient) DeactivateSubscriptionBasePlan(_ context.Context, _ string, productID, basePlanID string) ([]gpc.SubscriptionInfo, error) {
+	f.productID = productID
+	f.basePlanID = basePlanID
+	return f.basePlanUpdates, f.basePlanDeactErr
+}
+
+func (f *fakeClient) DeleteSubscriptionBasePlan(_ context.Context, _ string, productID, basePlanID string) error {
+	f.productID = productID
+	f.basePlanID = basePlanID
+	return f.basePlanDeleteErr
 }
 
 func (f *fakeClient) ListSubscriptionOffers(_ context.Context, _ string, productID, basePlanID string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionOffersListInfo, error) {

@@ -149,6 +149,105 @@ func (c *Client) ArchiveSubscription(ctx context.Context, packageName, productID
 	return nil
 }
 
+func (c *Client) ActivateSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) ([]SubscriptionInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return nil, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return nil, fmt.Errorf("product id is required")
+	}
+	basePlanID = strings.TrimSpace(basePlanID)
+	if basePlanID == "" {
+		return nil, fmt.Errorf("base plan id is required")
+	}
+	if c == nil || c.service == nil {
+		return nil, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Monetization.Subscriptions.BasePlans.BatchUpdateStates(
+		packageName,
+		productID,
+		&androidpublisher.BatchUpdateBasePlanStatesRequest{
+			Requests: []*androidpublisher.UpdateBasePlanStateRequest{
+				{
+					ActivateBasePlanRequest: &androidpublisher.ActivateBasePlanRequest{
+						PackageName: packageName,
+						ProductId:   productID,
+						BasePlanId:  basePlanID,
+					},
+				},
+			},
+		},
+	).Context(ctx).Do()
+	if err != nil {
+		return nil, mapGoogleAPIError(err)
+	}
+	return subscriptionInfosFromSlice(resp.Subscriptions), nil
+}
+
+func (c *Client) DeactivateSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) ([]SubscriptionInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return nil, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return nil, fmt.Errorf("product id is required")
+	}
+	basePlanID = strings.TrimSpace(basePlanID)
+	if basePlanID == "" {
+		return nil, fmt.Errorf("base plan id is required")
+	}
+	if c == nil || c.service == nil {
+		return nil, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Monetization.Subscriptions.BasePlans.BatchUpdateStates(
+		packageName,
+		productID,
+		&androidpublisher.BatchUpdateBasePlanStatesRequest{
+			Requests: []*androidpublisher.UpdateBasePlanStateRequest{
+				{
+					DeactivateBasePlanRequest: &androidpublisher.DeactivateBasePlanRequest{
+						PackageName: packageName,
+						ProductId:   productID,
+						BasePlanId:  basePlanID,
+					},
+				},
+			},
+		},
+	).Context(ctx).Do()
+	if err != nil {
+		return nil, mapGoogleAPIError(err)
+	}
+	return subscriptionInfosFromSlice(resp.Subscriptions), nil
+}
+
+func (c *Client) DeleteSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) error {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return fmt.Errorf("product id is required")
+	}
+	basePlanID = strings.TrimSpace(basePlanID)
+	if basePlanID == "" {
+		return fmt.Errorf("base plan id is required")
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := c.service.Monetization.Subscriptions.BasePlans.Delete(packageName, productID, basePlanID).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
 func (c *Client) ListSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, pageSize int64, pageToken string, paginate bool) (SubscriptionOffersListInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -394,4 +493,15 @@ func subscriptionOfferInfoFromOffer(offer *androidpublisher.SubscriptionOffer) S
 		PhaseCount:  len(offer.Phases),
 		TagCount:    len(offer.OfferTags),
 	}
+}
+
+func subscriptionInfosFromSlice(subscriptions []*androidpublisher.Subscription) []SubscriptionInfo {
+	if len(subscriptions) == 0 {
+		return nil
+	}
+	out := make([]SubscriptionInfo, 0, len(subscriptions))
+	for _, subscription := range subscriptions {
+		out = append(out, subscriptionInfoFromSubscription(subscription))
+	}
+	return out
 }

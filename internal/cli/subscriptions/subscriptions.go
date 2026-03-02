@@ -23,6 +23,9 @@ type Client interface {
 	UpdateSubscription(ctx context.Context, packageName, productID string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error)
 	DeleteSubscription(ctx context.Context, packageName, productID string) error
 	ArchiveSubscription(ctx context.Context, packageName, productID string) error
+	ActivateSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) ([]gpc.SubscriptionInfo, error)
+	DeactivateSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) ([]gpc.SubscriptionInfo, error)
+	DeleteSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) error
 
 	ListSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionOffersListInfo, error)
 	GetSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error)
@@ -52,6 +55,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newUpdateCommand(deps),
 			newDeleteCommand(deps),
 			newArchiveCommand(deps),
+			newBasePlansCommand(deps),
 			newOffersCommand(deps),
 		},
 	}
@@ -296,6 +300,156 @@ func newArchiveCommand(deps Deps) *ffcli.Command {
 				"packageName": pkg,
 				"productId":   productID,
 				"status":      "archived",
+			})
+		},
+	}
+}
+
+func newBasePlansCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "base-plans",
+		ShortHelp: "Manage subscription base plans",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newBasePlansActivateCommand(deps),
+			newBasePlansDeactivateCommand(deps),
+			newBasePlansDeleteCommand(deps),
+		},
+	}
+}
+
+func newBasePlansActivateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("activate", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, basePlanID string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
+
+	return &ffcli.Command{
+		Name:      "activate",
+		ShortHelp: "Activate a subscription base plan",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			basePlanID = strings.TrimSpace(basePlanID)
+			if basePlanID == "" {
+				return fmt.Errorf("--base-plan-id is required")
+			}
+
+			subscriptions, err := client.ActivateSubscriptionBasePlan(requestCtx, pkg, productID, basePlanID)
+			if err != nil {
+				return fmt.Errorf("failed to activate subscription base plan: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":   pkg,
+				"productId":     productID,
+				"basePlanId":    basePlanID,
+				"subscriptions": subscriptions,
+				"status":        "activated",
+			})
+		},
+	}
+}
+
+func newBasePlansDeactivateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("deactivate", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, basePlanID string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deactivating the base plan (required)")
+
+	return &ffcli.Command{
+		Name:      "deactivate",
+		ShortHelp: "Deactivate a subscription base plan",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			basePlanID = strings.TrimSpace(basePlanID)
+			if basePlanID == "" {
+				return fmt.Errorf("--base-plan-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to deactivate base plan %q", basePlanID)
+			}
+
+			subscriptions, err := client.DeactivateSubscriptionBasePlan(requestCtx, pkg, productID, basePlanID)
+			if err != nil {
+				return fmt.Errorf("failed to deactivate subscription base plan: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":   pkg,
+				"productId":     productID,
+				"basePlanId":    basePlanID,
+				"subscriptions": subscriptions,
+				"status":        "deactivated",
+			})
+		},
+	}
+}
+
+func newBasePlansDeleteCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, basePlanID string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deleting the base plan (required)")
+
+	return &ffcli.Command{
+		Name:      "delete",
+		ShortHelp: "Delete a subscription base plan",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			basePlanID = strings.TrimSpace(basePlanID)
+			if basePlanID == "" {
+				return fmt.Errorf("--base-plan-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to delete base plan %q", basePlanID)
+			}
+
+			if err := client.DeleteSubscriptionBasePlan(requestCtx, pkg, productID, basePlanID); err != nil {
+				return fmt.Errorf("failed to delete subscription base plan: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"productId":   productID,
+				"basePlanId":  basePlanID,
+				"status":      "deleted",
 			})
 		},
 	}
