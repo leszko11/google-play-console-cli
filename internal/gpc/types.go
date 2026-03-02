@@ -41,6 +41,13 @@ type AppDetailsUpdate struct {
 	ContactWebsite  string
 }
 
+type ImageInfo struct {
+	ID     string `json:"id,omitempty"`
+	SHA1   string `json:"sha1,omitempty"`
+	SHA256 string `json:"sha256,omitempty"`
+	URL    string `json:"url,omitempty"`
+}
+
 type TestersInfo struct {
 	Track        string   `json:"track,omitempty"`
 	GoogleGroups []string `json:"googleGroups,omitempty"`

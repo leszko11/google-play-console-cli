@@ -3,6 +3,7 @@ package gpc
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"google.golang.org/api/androidpublisher/v3"
@@ -327,6 +328,139 @@ func (c *Client) GetCountryAvailability(ctx context.Context, packageName, editID
 	return countryAvailabilityInfoFromTrackCountryAvailability(track, availability), nil
 }
 
+func (c *Client) ListImages(ctx context.Context, packageName, editID, language, imageType string) ([]ImageInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return nil, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return nil, fmt.Errorf("edit id is required")
+	}
+	language = strings.TrimSpace(language)
+	if language == "" {
+		return nil, fmt.Errorf("language is required")
+	}
+	imageType = strings.TrimSpace(imageType)
+	if imageType == "" {
+		return nil, fmt.Errorf("image type is required")
+	}
+	if c == nil || c.service == nil {
+		return nil, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Edits.Images.List(packageName, editID, language, imageType).Context(ctx).Do()
+	if err != nil {
+		return nil, mapGoogleAPIError(err)
+	}
+	images := make([]ImageInfo, 0, len(resp.Images))
+	for _, image := range resp.Images {
+		images = append(images, imageInfoFromImage(image))
+	}
+	return images, nil
+}
+
+func (c *Client) UploadImage(ctx context.Context, packageName, editID, language, imageType, imagePath string) (ImageInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return ImageInfo{}, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return ImageInfo{}, fmt.Errorf("edit id is required")
+	}
+	language = strings.TrimSpace(language)
+	if language == "" {
+		return ImageInfo{}, fmt.Errorf("language is required")
+	}
+	imageType = strings.TrimSpace(imageType)
+	if imageType == "" {
+		return ImageInfo{}, fmt.Errorf("image type is required")
+	}
+	imagePath = strings.TrimSpace(imagePath)
+	if imagePath == "" {
+		return ImageInfo{}, fmt.Errorf("image path is required")
+	}
+	if c == nil || c.service == nil {
+		return ImageInfo{}, ErrInvalidCredentials
+	}
+
+	file, err := os.Open(imagePath)
+	if err != nil {
+		return ImageInfo{}, fmt.Errorf("open image file: %w", err)
+	}
+	defer file.Close()
+
+	resp, err := c.service.Edits.Images.Upload(packageName, editID, language, imageType).Media(file).Context(ctx).Do()
+	if err != nil {
+		return ImageInfo{}, mapGoogleAPIError(err)
+	}
+	return imageInfoFromImage(resp.Image), nil
+}
+
+func (c *Client) DeleteImage(ctx context.Context, packageName, editID, language, imageType, imageID string) error {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return fmt.Errorf("edit id is required")
+	}
+	language = strings.TrimSpace(language)
+	if language == "" {
+		return fmt.Errorf("language is required")
+	}
+	imageType = strings.TrimSpace(imageType)
+	if imageType == "" {
+		return fmt.Errorf("image type is required")
+	}
+	imageID = strings.TrimSpace(imageID)
+	if imageID == "" {
+		return fmt.Errorf("image id is required")
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := c.service.Edits.Images.Delete(packageName, editID, language, imageType, imageID).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
+func (c *Client) DeleteAllImages(ctx context.Context, packageName, editID, language, imageType string) ([]ImageInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return nil, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return nil, fmt.Errorf("edit id is required")
+	}
+	language = strings.TrimSpace(language)
+	if language == "" {
+		return nil, fmt.Errorf("language is required")
+	}
+	imageType = strings.TrimSpace(imageType)
+	if imageType == "" {
+		return nil, fmt.Errorf("image type is required")
+	}
+	if c == nil || c.service == nil {
+		return nil, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Edits.Images.Deleteall(packageName, editID, language, imageType).Context(ctx).Do()
+	if err != nil {
+		return nil, mapGoogleAPIError(err)
+	}
+	deleted := make([]ImageInfo, 0, len(resp.Deleted))
+	for _, image := range resp.Deleted {
+		deleted = append(deleted, imageInfoFromImage(image))
+	}
+	return deleted, nil
+}
+
 func (c *Client) DeleteListing(ctx context.Context, packageName, editID, language string) error {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -404,6 +538,18 @@ func countryAvailabilityInfoFromTrackCountryAvailability(track string, availabil
 		info.Countries = append(info.Countries, CountryTargetedInfo{CountryCode: country.CountryCode})
 	}
 	return info
+}
+
+func imageInfoFromImage(image *androidpublisher.Image) ImageInfo {
+	if image == nil {
+		return ImageInfo{}
+	}
+	return ImageInfo{
+		ID:     image.Id,
+		SHA1:   image.Sha1,
+		SHA256: image.Sha256,
+		URL:    image.Url,
+	}
 }
 
 func editInfoFromAppEdit(edit *androidpublisher.AppEdit) EditInfo {

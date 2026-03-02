@@ -4,6 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -36,6 +41,13 @@ type fakeClient struct {
 	updateErr        error
 	delListErr       error
 	delAllErr        error
+	images           []gpc.ImageInfo
+	image            gpc.ImageInfo
+	imagesErr        error
+	uploadImageErr   error
+	deleteImageErr   error
+	deleteAllImgErr  error
+	uploadImageFn    func(packageName, editID, language, imageType, imagePath string) (gpc.ImageInfo, error)
 }
 
 func (f fakeClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, error) {
@@ -81,6 +93,21 @@ func (f fakeClient) UpdateListing(_ context.Context, _, _, _ string, _ gpc.Listi
 }
 func (f fakeClient) DeleteListing(_ context.Context, _, _, _ string) error  { return f.delListErr }
 func (f fakeClient) DeleteAllListings(_ context.Context, _, _ string) error { return f.delAllErr }
+func (f fakeClient) ListImages(_ context.Context, _, _, _, _ string) ([]gpc.ImageInfo, error) {
+	return f.images, f.imagesErr
+}
+func (f fakeClient) UploadImage(_ context.Context, packageName, editID, language, imageType, imagePath string) (gpc.ImageInfo, error) {
+	if f.uploadImageFn != nil {
+		return f.uploadImageFn(packageName, editID, language, imageType, imagePath)
+	}
+	return f.image, f.uploadImageErr
+}
+func (f fakeClient) DeleteImage(_ context.Context, _, _, _, _, _ string) error {
+	return f.deleteImageErr
+}
+func (f fakeClient) DeleteAllImages(_ context.Context, _, _, _, _ string) ([]gpc.ImageInfo, error) {
+	return f.images, f.deleteAllImgErr
+}
 
 func runEdits(t *testing.T, deps Deps, args ...string) (string, error) {
 	t.Helper()
@@ -511,4 +538,202 @@ func TestEditsListingsDelete_RequiresLocale(t *testing.T) {
 	if !strings.Contains(err.Error(), "--locale is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func TestEditsImagesList_ReturnsImages(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				images: []gpc.ImageInfo{
+					{ID: "img-1", URL: "https://example.com/1.png"},
+					{ID: "img-2", URL: "https://example.com/2.png"},
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"images",
+		"list",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+		"--image-type", "phoneScreenshots",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"imageType":"phoneScreenshots"`) || !strings.Contains(out, `"id":"img-1"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsImagesUpload_ReturnsUploaded(t *testing.T) {
+	imagePath := writePNG(t, 320, 320)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				uploadImageFn: func(_, _, _, imageType, gotPath string) (gpc.ImageInfo, error) {
+					if imageType != "phoneScreenshots" {
+						t.Fatalf("unexpected image type: %q", imageType)
+					}
+					if gotPath != imagePath {
+						t.Fatalf("unexpected image path: %q", gotPath)
+					}
+					return gpc.ImageInfo{ID: "img-uploaded"}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"images",
+		"upload",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+		"--image-type", "phoneScreenshots",
+		"--file", imagePath,
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"uploaded"`) || !strings.Contains(out, `"id":"img-uploaded"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsImagesUpload_RejectsWrongDimensionsForIcon(t *testing.T) {
+	imagePath := writePNG(t, 320, 320)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(
+		t,
+		deps,
+		"images",
+		"upload",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+		"--image-type", "icon",
+		"--file", imagePath,
+	)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "requires dimensions 512x512") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEditsImagesDelete_ReturnsDeleted(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"images",
+		"delete",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+		"--image-type", "phoneScreenshots",
+		"--image-id", "img-1",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"deleted"`) || !strings.Contains(out, `"imageId":"img-1"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsImagesDeleteAll_ReturnsDeletedAll(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{images: []gpc.ImageInfo{{ID: "img-1"}}}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"images",
+		"delete-all",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+		"--image-type", "phoneScreenshots",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"deleted_all"`) || !strings.Contains(out, `"id":"img-1"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsImagesList_RequiresImageType(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(
+		t,
+		deps,
+		"images",
+		"list",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+	)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--image-type is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func writePNG(t *testing.T, width, height int) string {
+	t.Helper()
+
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{R: 0x22, G: 0x44, B: 0x88, A: 0xff})
+		}
+	}
+
+	path := filepath.Join(t.TempDir(), "test.png")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create png: %v", err)
+	}
+	defer file.Close()
+	if err := png.Encode(file, img); err != nil {
+		t.Fatalf("encode png: %v", err)
+	}
+
+	return path
 }
