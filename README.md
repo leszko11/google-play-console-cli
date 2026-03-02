@@ -20,12 +20,13 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Purchase lifecycle commands (`purchases ...`)
 - Account users management (`users list/create/update/delete`)
 - Per-app grants management (`grants create/update/delete`)
+- Internal app sharing upload (`internal-sharing upload`)
 - CI quality gates for format, lint, test, and build
 
 ## Not Yet Implemented
 
 - One-time products and legacy in-app-products command groups
-- Internal app sharing and reporting surfaces
+- Reporting surfaces
 
 ## Build
 
@@ -157,6 +158,10 @@ gpc grants create --parent developers/<developer-id>/users/<email> --input /path
 gpc grants update --name developers/<developer-id>/users/<email>/grants/<package-name> --input /path/to/grant.json --update-mask appLevelPermissions
 gpc grants delete --name developers/<developer-id>/users/<email>/grants/<package-name> --confirm
 
+# Internal app sharing upload (no edit required)
+gpc internal-sharing upload --package-name com.example.app --apk /path/to/app.apk
+gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aab
+
 # Inspect tracks inside an edit
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
 gpc tracks get --package-name com.example.app --edit-id <edit-id> --track production
@@ -229,4 +234,5 @@ gpc subscriptions --help
 gpc purchases --help
 gpc users --help
 gpc grants --help
+gpc internal-sharing --help
 ```
