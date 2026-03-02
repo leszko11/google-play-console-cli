@@ -24,6 +24,12 @@ type fakeClient struct {
 	appDetailsErr    error
 	updateDetailsErr error
 	updateDetailsFn  func(packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
+	testers          gpc.TestersInfo
+	testersErr       error
+	updateTestersErr error
+	updateTestersFn  func(packageName, editID, track string, googleGroups []string) (gpc.TestersInfo, error)
+	countryAvail     gpc.CountryAvailabilityInfo
+	countryAvailErr  error
 	listing          gpc.ListingInfo
 	listings         []gpc.ListingInfo
 	listErr          error
@@ -51,6 +57,18 @@ func (f fakeClient) UpdateAppDetails(_ context.Context, packageName, editID stri
 		return f.updateDetailsFn(packageName, editID, update)
 	}
 	return f.appDetails, f.updateDetailsErr
+}
+func (f fakeClient) GetTesters(_ context.Context, _, _, _ string) (gpc.TestersInfo, error) {
+	return f.testers, f.testersErr
+}
+func (f fakeClient) UpdateTesters(_ context.Context, packageName, editID, track string, googleGroups []string) (gpc.TestersInfo, error) {
+	if f.updateTestersFn != nil {
+		return f.updateTestersFn(packageName, editID, track, googleGroups)
+	}
+	return f.testers, f.updateTestersErr
+}
+func (f fakeClient) GetCountryAvailability(_ context.Context, _, _, _ string) (gpc.CountryAvailabilityInfo, error) {
+	return f.countryAvail, f.countryAvailErr
 }
 func (f fakeClient) GetListing(_ context.Context, _, _, _ string) (gpc.ListingInfo, error) {
 	return f.listing, f.listErr
@@ -280,6 +298,132 @@ func TestEditsDetailsUpdate_ReturnsAPIError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	if !strings.Contains(err.Error(), "failed to update app details") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEditsTestersGet_ReturnsTesters(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				testers: gpc.TestersInfo{
+					Track:        "internal",
+					GoogleGroups: []string{"qa-team@example.com"},
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(t, deps, "testers", "get", "--package-name", "com.example.app", "--edit-id", "edit-1", "--track", "internal")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"track":"internal"`) || !strings.Contains(out, `"qa-team@example.com"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsTestersUpdate_ReturnsStatusUpdated(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				updateTestersFn: func(_, _, track string, googleGroups []string) (gpc.TestersInfo, error) {
+					if track != "internal" {
+						t.Fatalf("unexpected track: %q", track)
+					}
+					if len(googleGroups) != 2 || googleGroups[0] != "qa-team@example.com" || googleGroups[1] != "beta@example.com" {
+						t.Fatalf("unexpected google groups: %#v", googleGroups)
+					}
+					return gpc.TestersInfo{Track: track, GoogleGroups: googleGroups}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"testers",
+		"update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--track", "internal",
+		"--google-groups", "qa-team@example.com,beta@example.com",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"updated"`) || !strings.Contains(out, `"qa-team@example.com"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsTestersUpdate_RequiresGoogleGroups(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(
+		t,
+		deps,
+		"testers",
+		"update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--track", "internal",
+	)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--google-groups is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEditsCountryAvailabilityGet_ReturnsAvailability(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				countryAvail: gpc.CountryAvailabilityInfo{
+					Track:       "production",
+					RestOfWorld: true,
+					Countries: []gpc.CountryTargetedInfo{
+						{CountryCode: "PL"},
+						{CountryCode: "US"},
+					},
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(t, deps, "country-availability", "get", "--package-name", "com.example.app", "--edit-id", "edit-1", "--track", "production")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"restOfWorld":true`) || !strings.Contains(out, `"countryCode":"PL"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsCountryAvailabilityGet_RequiresTrack(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(t, deps, "country-availability", "get", "--package-name", "com.example.app", "--edit-id", "edit-1")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--track is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

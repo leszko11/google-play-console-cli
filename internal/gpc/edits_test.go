@@ -42,6 +42,15 @@ func TestEditMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.UpdateAppDetails(context.Background(), "com.example.app", "edit-1", AppDetailsUpdate{ContactEmail: "help@example.com"}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from UpdateAppDetails, got %v", err)
 	}
+	if _, err := c.GetTesters(context.Background(), "com.example.app", "edit-1", "internal"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from GetTesters, got %v", err)
+	}
+	if _, err := c.UpdateTesters(context.Background(), "com.example.app", "edit-1", "internal", []string{"qa@example.com"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from UpdateTesters, got %v", err)
+	}
+	if _, err := c.GetCountryAvailability(context.Background(), "com.example.app", "edit-1", "production"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from GetCountryAvailability, got %v", err)
+	}
 }
 
 func TestEditMethods_ValidateArgs(t *testing.T) {
@@ -107,6 +116,15 @@ func TestListingMethods_ValidateArgs(t *testing.T) {
 	if _, err := c.UpdateAppDetails(context.Background(), "com.example.app", "edit-1", AppDetailsUpdate{}); err == nil || !strings.Contains(err.Error(), "at least one app detail field must be provided") {
 		t.Fatalf("unexpected UpdateAppDetails empty update error: %v", err)
 	}
+	if _, err := c.GetTesters(context.Background(), "com.example.app", "edit-1", ""); err == nil || !strings.Contains(err.Error(), "track is required") {
+		t.Fatalf("unexpected GetTesters track error: %v", err)
+	}
+	if _, err := c.UpdateTesters(context.Background(), "com.example.app", "edit-1", "internal", nil); err == nil || !strings.Contains(err.Error(), "at least one google group is required") {
+		t.Fatalf("unexpected UpdateTesters groups error: %v", err)
+	}
+	if _, err := c.GetCountryAvailability(context.Background(), "com.example.app", "edit-1", ""); err == nil || !strings.Contains(err.Error(), "track is required") {
+		t.Fatalf("unexpected GetCountryAvailability track error: %v", err)
+	}
 }
 
 func TestListingInfoFromListing(t *testing.T) {
@@ -130,5 +148,28 @@ func TestAppDetailsInfoFromDetails(t *testing.T) {
 	})
 	if got.DefaultLanguage != "en-US" || got.ContactEmail != "support@example.com" || got.ContactWebsite != "https://example.com" {
 		t.Fatalf("unexpected app details map: %+v", got)
+	}
+}
+
+func TestTestersInfoFromTesters(t *testing.T) {
+	got := testersInfoFromTesters("internal", &androidpublisher.Testers{
+		GoogleGroups: []string{"qa-team@example.com"},
+	})
+	if got.Track != "internal" || len(got.GoogleGroups) != 1 || got.GoogleGroups[0] != "qa-team@example.com" {
+		t.Fatalf("unexpected testers map: %+v", got)
+	}
+}
+
+func TestCountryAvailabilityInfoFromTrackCountryAvailability(t *testing.T) {
+	got := countryAvailabilityInfoFromTrackCountryAvailability("production", &androidpublisher.TrackCountryAvailability{
+		RestOfWorld:        true,
+		SyncWithProduction: false,
+		Countries: []*androidpublisher.TrackTargetedCountry{
+			{CountryCode: "PL"},
+			{CountryCode: "US"},
+		},
+	})
+	if got.Track != "production" || !got.RestOfWorld || len(got.Countries) != 2 {
+		t.Fatalf("unexpected country availability map: %+v", got)
 	}
 }

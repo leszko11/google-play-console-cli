@@ -22,6 +22,9 @@ type Client interface {
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	GetAppDetails(ctx context.Context, packageName, editID string) (gpc.AppDetailsInfo, error)
 	UpdateAppDetails(ctx context.Context, packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
+	GetTesters(ctx context.Context, packageName, editID, track string) (gpc.TestersInfo, error)
+	UpdateTesters(ctx context.Context, packageName, editID, track string, googleGroups []string) (gpc.TestersInfo, error)
+	GetCountryAvailability(ctx context.Context, packageName, editID, track string) (gpc.CountryAvailabilityInfo, error)
 	GetListing(ctx context.Context, packageName, editID, language string) (gpc.ListingInfo, error)
 	ListListings(ctx context.Context, packageName, editID string) ([]gpc.ListingInfo, error)
 	UpdateListing(ctx context.Context, packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
@@ -50,6 +53,8 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newCommitCommand(deps),
 			newDeleteCommand(deps),
 			newDetailsCommand(deps),
+			newTestersCommand(deps),
+			newCountryAvailabilityCommand(deps),
 			newListingsCommand(deps),
 		},
 	}
@@ -360,6 +365,155 @@ func newDetailsUpdateCommand(deps Deps) *ffcli.Command {
 	}
 }
 
+func newTestersCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "testers",
+		ShortHelp: "Manage testers for a track inside an edit",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newTestersGetCommand(deps),
+			newTestersUpdateCommand(deps),
+		},
+	}
+}
+
+func newTestersGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, track string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&track, "track", "", "Track name (e.g. internal, closed)")
+
+	return &ffcli.Command{
+		Name:      "get",
+		ShortHelp: "Get tester Google Groups for a track in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			track = strings.TrimSpace(track)
+			if track == "" {
+				return fmt.Errorf("--track is required")
+			}
+			testers, err := client.GetTesters(requestCtx, pkg, editID, track)
+			if err != nil {
+				return fmt.Errorf("failed to get testers: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"testers":     testers,
+			})
+		},
+	}
+}
+
+func newTestersUpdateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("update", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, track, groupsCSV string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&track, "track", "", "Track name (e.g. internal, closed)")
+	fs.StringVar(&groupsCSV, "google-groups", "", "Comma-separated Google Group email addresses")
+
+	return &ffcli.Command{
+		Name:      "update",
+		ShortHelp: "Update tester Google Groups for a track in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			track = strings.TrimSpace(track)
+			if track == "" {
+				return fmt.Errorf("--track is required")
+			}
+			googleGroups := parseCommaSeparated(groupsCSV)
+			if len(googleGroups) == 0 {
+				return fmt.Errorf("--google-groups is required")
+			}
+			testers, err := client.UpdateTesters(requestCtx, pkg, editID, track, googleGroups)
+			if err != nil {
+				return fmt.Errorf("failed to update testers: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"testers":     testers,
+				"status":      "updated",
+			})
+		},
+	}
+}
+
+func newCountryAvailabilityCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "country-availability",
+		ShortHelp: "Inspect track country availability inside an edit",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newCountryAvailabilityGetCommand(deps),
+		},
+	}
+}
+
+func newCountryAvailabilityGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, track string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&track, "track", "", "Track name (e.g. production)")
+
+	return &ffcli.Command{
+		Name:      "get",
+		ShortHelp: "Get country availability for a track in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			track = strings.TrimSpace(track)
+			if track == "" {
+				return fmt.Errorf("--track is required")
+			}
+			availability, err := client.GetCountryAvailability(requestCtx, pkg, editID, track)
+			if err != nil {
+				return fmt.Errorf("failed to get country availability: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":         pkg,
+				"editId":              editID,
+				"countryAvailability": availability,
+			})
+		},
+	}
+}
+
 func newListingsListCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
@@ -393,6 +547,19 @@ func newListingsListCommand(deps Deps) *ffcli.Command {
 			})
 		},
 	}
+}
+
+func parseCommaSeparated(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		if value == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
 }
 
 func newListingsGetCommand(deps Deps) *ffcli.Command {
