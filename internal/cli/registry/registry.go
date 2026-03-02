@@ -14,6 +14,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/cli/subscriptions"
 	"github.com/leszko11/google-play-console-cli/internal/cli/tracks"
+	"github.com/leszko11/google-play-console-cli/internal/cli/users"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
@@ -36,6 +37,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		reviews.NewCommand(reviews.Deps{}),
 		subscriptions.NewCommand(subscriptions.Deps{}),
 		purchases.NewCommand(purchases.Deps{}),
+		users.NewCommand(users.Deps{}),
 		completion.NewCommand(),
 	}
 }

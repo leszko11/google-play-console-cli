@@ -80,6 +80,21 @@ type ReviewReplyInfo struct {
 	LastEditedNanos   int64  `json:"lastEditedNanos,omitempty"`
 }
 
+type UserInfo struct {
+	Name                        string   `json:"name,omitempty"`
+	Email                       string   `json:"email,omitempty"`
+	AccessState                 string   `json:"accessState,omitempty"`
+	ExpirationTime              string   `json:"expirationTime,omitempty"`
+	Partial                     bool     `json:"partial,omitempty"`
+	DeveloperAccountPermissions []string `json:"developerAccountPermissions,omitempty"`
+	GrantCount                  int      `json:"grantCount,omitempty"`
+}
+
+type UsersListInfo struct {
+	Users         []UserInfo `json:"users,omitempty"`
+	NextPageToken string     `json:"nextPageToken,omitempty"`
+}
+
 type SubscriptionInfo struct {
 	PackageName   string `json:"packageName,omitempty"`
 	ProductID     string `json:"productId,omitempty"`

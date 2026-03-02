@@ -127,6 +127,10 @@ gpc purchases subscriptions cancel --package-name com.example.app --token <subsc
 gpc purchases subscriptions revoke --package-name com.example.app --token <subscription-token> --refund-type full --confirm
 gpc purchases voided list --package-name com.example.app --max-results 100
 gpc --paginate purchases voided list --package-name com.example.app --max-results 100
+gpc users list --developer-id <developer-id>
+gpc users create --developer-id <developer-id> --input /path/to/user.json
+gpc users update --name developers/<developer-id>/users/<email> --input /path/to/user.json --update-mask expirationTime
+gpc users delete --name developers/<developer-id>/users/<email> --confirm
 ```
 
 ## Expected Outcomes
@@ -185,3 +189,7 @@ gpc --paginate purchases voided list --package-name com.example.app --max-result
   - `gpc purchases subscriptions revoke ... --confirm` should return `status: revoked`.
   - `gpc purchases voided list ...` should return voided purchases and optional `nextToken`.
   - `gpc --paginate purchases voided list ...` should aggregate all pages and return empty `nextToken`.
+  - `gpc users list ...` should return account users with optional `nextPageToken`.
+  - `gpc users create ...` should return `status: created`.
+  - `gpc users update ...` should return `status: updated`.
+  - `gpc users delete ... --confirm` should return `status: deleted`.
