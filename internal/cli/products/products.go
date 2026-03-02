@@ -22,6 +22,10 @@ type Client interface {
 	CreateOneTimeProduct(ctx context.Context, packageName string, product *androidpublisher.OneTimeProduct) (gpc.OneTimeProductInfo, error)
 	UpdateOneTimeProduct(ctx context.Context, packageName, productID string, product *androidpublisher.OneTimeProduct, updateMask string) (gpc.OneTimeProductInfo, error)
 	DeleteOneTimeProduct(ctx context.Context, packageName, productID string) error
+	ListOneTimeProductOffers(ctx context.Context, packageName, productID, purchaseOptionID string, pageSize int64, pageToken string, paginate bool) (gpc.OneTimeProductOffersListInfo, error)
+	ActivateOneTimeProductOffer(ctx context.Context, packageName, productID, purchaseOptionID, offerID string) (gpc.OneTimeProductOfferInfo, error)
+	DeactivateOneTimeProductOffer(ctx context.Context, packageName, productID, purchaseOptionID, offerID string) (gpc.OneTimeProductOfferInfo, error)
+	CancelOneTimeProductOffer(ctx context.Context, packageName, productID, purchaseOptionID, offerID string) (gpc.OneTimeProductOfferInfo, error)
 }
 
 type Deps struct {
@@ -44,6 +48,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newCreateCommand(deps),
 			newUpdateCommand(deps),
 			newDeleteCommand(deps),
+			newOffersCommand(deps),
 		},
 	}
 }
@@ -253,6 +258,227 @@ func newDeleteCommand(deps Deps) *ffcli.Command {
 				"packageName": pkg,
 				"productId":   productID,
 				"status":      "deleted",
+			})
+		},
+	}
+}
+
+func newOffersCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "offers",
+		ShortHelp: "Manage one-time product offers under purchase options",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newOffersListCommand(deps),
+			newOffersActivateCommand(deps),
+			newOffersDeactivateCommand(deps),
+			newOffersCancelCommand(deps),
+		},
+	}
+}
+
+func newOffersListCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, purchaseOptionID, pageToken string
+	var pageSize int64
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "One-time product ID")
+	fs.StringVar(&purchaseOptionID, "purchase-option-id", "", "Purchase option ID")
+	fs.Int64Var(&pageSize, "page-size", 0, "Maximum offers per page")
+	fs.StringVar(&pageToken, "page-token", "", "Page token for the next page")
+
+	return &ffcli.Command{
+		Name:      "list",
+		ShortHelp: "List offers for a one-time product purchase option",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+			if purchaseOptionID == "" {
+				return fmt.Errorf("--purchase-option-id is required")
+			}
+			if pageSize < 0 {
+				return fmt.Errorf("--page-size must be greater than or equal to zero")
+			}
+
+			result, err := client.ListOneTimeProductOffers(requestCtx, pkg, productID, purchaseOptionID, pageSize, pageToken, shared.ActiveGlobalFlags().Paginate)
+			if err != nil {
+				return fmt.Errorf("failed to list one-time product offers: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":      pkg,
+				"productId":        productID,
+				"purchaseOptionId": purchaseOptionID,
+				"offers":           result.Offers,
+				"nextPageToken":    result.NextPageToken,
+			})
+		},
+	}
+}
+
+func newOffersActivateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("activate", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, purchaseOptionID, offerID string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "One-time product ID")
+	fs.StringVar(&purchaseOptionID, "purchase-option-id", "", "Purchase option ID")
+	fs.StringVar(&offerID, "offer-id", "", "Offer ID")
+
+	return &ffcli.Command{
+		Name:      "activate",
+		ShortHelp: "Activate a one-time product offer",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+			if purchaseOptionID == "" {
+				return fmt.Errorf("--purchase-option-id is required")
+			}
+			offerID = strings.TrimSpace(offerID)
+			if offerID == "" {
+				return fmt.Errorf("--offer-id is required")
+			}
+
+			offer, err := client.ActivateOneTimeProductOffer(requestCtx, pkg, productID, purchaseOptionID, offerID)
+			if err != nil {
+				return fmt.Errorf("failed to activate one-time product offer: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":      pkg,
+				"productId":        productID,
+				"purchaseOptionId": purchaseOptionID,
+				"offer":            offer,
+				"status":           "activated",
+			})
+		},
+	}
+}
+
+func newOffersDeactivateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("deactivate", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, purchaseOptionID, offerID string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "One-time product ID")
+	fs.StringVar(&purchaseOptionID, "purchase-option-id", "", "Purchase option ID")
+	fs.StringVar(&offerID, "offer-id", "", "Offer ID")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deactivating the offer (required)")
+
+	return &ffcli.Command{
+		Name:      "deactivate",
+		ShortHelp: "Deactivate a one-time product offer",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+			if purchaseOptionID == "" {
+				return fmt.Errorf("--purchase-option-id is required")
+			}
+			offerID = strings.TrimSpace(offerID)
+			if offerID == "" {
+				return fmt.Errorf("--offer-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to deactivate offer %q", offerID)
+			}
+
+			offer, err := client.DeactivateOneTimeProductOffer(requestCtx, pkg, productID, purchaseOptionID, offerID)
+			if err != nil {
+				return fmt.Errorf("failed to deactivate one-time product offer: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":      pkg,
+				"productId":        productID,
+				"purchaseOptionId": purchaseOptionID,
+				"offer":            offer,
+				"status":           "deactivated",
+			})
+		},
+	}
+}
+
+func newOffersCancelCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("cancel", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, purchaseOptionID, offerID string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "One-time product ID")
+	fs.StringVar(&purchaseOptionID, "purchase-option-id", "", "Purchase option ID")
+	fs.StringVar(&offerID, "offer-id", "", "Offer ID")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm canceling the offer (required)")
+
+	return &ffcli.Command{
+		Name:      "cancel",
+		ShortHelp: "Cancel a one-time product pre-order offer",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+			if purchaseOptionID == "" {
+				return fmt.Errorf("--purchase-option-id is required")
+			}
+			offerID = strings.TrimSpace(offerID)
+			if offerID == "" {
+				return fmt.Errorf("--offer-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to cancel offer %q", offerID)
+			}
+
+			offer, err := client.CancelOneTimeProductOffer(requestCtx, pkg, productID, purchaseOptionID, offerID)
+			if err != nil {
+				return fmt.Errorf("failed to cancel one-time product offer: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":      pkg,
+				"productId":        productID,
+				"purchaseOptionId": purchaseOptionID,
+				"offer":            offer,
+				"status":           "canceled",
 			})
 		},
 	}

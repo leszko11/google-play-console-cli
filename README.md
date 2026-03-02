@@ -146,6 +146,12 @@ gpc products create --package-name com.example.app --input /path/to/one-time-pro
 gpc products update --package-name com.example.app --product-id coins_100 --input /path/to/one-time-product.json --update-mask listings,purchaseOptions
 gpc products delete --package-name com.example.app --product-id coins_100 --confirm
 
+# One-time product offers management
+gpc products offers list --package-name com.example.app --product-id coins_100 --purchase-option-id buy
+gpc products offers activate --package-name com.example.app --product-id coins_100 --purchase-option-id buy --offer-id offer_intro
+gpc products offers deactivate --package-name com.example.app --product-id coins_100 --purchase-option-id buy --offer-id offer_intro --confirm
+gpc products offers cancel --package-name com.example.app --product-id coins_100 --purchase-option-id buy --offer-id offer_preorder --confirm
+
 # Legacy in-app product management
 gpc iap list --package-name com.example.app --max-results 100
 gpc iap get --package-name com.example.app --sku coins_100

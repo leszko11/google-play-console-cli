@@ -144,8 +144,170 @@ func (c *Client) DeleteOneTimeProduct(ctx context.Context, packageName, productI
 	return nil
 }
 
+func (c *Client) ListOneTimeProductOffers(ctx context.Context, packageName, productID, purchaseOptionID string, pageSize int64, pageToken string, paginate bool) (OneTimeProductOffersListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("product id is required")
+	}
+	purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+	if purchaseOptionID == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("purchase option id is required")
+	}
+	if pageSize < 0 {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("page size must be greater than or equal to zero")
+	}
+	pageToken = strings.TrimSpace(pageToken)
+	if c == nil || c.service == nil {
+		return OneTimeProductOffersListInfo{}, ErrInvalidCredentials
+	}
+
+	if !paginate {
+		resp, err := c.oneTimeProductOffersListCall(ctx, packageName, productID, purchaseOptionID, pageSize, pageToken).Do()
+		if err != nil {
+			return OneTimeProductOffersListInfo{}, mapGoogleAPIError(err)
+		}
+		return oneTimeProductOffersListInfoFromResponse(resp), nil
+	}
+
+	result := OneTimeProductOffersListInfo{}
+	nextToken := pageToken
+	for {
+		resp, err := c.oneTimeProductOffersListCall(ctx, packageName, productID, purchaseOptionID, pageSize, nextToken).Do()
+		if err != nil {
+			return OneTimeProductOffersListInfo{}, mapGoogleAPIError(err)
+		}
+		page := oneTimeProductOffersListInfoFromResponse(resp)
+		result.Offers = append(result.Offers, page.Offers...)
+		if page.NextPageToken == "" {
+			result.NextPageToken = ""
+			return result, nil
+		}
+		if page.NextPageToken == nextToken {
+			return OneTimeProductOffersListInfo{}, fmt.Errorf("pagination token did not advance")
+		}
+		nextToken = page.NextPageToken
+	}
+}
+
+func (c *Client) ActivateOneTimeProductOffer(ctx context.Context, packageName, productID, purchaseOptionID, offerID string) (OneTimeProductOfferInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("product id is required")
+	}
+	purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+	if purchaseOptionID == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("purchase option id is required")
+	}
+	offerID = strings.TrimSpace(offerID)
+	if offerID == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("offer id is required")
+	}
+	if c == nil || c.service == nil {
+		return OneTimeProductOfferInfo{}, ErrInvalidCredentials
+	}
+
+	offer, err := c.service.Monetization.Onetimeproducts.PurchaseOptions.Offers.Activate(
+		packageName,
+		productID,
+		purchaseOptionID,
+		offerID,
+		&androidpublisher.ActivateOneTimeProductOfferRequest{},
+	).Context(ctx).Do()
+	if err != nil {
+		return OneTimeProductOfferInfo{}, mapGoogleAPIError(err)
+	}
+	return oneTimeProductOfferInfoFromOffer(offer), nil
+}
+
+func (c *Client) DeactivateOneTimeProductOffer(ctx context.Context, packageName, productID, purchaseOptionID, offerID string) (OneTimeProductOfferInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("product id is required")
+	}
+	purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+	if purchaseOptionID == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("purchase option id is required")
+	}
+	offerID = strings.TrimSpace(offerID)
+	if offerID == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("offer id is required")
+	}
+	if c == nil || c.service == nil {
+		return OneTimeProductOfferInfo{}, ErrInvalidCredentials
+	}
+
+	offer, err := c.service.Monetization.Onetimeproducts.PurchaseOptions.Offers.Deactivate(
+		packageName,
+		productID,
+		purchaseOptionID,
+		offerID,
+		&androidpublisher.DeactivateOneTimeProductOfferRequest{},
+	).Context(ctx).Do()
+	if err != nil {
+		return OneTimeProductOfferInfo{}, mapGoogleAPIError(err)
+	}
+	return oneTimeProductOfferInfoFromOffer(offer), nil
+}
+
+func (c *Client) CancelOneTimeProductOffer(ctx context.Context, packageName, productID, purchaseOptionID, offerID string) (OneTimeProductOfferInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("product id is required")
+	}
+	purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+	if purchaseOptionID == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("purchase option id is required")
+	}
+	offerID = strings.TrimSpace(offerID)
+	if offerID == "" {
+		return OneTimeProductOfferInfo{}, fmt.Errorf("offer id is required")
+	}
+	if c == nil || c.service == nil {
+		return OneTimeProductOfferInfo{}, ErrInvalidCredentials
+	}
+
+	offer, err := c.service.Monetization.Onetimeproducts.PurchaseOptions.Offers.Cancel(
+		packageName,
+		productID,
+		purchaseOptionID,
+		offerID,
+		&androidpublisher.CancelOneTimeProductOfferRequest{},
+	).Context(ctx).Do()
+	if err != nil {
+		return OneTimeProductOfferInfo{}, mapGoogleAPIError(err)
+	}
+	return oneTimeProductOfferInfoFromOffer(offer), nil
+}
+
 func (c *Client) oneTimeProductsListCall(ctx context.Context, packageName string, pageSize int64, pageToken string) *androidpublisher.MonetizationOnetimeproductsListCall {
 	call := c.service.Monetization.Onetimeproducts.List(packageName).Context(ctx)
+	if pageSize > 0 {
+		call.PageSize(pageSize)
+	}
+	if pageToken != "" {
+		call.PageToken(pageToken)
+	}
+	return call
+}
+
+func (c *Client) oneTimeProductOffersListCall(ctx context.Context, packageName, productID, purchaseOptionID string, pageSize int64, pageToken string) *androidpublisher.MonetizationOnetimeproductsPurchaseOptionsOffersListCall {
+	call := c.service.Monetization.Onetimeproducts.PurchaseOptions.Offers.List(packageName, productID, purchaseOptionID).Context(ctx)
 	if pageSize > 0 {
 		call.PageSize(pageSize)
 	}
@@ -179,5 +341,34 @@ func oneTimeProductInfoFromProduct(product *androidpublisher.OneTimeProduct) One
 		ListingCount:        len(product.Listings),
 		PurchaseOptionCount: len(product.PurchaseOptions),
 		OfferTagCount:       len(product.OfferTags),
+	}
+}
+
+func oneTimeProductOffersListInfoFromResponse(resp *androidpublisher.ListOneTimeProductOffersResponse) OneTimeProductOffersListInfo {
+	if resp == nil {
+		return OneTimeProductOffersListInfo{}
+	}
+	result := OneTimeProductOffersListInfo{
+		Offers:        make([]OneTimeProductOfferInfo, 0, len(resp.OneTimeProductOffers)),
+		NextPageToken: resp.NextPageToken,
+	}
+	for _, offer := range resp.OneTimeProductOffers {
+		result.Offers = append(result.Offers, oneTimeProductOfferInfoFromOffer(offer))
+	}
+	return result
+}
+
+func oneTimeProductOfferInfoFromOffer(offer *androidpublisher.OneTimeProductOffer) OneTimeProductOfferInfo {
+	if offer == nil {
+		return OneTimeProductOfferInfo{}
+	}
+	return OneTimeProductOfferInfo{
+		PackageName:         offer.PackageName,
+		ProductID:           offer.ProductId,
+		PurchaseOptionID:    offer.PurchaseOptionId,
+		OfferID:             offer.OfferId,
+		State:               offer.State,
+		OfferTagCount:       len(offer.OfferTags),
+		RegionalConfigCount: len(offer.RegionalPricingAndAvailabilityConfigs),
 	}
 }
