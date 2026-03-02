@@ -110,6 +110,15 @@ gpc deploy \
   --dry-run
 ```
 
+## Bootstrap New Apps
+
+Google Play API can only manage packages that were initialized with at least one artifact uploaded in Play Console UI.
+
+When `gpc` hits a `package not found` error in an interactive terminal and detects an Android Gradle project (`./gradlew` or `./android/gradlew`), it offers a guided build flow:
+- asks for `aab`/`apk`, module, and variant
+- runs the Gradle task
+- prints the built artifact path you can upload manually in Play Console for one-time bootstrap
+
 ## Global Flags
 
 - `--package-name`: default package for commands that support package-level operations.

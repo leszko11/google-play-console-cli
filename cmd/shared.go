@@ -13,5 +13,6 @@ func handleError(err error) int {
 	}
 
 	fmt.Fprintln(os.Stderr, err)
+	maybeOfferBootstrapBuild(err)
 	return ExitCodeError
 }
