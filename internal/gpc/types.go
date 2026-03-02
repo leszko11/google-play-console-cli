@@ -102,6 +102,19 @@ type GrantInfo struct {
 	PermissionCount     int      `json:"permissionCount,omitempty"`
 }
 
+type OneTimeProductInfo struct {
+	PackageName         string `json:"packageName,omitempty"`
+	ProductID           string `json:"productId,omitempty"`
+	ListingCount        int    `json:"listingCount,omitempty"`
+	PurchaseOptionCount int    `json:"purchaseOptionCount,omitempty"`
+	OfferTagCount       int    `json:"offerTagCount,omitempty"`
+}
+
+type OneTimeProductsListInfo struct {
+	Products      []OneTimeProductInfo `json:"products,omitempty"`
+	NextPageToken string               `json:"nextPageToken,omitempty"`
+}
+
 type SubscriptionInfo struct {
 	PackageName   string `json:"packageName,omitempty"`
 	ProductID     string `json:"productId,omitempty"`

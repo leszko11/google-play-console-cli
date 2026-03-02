@@ -119,6 +119,11 @@ gpc subscriptions offers get --package-name com.example.app --product-id premium
 gpc subscriptions offers create --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --input /path/to/offer.json
 gpc subscriptions offers update --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --input /path/to/offer.json --update-mask phases,regionalConfigs
 gpc subscriptions offers delete --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --confirm
+gpc products list --package-name com.example.app --page-size 100
+gpc products get --package-name com.example.app --product-id coins_100
+gpc products create --package-name com.example.app --input /path/to/one-time-product.json
+gpc products update --package-name com.example.app --product-id coins_100 --input /path/to/one-time-product.json --update-mask listings,purchaseOptions
+gpc products delete --package-name com.example.app --product-id coins_100 --confirm
 gpc purchases products get --package-name com.example.app --product-id premium --token <purchase-token>
 gpc purchases products acknowledge --package-name com.example.app --product-id premium --token <purchase-token>
 gpc purchases products consume --package-name com.example.app --product-id premium --token <purchase-token> --confirm
@@ -186,6 +191,11 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc subscriptions offers create ...` should return `status: created`.
   - `gpc subscriptions offers update ...` should return `status: updated`.
   - `gpc subscriptions offers delete ... --confirm` should return `status: deleted`.
+  - `gpc products list ...` should return one-time products and optional `nextPageToken`.
+  - `gpc products get ...` should return one one-time product.
+  - `gpc products create ...` should return `status: created`.
+  - `gpc products update ...` should return `status: updated`.
+  - `gpc products delete ... --confirm` should return `status: deleted`.
   - `gpc purchases products get ...` should return one-time purchase details.
   - `gpc purchases products acknowledge ...` should return `status: acknowledged`.
   - `gpc purchases products consume ... --confirm` should return `status: consumed`.
