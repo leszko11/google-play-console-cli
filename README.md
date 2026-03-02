@@ -18,12 +18,13 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Reviews management (`reviews list/get/reply`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Purchase lifecycle commands (`purchases ...`)
+- Account users management (`users list/create/update/delete`)
 - CI quality gates for format, lint, test, and build
 
 ## Not Yet Implemented
 
 - One-time products and legacy in-app-products command groups
-- Users, grants, internal app sharing, and reporting surfaces
+- Grants, internal app sharing, and reporting surfaces
 
 ## Build
 
@@ -144,6 +145,12 @@ gpc purchases subscriptions cancel --package-name com.example.app --token <subsc
 gpc purchases subscriptions revoke --package-name com.example.app --token <subscription-token> --refund-type full --confirm
 gpc purchases voided list --package-name com.example.app --max-results 100
 
+# Account users management (developer-level, not package-level)
+gpc users list --developer-id <developer-id>
+gpc users create --developer-id <developer-id> --input /path/to/user.json
+gpc users update --name developers/<developer-id>/users/<email> --input /path/to/user.json --update-mask expirationTime
+gpc users delete --name developers/<developer-id>/users/<email> --confirm
+
 # Inspect tracks inside an edit
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
 gpc tracks get --package-name com.example.app --edit-id <edit-id> --track production
@@ -214,4 +221,5 @@ gpc deploy --help
 gpc reviews --help
 gpc subscriptions --help
 gpc purchases --help
+gpc users --help
 ```
