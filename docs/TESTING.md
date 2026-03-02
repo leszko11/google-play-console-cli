@@ -103,6 +103,9 @@ gpc deploy --package-name com.example.app --aab /path/to/app.aab --track interna
 gpc reviews list --package-name com.example.app --max-results 50
 gpc reviews get --package-name com.example.app --review-id <review-id>
 gpc reviews reply --package-name com.example.app --review-id <review-id> --reply-text "Thanks for your feedback!"
+gpc subscriptions list --package-name com.example.app --page-size 100
+gpc --paginate subscriptions list --package-name com.example.app --page-size 100
+gpc subscriptions get --package-name com.example.app --product-id premium_monthly
 ```
 
 ## Expected Outcomes
@@ -137,3 +140,6 @@ gpc reviews reply --package-name com.example.app --review-id <review-id> --reply
   - `gpc reviews list ...` should return a review array and optional `nextToken`.
   - `gpc reviews get ...` should return a single review.
   - `gpc reviews reply ...` should return `status: replied`.
+  - `gpc subscriptions list ...` should return subscription products and optional `nextPageToken`.
+  - `gpc --paginate subscriptions list ...` should aggregate all pages and return empty `nextPageToken`.
+  - `gpc subscriptions get ...` should return a subscription for the requested `productId`.

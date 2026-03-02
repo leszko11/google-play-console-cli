@@ -15,6 +15,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Deobfuscation mapping upload (`deobfuscation upload`)
 - End-to-end deploy orchestration (`deploy`)
 - Reviews management (`reviews list/get/reply`)
+- Monetization subscriptions read commands (`subscriptions list/get`)
 - CI quality gates for format, lint, test, and build
 
 ## Not Yet Implemented
@@ -98,6 +99,10 @@ gpc reviews list --package-name com.example.app --max-results 50
 gpc reviews get --package-name com.example.app --review-id <review-id>
 gpc reviews reply --package-name com.example.app --review-id <review-id> --reply-text "Thanks for your feedback!"
 
+# List/get subscription products
+gpc subscriptions list --package-name com.example.app --page-size 100
+gpc subscriptions get --package-name com.example.app --product-id premium_monthly
+
 # Inspect tracks inside an edit
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
 gpc tracks get --package-name com.example.app --edit-id <edit-id> --track production
@@ -166,4 +171,5 @@ gpc apks --help
 gpc deobfuscation --help
 gpc deploy --help
 gpc reviews --help
+gpc subscriptions --help
 ```

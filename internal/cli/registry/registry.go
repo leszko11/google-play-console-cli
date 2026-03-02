@@ -11,6 +11,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/edits"
 	"github.com/leszko11/google-play-console-cli/internal/cli/reviews"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	"github.com/leszko11/google-play-console-cli/internal/cli/subscriptions"
 	"github.com/leszko11/google-play-console-cli/internal/cli/tracks"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
@@ -32,6 +33,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		deobfuscation.NewCommand(deobfuscation.Deps{}),
 		deploy.NewCommand(deploy.Deps{}),
 		reviews.NewCommand(reviews.Deps{}),
+		subscriptions.NewCommand(subscriptions.Deps{}),
 		completion.NewCommand(),
 	}
 }

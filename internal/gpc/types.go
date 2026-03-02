@@ -73,6 +73,19 @@ type ReviewReplyInfo struct {
 	LastEditedNanos   int64  `json:"lastEditedNanos,omitempty"`
 }
 
+type SubscriptionInfo struct {
+	PackageName   string `json:"packageName,omitempty"`
+	ProductID     string `json:"productId,omitempty"`
+	Archived      bool   `json:"archived,omitempty"`
+	BasePlanCount int    `json:"basePlanCount,omitempty"`
+	ListingCount  int    `json:"listingCount,omitempty"`
+}
+
+type SubscriptionsListInfo struct {
+	Subscriptions []SubscriptionInfo `json:"subscriptions,omitempty"`
+	NextPageToken string             `json:"nextPageToken,omitempty"`
+}
+
 type TrackInfo struct {
 	Name     string             `json:"name"`
 	Releases []TrackReleaseInfo `json:"releases,omitempty"`
