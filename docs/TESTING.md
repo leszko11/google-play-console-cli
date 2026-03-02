@@ -110,6 +110,11 @@ gpc subscriptions create --package-name com.example.app --input /path/to/subscri
 gpc subscriptions update --package-name com.example.app --product-id premium_monthly --input /path/to/subscription.json
 gpc subscriptions delete --package-name com.example.app --product-id premium_monthly --confirm
 gpc subscriptions archive --package-name com.example.app --product-id premium_monthly --confirm
+gpc subscriptions offers list --package-name com.example.app --product-id premium_monthly --base-plan-id monthly
+gpc subscriptions offers get --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro
+gpc subscriptions offers create --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --input /path/to/offer.json
+gpc subscriptions offers update --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --input /path/to/offer.json --update-mask phases,regionalConfigs
+gpc subscriptions offers delete --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --confirm
 gpc purchases products get --package-name com.example.app --product-id premium --token <purchase-token>
 gpc purchases products acknowledge --package-name com.example.app --product-id premium --token <purchase-token>
 gpc purchases products consume --package-name com.example.app --product-id premium --token <purchase-token> --confirm
@@ -159,6 +164,11 @@ gpc --paginate purchases voided list --package-name com.example.app --max-result
   - `gpc subscriptions update ...` should return `status: updated`.
   - `gpc subscriptions delete ... --confirm` should return `status: deleted`.
   - `gpc subscriptions archive ... --confirm` should return `status: archived`.
+  - `gpc subscriptions offers list ...` should return offers and optional `nextPageToken`.
+  - `gpc subscriptions offers get ...` should return one offer.
+  - `gpc subscriptions offers create ...` should return `status: created`.
+  - `gpc subscriptions offers update ...` should return `status: updated`.
+  - `gpc subscriptions offers delete ... --confirm` should return `status: deleted`.
   - `gpc purchases products get ...` should return one-time purchase details.
   - `gpc purchases products acknowledge ...` should return `status: acknowledged`.
   - `gpc purchases products consume ... --confirm` should return `status: consumed`.

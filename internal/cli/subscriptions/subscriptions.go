@@ -23,6 +23,12 @@ type Client interface {
 	UpdateSubscription(ctx context.Context, packageName, productID string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error)
 	DeleteSubscription(ctx context.Context, packageName, productID string) error
 	ArchiveSubscription(ctx context.Context, packageName, productID string) error
+
+	ListSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionOffersListInfo, error)
+	GetSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error)
+	CreateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID string, offer *androidpublisher.SubscriptionOffer) (gpc.SubscriptionOfferInfo, error)
+	UpdateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string, offer *androidpublisher.SubscriptionOffer, updateMask string) (gpc.SubscriptionOfferInfo, error)
+	DeleteSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) error
 }
 
 type Deps struct {
@@ -46,6 +52,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newUpdateCommand(deps),
 			newDeleteCommand(deps),
 			newArchiveCommand(deps),
+			newOffersCommand(deps),
 		},
 	}
 }
@@ -294,6 +301,263 @@ func newArchiveCommand(deps Deps) *ffcli.Command {
 	}
 }
 
+func newOffersCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "offers",
+		ShortHelp: "Manage subscription offers under base plans",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newOffersListCommand(deps),
+			newOffersGetCommand(deps),
+			newOffersCreateCommand(deps),
+			newOffersUpdateCommand(deps),
+			newOffersDeleteCommand(deps),
+		},
+	}
+}
+
+func newOffersListCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, basePlanID, pageToken string
+	var pageSize int64
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
+	fs.Int64Var(&pageSize, "page-size", 0, "Maximum offers per page")
+	fs.StringVar(&pageToken, "page-token", "", "Page token for the next page")
+
+	return &ffcli.Command{
+		Name:      "list",
+		ShortHelp: "List offers under a subscription base plan",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			basePlanID = strings.TrimSpace(basePlanID)
+			if basePlanID == "" {
+				return fmt.Errorf("--base-plan-id is required")
+			}
+			if pageSize < 0 {
+				return fmt.Errorf("--page-size must be greater than or equal to zero")
+			}
+
+			result, err := client.ListSubscriptionOffers(requestCtx, pkg, productID, basePlanID, pageSize, pageToken, shared.ActiveGlobalFlags().Paginate)
+			if err != nil {
+				return fmt.Errorf("failed to list subscription offers: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":   pkg,
+				"offers":        result.Offers,
+				"nextPageToken": result.NextPageToken,
+			})
+		},
+	}
+}
+
+func newOffersGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, basePlanID, offerID string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
+	fs.StringVar(&offerID, "offer-id", "", "Offer ID")
+
+	return &ffcli.Command{
+		Name:      "get",
+		ShortHelp: "Get one subscription offer",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			basePlanID = strings.TrimSpace(basePlanID)
+			if basePlanID == "" {
+				return fmt.Errorf("--base-plan-id is required")
+			}
+			offerID = strings.TrimSpace(offerID)
+			if offerID == "" {
+				return fmt.Errorf("--offer-id is required")
+			}
+
+			offer, err := client.GetSubscriptionOffer(requestCtx, pkg, productID, basePlanID, offerID)
+			if err != nil {
+				return fmt.Errorf("failed to get subscription offer: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"offer":       offer,
+			})
+		},
+	}
+}
+
+func newOffersCreateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("create", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, basePlanID, inputPath string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
+	fs.StringVar(&inputPath, "input", "", "Path to subscription offer JSON payload (use - for stdin)")
+
+	return &ffcli.Command{
+		Name:      "create",
+		ShortHelp: "Create a subscription offer",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			basePlanID = strings.TrimSpace(basePlanID)
+			if basePlanID == "" {
+				return fmt.Errorf("--base-plan-id is required")
+			}
+			offer, err := readSubscriptionOfferPayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+
+			created, err := client.CreateSubscriptionOffer(requestCtx, pkg, productID, basePlanID, offer)
+			if err != nil {
+				return fmt.Errorf("failed to create subscription offer: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"offer":       created,
+				"status":      "created",
+			})
+		},
+	}
+}
+
+func newOffersUpdateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("update", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, basePlanID, offerID, inputPath, updateMask string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
+	fs.StringVar(&offerID, "offer-id", "", "Offer ID")
+	fs.StringVar(&inputPath, "input", "", "Path to subscription offer JSON payload (use - for stdin)")
+	fs.StringVar(&updateMask, "update-mask", "", "Comma-separated list of fields to update")
+
+	return &ffcli.Command{
+		Name:      "update",
+		ShortHelp: "Update a subscription offer",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			basePlanID = strings.TrimSpace(basePlanID)
+			if basePlanID == "" {
+				return fmt.Errorf("--base-plan-id is required")
+			}
+			offerID = strings.TrimSpace(offerID)
+			if offerID == "" {
+				return fmt.Errorf("--offer-id is required")
+			}
+			offer, err := readSubscriptionOfferPayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+
+			updated, err := client.UpdateSubscriptionOffer(requestCtx, pkg, productID, basePlanID, offerID, offer, updateMask)
+			if err != nil {
+				return fmt.Errorf("failed to update subscription offer: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"offer":       updated,
+				"status":      "updated",
+			})
+		},
+	}
+}
+
+func newOffersDeleteCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, basePlanID, offerID string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
+	fs.StringVar(&offerID, "offer-id", "", "Offer ID")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deleting the offer (required)")
+
+	return &ffcli.Command{
+		Name:      "delete",
+		ShortHelp: "Delete a subscription offer",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			basePlanID = strings.TrimSpace(basePlanID)
+			if basePlanID == "" {
+				return fmt.Errorf("--base-plan-id is required")
+			}
+			offerID = strings.TrimSpace(offerID)
+			if offerID == "" {
+				return fmt.Errorf("--offer-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to delete offer %q", offerID)
+			}
+
+			if err := client.DeleteSubscriptionOffer(requestCtx, pkg, productID, basePlanID, offerID); err != nil {
+				return fmt.Errorf("failed to delete subscription offer: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"productId":   productID,
+				"basePlanId":  basePlanID,
+				"offerId":     offerID,
+				"status":      "deleted",
+			})
+		},
+	}
+}
+
 func buildClient(ctx context.Context, deps Deps, packageName string) (Client, string, context.Context, context.CancelFunc, error) {
 	pkg, err := shared.ResolvePackageName(packageName)
 	if err != nil {
@@ -339,4 +603,34 @@ func readSubscriptionPayload(inputPath string, stdin io.Reader) (*androidpublish
 		return nil, fmt.Errorf("invalid subscription JSON payload: %w", err)
 	}
 	return &subscription, nil
+}
+
+func readSubscriptionOfferPayload(inputPath string, stdin io.Reader) (*androidpublisher.SubscriptionOffer, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var raw []byte
+	var err error
+	if inputPath == "-" {
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		raw, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input: %w", err)
+		}
+	}
+
+	var offer androidpublisher.SubscriptionOffer
+	if err := json.Unmarshal(raw, &offer); err != nil {
+		return nil, fmt.Errorf("invalid subscription offer JSON payload: %w", err)
+	}
+	return &offer, nil
 }
