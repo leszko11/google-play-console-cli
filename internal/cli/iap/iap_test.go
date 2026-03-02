@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"flag"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"google.golang.org/api/androidpublisher/v3"
@@ -27,9 +29,15 @@ type fakeClient struct {
 
 	createFn func(packageName string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
 	updateFn func(packageName, sku string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
+	capture  *iapListCapture
 }
 
-func (f fakeClient) ListIAPs(_ context.Context, _ string, _ int64, _ string, _ bool) (gpc.IAPsListInfo, error) {
+func (f fakeClient) ListIAPs(_ context.Context, _ string, maxResults int64, pageToken string, paginate bool) (gpc.IAPsListInfo, error) {
+	if f.capture != nil {
+		f.capture.maxResults = maxResults
+		f.capture.pageToken = pageToken
+		f.capture.paginate = paginate
+	}
 	return f.list, f.listErr
 }
 
@@ -72,7 +80,22 @@ func defaultConfig() config.Config {
 	}
 }
 
+type iapListCapture struct {
+	maxResults int64
+	pageToken  string
+	paginate   bool
+}
+
+func bindGlobalPaginate(t *testing.T, paginate bool) {
+	t.Helper()
+	fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
+	cfg := &shared.GlobalFlags{}
+	shared.BindGlobalFlags(fs, cfg)
+	cfg.Paginate = paginate
+}
+
 func TestIAPList_ReturnsProducts(t *testing.T) {
+	bindGlobalPaginate(t, false)
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
@@ -90,6 +113,25 @@ func TestIAPList_ReturnsProducts(t *testing.T) {
 	}
 	if !strings.Contains(out, `"sku":"coins_100"`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestIAPList_UsesGlobalPaginate(t *testing.T) {
+	bindGlobalPaginate(t, true)
+	capture := &iapListCapture{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{capture: capture}, nil
+		},
+	}
+
+	_, err := runIAP(t, deps, "list", "--package-name", "com.example.app")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !capture.paginate {
+		t.Fatal("expected paginate=true from global flags")
 	}
 }
 
