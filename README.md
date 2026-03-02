@@ -16,6 +16,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - End-to-end deploy orchestration (`deploy`)
 - Reviews management (`reviews list/get/reply`)
 - Monetization subscription commands (`subscriptions list/get/create/update/delete/archive`)
+- Purchase lifecycle commands (`purchases ...`)
 - CI quality gates for format, lint, test, and build
 
 ## Not Yet Implemented
@@ -111,6 +112,15 @@ gpc subscriptions update --package-name com.example.app --product-id premium_mon
 gpc subscriptions delete --package-name com.example.app --product-id premium_monthly --confirm
 gpc subscriptions archive --package-name com.example.app --product-id premium_monthly --confirm
 
+# Purchase management
+gpc purchases products get --package-name com.example.app --product-id premium --token <purchase-token>
+gpc purchases products acknowledge --package-name com.example.app --product-id premium --token <purchase-token>
+gpc purchases products consume --package-name com.example.app --product-id premium --token <purchase-token> --confirm
+gpc purchases subscriptions get --package-name com.example.app --token <subscription-token>
+gpc purchases subscriptions cancel --package-name com.example.app --token <subscription-token> --confirm
+gpc purchases subscriptions revoke --package-name com.example.app --token <subscription-token> --refund-type full --confirm
+gpc purchases voided list --package-name com.example.app --max-results 100
+
 # Inspect tracks inside an edit
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
 gpc tracks get --package-name com.example.app --edit-id <edit-id> --track production
@@ -180,4 +190,5 @@ gpc deobfuscation --help
 gpc deploy --help
 gpc reviews --help
 gpc subscriptions --help
+gpc purchases --help
 ```

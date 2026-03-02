@@ -110,6 +110,14 @@ gpc subscriptions create --package-name com.example.app --input /path/to/subscri
 gpc subscriptions update --package-name com.example.app --product-id premium_monthly --input /path/to/subscription.json
 gpc subscriptions delete --package-name com.example.app --product-id premium_monthly --confirm
 gpc subscriptions archive --package-name com.example.app --product-id premium_monthly --confirm
+gpc purchases products get --package-name com.example.app --product-id premium --token <purchase-token>
+gpc purchases products acknowledge --package-name com.example.app --product-id premium --token <purchase-token>
+gpc purchases products consume --package-name com.example.app --product-id premium --token <purchase-token> --confirm
+gpc purchases subscriptions get --package-name com.example.app --token <subscription-token>
+gpc purchases subscriptions cancel --package-name com.example.app --token <subscription-token> --confirm
+gpc purchases subscriptions revoke --package-name com.example.app --token <subscription-token> --refund-type full --confirm
+gpc purchases voided list --package-name com.example.app --max-results 100
+gpc --paginate purchases voided list --package-name com.example.app --max-results 100
 ```
 
 ## Expected Outcomes
@@ -151,3 +159,11 @@ gpc subscriptions archive --package-name com.example.app --product-id premium_mo
   - `gpc subscriptions update ...` should return `status: updated`.
   - `gpc subscriptions delete ... --confirm` should return `status: deleted`.
   - `gpc subscriptions archive ... --confirm` should return `status: archived`.
+  - `gpc purchases products get ...` should return one-time purchase details.
+  - `gpc purchases products acknowledge ...` should return `status: acknowledged`.
+  - `gpc purchases products consume ... --confirm` should return `status: consumed`.
+  - `gpc purchases subscriptions get ...` should return subscription purchase details.
+  - `gpc purchases subscriptions cancel ... --confirm` should return `status: canceled`.
+  - `gpc purchases subscriptions revoke ... --confirm` should return `status: revoked`.
+  - `gpc purchases voided list ...` should return voided purchases and optional `nextToken`.
+  - `gpc --paginate purchases voided list ...` should aggregate all pages and return empty `nextToken`.

@@ -86,6 +86,53 @@ type SubscriptionsListInfo struct {
 	NextPageToken string             `json:"nextPageToken,omitempty"`
 }
 
+type ProductPurchaseInfo struct {
+	OrderID              string `json:"orderId,omitempty"`
+	ProductID            string `json:"productId,omitempty"`
+	PurchaseToken        string `json:"purchaseToken,omitempty"`
+	PurchaseState        int64  `json:"purchaseState,omitempty"`
+	AcknowledgementState int64  `json:"acknowledgementState,omitempty"`
+	ConsumptionState     int64  `json:"consumptionState,omitempty"`
+	PurchaseTimeMillis   int64  `json:"purchaseTimeMillis,omitempty"`
+	RegionCode           string `json:"regionCode,omitempty"`
+}
+
+type SubscriptionPurchaseInfo struct {
+	Kind                 string `json:"kind,omitempty"`
+	LatestOrderID        string `json:"latestOrderId,omitempty"`
+	SubscriptionState    string `json:"subscriptionState,omitempty"`
+	AcknowledgementState string `json:"acknowledgementState,omitempty"`
+	RegionCode           string `json:"regionCode,omitempty"`
+	StartTime            string `json:"startTime,omitempty"`
+	LineItemCount        int    `json:"lineItemCount,omitempty"`
+}
+
+type VoidedPurchaseInfo struct {
+	OrderID            string `json:"orderId,omitempty"`
+	PurchaseToken      string `json:"purchaseToken,omitempty"`
+	PurchaseTimeMillis int64  `json:"purchaseTimeMillis,omitempty"`
+	VoidedTimeMillis   int64  `json:"voidedTimeMillis,omitempty"`
+	VoidedReason       int64  `json:"voidedReason,omitempty"`
+	VoidedSource       int64  `json:"voidedSource,omitempty"`
+	VoidedQuantity     int64  `json:"voidedQuantity,omitempty"`
+}
+
+type VoidedPurchasesQuery struct {
+	MaxResults                        int64
+	StartIndex                        int64
+	Token                             string
+	StartTime                         int64
+	EndTime                           int64
+	Type                              int64
+	IncludeQuantityBasedPartialRefund bool
+	Paginate                          bool
+}
+
+type VoidedPurchasesListInfo struct {
+	VoidedPurchases []VoidedPurchaseInfo `json:"voidedPurchases,omitempty"`
+	NextToken       string               `json:"nextToken,omitempty"`
+}
+
 type TrackInfo struct {
 	Name     string             `json:"name"`
 	Releases []TrackReleaseInfo `json:"releases,omitempty"`
