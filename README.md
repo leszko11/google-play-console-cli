@@ -9,10 +9,12 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Authentication bootstrap with Google service account credentials
 - Basic app visibility commands (`apps list`, `apps get`)
 - Edit transactions and listing updates (`edits`)
+- Testers and country availability inside edits
 - Track management inside edits (`tracks list/get/update/promote`)
 - Binary uploads in edits (`apks list/upload`, `bundles list/upload`)
 - Deobfuscation mapping upload (`deobfuscation upload`)
 - End-to-end deploy orchestration (`deploy`)
+- Reviews management (`reviews list/get/reply`)
 - CI quality gates for format, lint, test, and build
 
 ## Not Yet Implemented
@@ -70,6 +72,11 @@ gpc edits details update \
   --edit-id <edit-id> \
   --contact-email support@example.com
 
+# Manage testers and country availability in an edit
+gpc edits testers get --package-name com.example.app --edit-id <edit-id> --track internal
+gpc edits testers update --package-name com.example.app --edit-id <edit-id> --track internal --google-groups qa-team@example.com
+gpc edits country-availability get --package-name com.example.app --edit-id <edit-id> --track production
+
 # Update listing title in an edit (publish with edits commit)
 gpc edits listings update \
   --package-name com.example.app \
@@ -85,6 +92,11 @@ gpc edits listings delete-all --package-name com.example.app --edit-id <edit-id>
 # Commit or delete edits are destructive and require explicit confirmation
 gpc edits commit --package-name com.example.app --edit-id <edit-id> --confirm
 gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
+
+# List/get/reply to user reviews
+gpc reviews list --package-name com.example.app --max-results 50
+gpc reviews get --package-name com.example.app --review-id <review-id>
+gpc reviews reply --package-name com.example.app --review-id <review-id> --reply-text "Thanks for your feedback!"
 
 # Inspect tracks inside an edit
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
@@ -153,4 +165,5 @@ gpc bundles --help
 gpc apks --help
 gpc deobfuscation --help
 gpc deploy --help
+gpc reviews --help
 ```

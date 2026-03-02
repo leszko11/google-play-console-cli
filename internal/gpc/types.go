@@ -41,6 +41,38 @@ type AppDetailsUpdate struct {
 	ContactWebsite  string
 }
 
+type TestersInfo struct {
+	Track        string   `json:"track,omitempty"`
+	GoogleGroups []string `json:"googleGroups,omitempty"`
+}
+
+type CountryTargetedInfo struct {
+	CountryCode string `json:"countryCode,omitempty"`
+}
+
+type CountryAvailabilityInfo struct {
+	Track              string                `json:"track,omitempty"`
+	Countries          []CountryTargetedInfo `json:"countries,omitempty"`
+	RestOfWorld        bool                  `json:"restOfWorld,omitempty"`
+	SyncWithProduction bool                  `json:"syncWithProduction,omitempty"`
+}
+
+type ReviewInfo struct {
+	ReviewID   string `json:"reviewId,omitempty"`
+	AuthorName string `json:"authorName,omitempty"`
+}
+
+type ReviewsListInfo struct {
+	Reviews   []ReviewInfo `json:"reviews,omitempty"`
+	NextToken string       `json:"nextToken,omitempty"`
+}
+
+type ReviewReplyInfo struct {
+	ReplyText         string `json:"replyText,omitempty"`
+	LastEditedSeconds int64  `json:"lastEditedSeconds,omitempty"`
+	LastEditedNanos   int64  `json:"lastEditedNanos,omitempty"`
+}
+
 type TrackInfo struct {
 	Name     string             `json:"name"`
 	Releases []TrackReleaseInfo `json:"releases,omitempty"`

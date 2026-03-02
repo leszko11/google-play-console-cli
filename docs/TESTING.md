@@ -78,6 +78,9 @@ gpc edits create --package-name com.example.app
 gpc edits get --package-name com.example.app --edit-id <edit-id>
 gpc edits details get --package-name com.example.app --edit-id <edit-id>
 gpc edits details update --package-name com.example.app --edit-id <edit-id> --contact-email support@example.com
+gpc edits testers get --package-name com.example.app --edit-id <edit-id> --track internal
+gpc edits testers update --package-name com.example.app --edit-id <edit-id> --track internal --google-groups qa-team@example.com
+gpc edits country-availability get --package-name com.example.app --edit-id <edit-id> --track production
 gpc edits listings list --package-name com.example.app --edit-id <edit-id>
 gpc edits listings get --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings update --package-name com.example.app --edit-id <edit-id> --locale en-US --title "My App Test"
@@ -97,6 +100,9 @@ gpc apks upload --package-name com.example.app --edit-id <edit-id> --file /path/
 gpc deobfuscation upload --package-name com.example.app --edit-id <edit-id> --version-code <version-code> --type proguard --file /path/to/mapping.txt
 gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --confirm
 gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --dry-run
+gpc reviews list --package-name com.example.app --max-results 50
+gpc reviews get --package-name com.example.app --review-id <review-id>
+gpc reviews reply --package-name com.example.app --review-id <review-id> --reply-text "Thanks for your feedback!"
 ```
 
 ## Expected Outcomes
@@ -112,6 +118,9 @@ gpc deploy --package-name com.example.app --aab /path/to/app.aab --track interna
   - `gpc edits create --package-name <valid-package>` should return a JSON edit object with `id`.
   - `gpc edits details get ...` should return app details for the edit.
   - `gpc edits details update ...` should return `status: updated` inside an edit.
+  - `gpc edits testers get ...` should return testers for the selected track.
+  - `gpc edits testers update ...` should return `status: updated`.
+  - `gpc edits country-availability get ...` should return country targeting for the track.
   - `gpc edits listings list ...` should return localized listings for the edit.
   - `gpc edits listings update ...` should return `status: updated` inside an edit.
   - `gpc edits listings delete ...` should return `status: deleted`.
@@ -125,3 +134,6 @@ gpc deploy --package-name com.example.app --aab /path/to/app.aab --track interna
   - `gpc deploy ... --confirm` should return `status: committed` and include deterministic `steps`.
   - `gpc deploy ... --dry-run` should return `status: dry-run` and delete the temporary edit.
   - `gpc deploy --track production` should fail unless `--allow-production` is set.
+  - `gpc reviews list ...` should return a review array and optional `nextToken`.
+  - `gpc reviews get ...` should return a single review.
+  - `gpc reviews reply ...` should return `status: replied`.

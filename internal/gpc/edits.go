@@ -242,6 +242,91 @@ func (c *Client) UpdateAppDetails(ctx context.Context, packageName, editID strin
 	return appDetailsInfoFromDetails(details), nil
 }
 
+func (c *Client) GetTesters(ctx context.Context, packageName, editID, track string) (TestersInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return TestersInfo{}, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return TestersInfo{}, fmt.Errorf("edit id is required")
+	}
+	track = strings.TrimSpace(track)
+	if track == "" {
+		return TestersInfo{}, fmt.Errorf("track is required")
+	}
+	if c == nil || c.service == nil {
+		return TestersInfo{}, ErrInvalidCredentials
+	}
+
+	testers, err := c.service.Edits.Testers.Get(packageName, editID, track).Context(ctx).Do()
+	if err != nil {
+		return TestersInfo{}, mapGoogleAPIError(err)
+	}
+	return testersInfoFromTesters(track, testers), nil
+}
+
+func (c *Client) UpdateTesters(ctx context.Context, packageName, editID, track string, googleGroups []string) (TestersInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return TestersInfo{}, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return TestersInfo{}, fmt.Errorf("edit id is required")
+	}
+	track = strings.TrimSpace(track)
+	if track == "" {
+		return TestersInfo{}, fmt.Errorf("track is required")
+	}
+
+	sanitizedGroups := make([]string, 0, len(googleGroups))
+	for _, group := range googleGroups {
+		group = strings.TrimSpace(group)
+		if group == "" {
+			continue
+		}
+		sanitizedGroups = append(sanitizedGroups, group)
+	}
+	if len(sanitizedGroups) == 0 {
+		return TestersInfo{}, fmt.Errorf("at least one google group is required")
+	}
+	if c == nil || c.service == nil {
+		return TestersInfo{}, ErrInvalidCredentials
+	}
+
+	req := &androidpublisher.Testers{GoogleGroups: sanitizedGroups}
+	testers, err := c.service.Edits.Testers.Patch(packageName, editID, track, req).Context(ctx).Do()
+	if err != nil {
+		return TestersInfo{}, mapGoogleAPIError(err)
+	}
+	return testersInfoFromTesters(track, testers), nil
+}
+
+func (c *Client) GetCountryAvailability(ctx context.Context, packageName, editID, track string) (CountryAvailabilityInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return CountryAvailabilityInfo{}, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return CountryAvailabilityInfo{}, fmt.Errorf("edit id is required")
+	}
+	track = strings.TrimSpace(track)
+	if track == "" {
+		return CountryAvailabilityInfo{}, fmt.Errorf("track is required")
+	}
+	if c == nil || c.service == nil {
+		return CountryAvailabilityInfo{}, ErrInvalidCredentials
+	}
+
+	availability, err := c.service.Edits.Countryavailability.Get(packageName, editID, track).Context(ctx).Do()
+	if err != nil {
+		return CountryAvailabilityInfo{}, mapGoogleAPIError(err)
+	}
+	return countryAvailabilityInfoFromTrackCountryAvailability(track, availability), nil
+}
+
 func (c *Client) DeleteListing(ctx context.Context, packageName, editID, language string) error {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -294,6 +379,31 @@ func appDetailsInfoFromDetails(details *androidpublisher.AppDetails) AppDetailsI
 		ContactPhone:    details.ContactPhone,
 		ContactWebsite:  details.ContactWebsite,
 	}
+}
+
+func testersInfoFromTesters(track string, testers *androidpublisher.Testers) TestersInfo {
+	info := TestersInfo{Track: track}
+	if testers == nil {
+		return info
+	}
+	info.GoogleGroups = append(info.GoogleGroups, testers.GoogleGroups...)
+	return info
+}
+
+func countryAvailabilityInfoFromTrackCountryAvailability(track string, availability *androidpublisher.TrackCountryAvailability) CountryAvailabilityInfo {
+	info := CountryAvailabilityInfo{Track: track}
+	if availability == nil {
+		return info
+	}
+	info.RestOfWorld = availability.RestOfWorld
+	info.SyncWithProduction = availability.SyncWithProduction
+	for _, country := range availability.Countries {
+		if country == nil {
+			continue
+		}
+		info.Countries = append(info.Countries, CountryTargetedInfo{CountryCode: country.CountryCode})
+	}
+	return info
 }
 
 func editInfoFromAppEdit(edit *androidpublisher.AppEdit) EditInfo {
