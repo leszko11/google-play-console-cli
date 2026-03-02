@@ -15,7 +15,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Deobfuscation mapping upload (`deobfuscation upload`)
 - End-to-end deploy orchestration (`deploy`)
 - Reviews management (`reviews list/get/reply`)
-- Monetization subscriptions read commands (`subscriptions list/get`)
+- Monetization subscription commands (`subscriptions list/get/create/update/delete/archive`)
 - CI quality gates for format, lint, test, and build
 
 ## Not Yet Implemented
@@ -102,6 +102,14 @@ gpc reviews reply --package-name com.example.app --review-id <review-id> --reply
 # List/get subscription products
 gpc subscriptions list --package-name com.example.app --page-size 100
 gpc subscriptions get --package-name com.example.app --product-id premium_monthly
+
+# Create/update subscriptions from JSON payload files
+gpc subscriptions create --package-name com.example.app --input /path/to/subscription.json
+gpc subscriptions update --package-name com.example.app --product-id premium_monthly --input /path/to/subscription.json
+
+# Delete/archive subscriptions (explicit confirmation required)
+gpc subscriptions delete --package-name com.example.app --product-id premium_monthly --confirm
+gpc subscriptions archive --package-name com.example.app --product-id premium_monthly --confirm
 
 # Inspect tracks inside an edit
 gpc tracks list --package-name com.example.app --edit-id <edit-id>

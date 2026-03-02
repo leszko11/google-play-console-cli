@@ -18,6 +18,18 @@ func TestSubscriptionMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.GetSubscription(context.Background(), "com.example.app", "premium_monthly"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from GetSubscription, got %v", err)
 	}
+	if _, err := c.CreateSubscription(context.Background(), "com.example.app", &androidpublisher.Subscription{ProductId: "premium_monthly"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from CreateSubscription, got %v", err)
+	}
+	if _, err := c.UpdateSubscription(context.Background(), "com.example.app", "premium_monthly", &androidpublisher.Subscription{}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from UpdateSubscription, got %v", err)
+	}
+	if err := c.DeleteSubscription(context.Background(), "com.example.app", "premium_monthly"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from DeleteSubscription, got %v", err)
+	}
+	if err := c.ArchiveSubscription(context.Background(), "com.example.app", "premium_monthly"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from ArchiveSubscription, got %v", err)
+	}
 }
 
 func TestSubscriptionMethods_ValidateArgs(t *testing.T) {
@@ -31,6 +43,21 @@ func TestSubscriptionMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.GetSubscription(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "product id is required") {
 		t.Fatalf("unexpected GetSubscription product id error: %v", err)
+	}
+	if _, err := c.CreateSubscription(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "subscription payload is required") {
+		t.Fatalf("unexpected CreateSubscription payload error: %v", err)
+	}
+	if _, err := c.UpdateSubscription(context.Background(), "com.example.app", "", &androidpublisher.Subscription{}); err == nil || !strings.Contains(err.Error(), "product id is required") {
+		t.Fatalf("unexpected UpdateSubscription product id error: %v", err)
+	}
+	if _, err := c.UpdateSubscription(context.Background(), "com.example.app", "premium_monthly", nil); err == nil || !strings.Contains(err.Error(), "subscription payload is required") {
+		t.Fatalf("unexpected UpdateSubscription payload error: %v", err)
+	}
+	if err := c.DeleteSubscription(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "product id is required") {
+		t.Fatalf("unexpected DeleteSubscription product id error: %v", err)
+	}
+	if err := c.ArchiveSubscription(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "product id is required") {
+		t.Fatalf("unexpected ArchiveSubscription product id error: %v", err)
 	}
 }
 

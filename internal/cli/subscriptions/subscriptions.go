@@ -2,6 +2,7 @@ package subscriptions
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -12,11 +13,16 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
+	"google.golang.org/api/androidpublisher/v3"
 )
 
 type Client interface {
 	ListSubscriptions(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionsListInfo, error)
 	GetSubscription(ctx context.Context, packageName, productID string) (gpc.SubscriptionInfo, error)
+	CreateSubscription(ctx context.Context, packageName string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error)
+	UpdateSubscription(ctx context.Context, packageName, productID string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error)
+	DeleteSubscription(ctx context.Context, packageName, productID string) error
+	ArchiveSubscription(ctx context.Context, packageName, productID string) error
 }
 
 type Deps struct {
@@ -36,6 +42,10 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newListCommand(deps),
 			newGetCommand(deps),
+			newCreateCommand(deps),
+			newUpdateCommand(deps),
+			newDeleteCommand(deps),
+			newArchiveCommand(deps),
 		},
 	}
 }
@@ -131,6 +141,159 @@ func newGetCommand(deps Deps) *ffcli.Command {
 	}
 }
 
+func newCreateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("create", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, inputPath string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&inputPath, "input", "", "Path to subscription JSON payload (use - for stdin)")
+
+	return &ffcli.Command{
+		Name:      "create",
+		ShortHelp: "Create a subscription",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			subscription, err := readSubscriptionPayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			created, err := client.CreateSubscription(requestCtx, pkg, subscription)
+			if err != nil {
+				return fmt.Errorf("failed to create subscription: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":  pkg,
+				"subscription": created,
+				"status":       "created",
+			})
+		},
+	}
+}
+
+func newUpdateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("update", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, inputPath string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&inputPath, "input", "", "Path to subscription JSON payload (use - for stdin)")
+
+	return &ffcli.Command{
+		Name:      "update",
+		ShortHelp: "Update a subscription",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			subscription, err := readSubscriptionPayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			updated, err := client.UpdateSubscription(requestCtx, pkg, productID, subscription)
+			if err != nil {
+				return fmt.Errorf("failed to update subscription: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":  pkg,
+				"subscription": updated,
+				"status":       "updated",
+			})
+		},
+	}
+}
+
+func newDeleteCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deleting the subscription (required)")
+
+	return &ffcli.Command{
+		Name:      "delete",
+		ShortHelp: "Delete a subscription",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to delete subscription %q", productID)
+			}
+			if err := client.DeleteSubscription(requestCtx, pkg, productID); err != nil {
+				return fmt.Errorf("failed to delete subscription: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"productId":   productID,
+				"status":      "deleted",
+			})
+		},
+	}
+}
+
+func newArchiveCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("archive", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm archiving the subscription (required)")
+
+	return &ffcli.Command{
+		Name:      "archive",
+		ShortHelp: "Archive a subscription",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to archive subscription %q", productID)
+			}
+			if err := client.ArchiveSubscription(requestCtx, pkg, productID); err != nil {
+				return fmt.Errorf("failed to archive subscription: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"productId":   productID,
+				"status":      "archived",
+			})
+		},
+	}
+}
+
 func buildClient(ctx context.Context, deps Deps, packageName string) (Client, string, context.Context, context.CancelFunc, error) {
 	pkg, err := shared.ResolvePackageName(packageName)
 	if err != nil {
@@ -146,4 +309,34 @@ func buildClient(ctx context.Context, deps Deps, packageName string) (Client, st
 		return nil, "", nil, nil, err
 	}
 	return client, pkg, requestCtx, cancel, nil
+}
+
+func readSubscriptionPayload(inputPath string, stdin io.Reader) (*androidpublisher.Subscription, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var raw []byte
+	var err error
+	if inputPath == "-" {
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		raw, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input: %w", err)
+		}
+	}
+
+	var subscription androidpublisher.Subscription
+	if err := json.Unmarshal(raw, &subscription); err != nil {
+		return nil, fmt.Errorf("invalid subscription JSON payload: %w", err)
+	}
+	return &subscription, nil
 }

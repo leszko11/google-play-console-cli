@@ -69,6 +69,86 @@ func (c *Client) GetSubscription(ctx context.Context, packageName, productID str
 	return subscriptionInfoFromSubscription(subscription), nil
 }
 
+func (c *Client) CreateSubscription(ctx context.Context, packageName string, subscription *androidpublisher.Subscription) (SubscriptionInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return SubscriptionInfo{}, fmt.Errorf("package name is required")
+	}
+	if subscription == nil {
+		return SubscriptionInfo{}, fmt.Errorf("subscription payload is required")
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionInfo{}, ErrInvalidCredentials
+	}
+
+	created, err := c.service.Monetization.Subscriptions.Create(packageName, subscription).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionInfo{}, mapGoogleAPIError(err)
+	}
+	return subscriptionInfoFromSubscription(created), nil
+}
+
+func (c *Client) UpdateSubscription(ctx context.Context, packageName, productID string, subscription *androidpublisher.Subscription) (SubscriptionInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return SubscriptionInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return SubscriptionInfo{}, fmt.Errorf("product id is required")
+	}
+	if subscription == nil {
+		return SubscriptionInfo{}, fmt.Errorf("subscription payload is required")
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionInfo{}, ErrInvalidCredentials
+	}
+
+	updated, err := c.service.Monetization.Subscriptions.Patch(packageName, productID, subscription).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionInfo{}, mapGoogleAPIError(err)
+	}
+	return subscriptionInfoFromSubscription(updated), nil
+}
+
+func (c *Client) DeleteSubscription(ctx context.Context, packageName, productID string) error {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return fmt.Errorf("product id is required")
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := c.service.Monetization.Subscriptions.Delete(packageName, productID).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
+func (c *Client) ArchiveSubscription(ctx context.Context, packageName, productID string) error {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return fmt.Errorf("product id is required")
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if _, err := c.service.Monetization.Subscriptions.Archive(packageName, productID, &androidpublisher.ArchiveSubscriptionRequest{}).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
 func (c *Client) subscriptionsListCall(ctx context.Context, packageName string, pageSize int64, pageToken string) *androidpublisher.MonetizationSubscriptionsListCall {
 	call := c.service.Monetization.Subscriptions.List(packageName).Context(ctx)
 	if pageSize > 0 {
