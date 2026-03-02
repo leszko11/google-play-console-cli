@@ -19,12 +19,13 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Purchase lifecycle commands (`purchases ...`)
 - Account users management (`users list/create/update/delete`)
+- Per-app grants management (`grants create/update/delete`)
 - CI quality gates for format, lint, test, and build
 
 ## Not Yet Implemented
 
 - One-time products and legacy in-app-products command groups
-- Grants, internal app sharing, and reporting surfaces
+- Internal app sharing and reporting surfaces
 
 ## Build
 
@@ -151,6 +152,11 @@ gpc users create --developer-id <developer-id> --input /path/to/user.json
 gpc users update --name developers/<developer-id>/users/<email> --input /path/to/user.json --update-mask expirationTime
 gpc users delete --name developers/<developer-id>/users/<email> --confirm
 
+# Per-app grants management under a user resource
+gpc grants create --parent developers/<developer-id>/users/<email> --input /path/to/grant.json
+gpc grants update --name developers/<developer-id>/users/<email>/grants/<package-name> --input /path/to/grant.json --update-mask appLevelPermissions
+gpc grants delete --name developers/<developer-id>/users/<email>/grants/<package-name> --confirm
+
 # Inspect tracks inside an edit
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
 gpc tracks get --package-name com.example.app --edit-id <edit-id> --track production
@@ -222,4 +228,5 @@ gpc reviews --help
 gpc subscriptions --help
 gpc purchases --help
 gpc users --help
+gpc grants --help
 ```

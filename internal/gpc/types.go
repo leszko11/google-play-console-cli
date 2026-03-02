@@ -95,6 +95,13 @@ type UsersListInfo struct {
 	NextPageToken string     `json:"nextPageToken,omitempty"`
 }
 
+type GrantInfo struct {
+	Name                string   `json:"name,omitempty"`
+	PackageName         string   `json:"packageName,omitempty"`
+	AppLevelPermissions []string `json:"appLevelPermissions,omitempty"`
+	PermissionCount     int      `json:"permissionCount,omitempty"`
+}
+
 type SubscriptionInfo struct {
 	PackageName   string `json:"packageName,omitempty"`
 	ProductID     string `json:"productId,omitempty"`

@@ -131,6 +131,9 @@ gpc users list --developer-id <developer-id>
 gpc users create --developer-id <developer-id> --input /path/to/user.json
 gpc users update --name developers/<developer-id>/users/<email> --input /path/to/user.json --update-mask expirationTime
 gpc users delete --name developers/<developer-id>/users/<email> --confirm
+gpc grants create --parent developers/<developer-id>/users/<email> --input /path/to/grant.json
+gpc grants update --name developers/<developer-id>/users/<email>/grants/<package-name> --input /path/to/grant.json --update-mask appLevelPermissions
+gpc grants delete --name developers/<developer-id>/users/<email>/grants/<package-name> --confirm
 ```
 
 ## Expected Outcomes
@@ -193,3 +196,6 @@ gpc users delete --name developers/<developer-id>/users/<email> --confirm
   - `gpc users create ...` should return `status: created`.
   - `gpc users update ...` should return `status: updated`.
   - `gpc users delete ... --confirm` should return `status: deleted`.
+  - `gpc grants create ...` should return `status: created`.
+  - `gpc grants update ...` should return `status: updated`.
+  - `gpc grants delete ... --confirm` should return `status: deleted`.
