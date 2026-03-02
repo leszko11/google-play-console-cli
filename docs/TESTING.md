@@ -124,6 +124,11 @@ gpc products get --package-name com.example.app --product-id coins_100
 gpc products create --package-name com.example.app --input /path/to/one-time-product.json
 gpc products update --package-name com.example.app --product-id coins_100 --input /path/to/one-time-product.json --update-mask listings,purchaseOptions
 gpc products delete --package-name com.example.app --product-id coins_100 --confirm
+gpc iap list --package-name com.example.app --max-results 100
+gpc iap get --package-name com.example.app --sku coins_100
+gpc iap create --package-name com.example.app --input /path/to/inappproduct.json
+gpc iap update --package-name com.example.app --sku coins_100 --input /path/to/inappproduct.json
+gpc iap delete --package-name com.example.app --sku coins_100 --confirm
 gpc purchases products get --package-name com.example.app --product-id premium --token <purchase-token>
 gpc purchases products acknowledge --package-name com.example.app --product-id premium --token <purchase-token>
 gpc purchases products consume --package-name com.example.app --product-id premium --token <purchase-token> --confirm
@@ -196,6 +201,11 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc products create ...` should return `status: created`.
   - `gpc products update ...` should return `status: updated`.
   - `gpc products delete ... --confirm` should return `status: deleted`.
+  - `gpc iap list ...` should return legacy in-app products and optional `nextPageToken`.
+  - `gpc iap get ...` should return one legacy in-app product.
+  - `gpc iap create ...` should return `status: created`.
+  - `gpc iap update ...` should return `status: updated`.
+  - `gpc iap delete ... --confirm` should return `status: deleted`.
   - `gpc purchases products get ...` should return one-time purchase details.
   - `gpc purchases products acknowledge ...` should return `status: acknowledged`.
   - `gpc purchases products consume ... --confirm` should return `status: consumed`.

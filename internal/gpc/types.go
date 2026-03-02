@@ -115,6 +115,20 @@ type OneTimeProductsListInfo struct {
 	NextPageToken string               `json:"nextPageToken,omitempty"`
 }
 
+type IAPInfo struct {
+	PackageName  string `json:"packageName,omitempty"`
+	SKU          string `json:"sku,omitempty"`
+	Status       string `json:"status,omitempty"`
+	PurchaseType string `json:"purchaseType,omitempty"`
+	ListingCount int    `json:"listingCount,omitempty"`
+	PriceCount   int    `json:"priceCount,omitempty"`
+}
+
+type IAPsListInfo struct {
+	Products      []IAPInfo `json:"products,omitempty"`
+	NextPageToken string    `json:"nextPageToken,omitempty"`
+}
+
 type SubscriptionInfo struct {
 	PackageName   string `json:"packageName,omitempty"`
 	ProductID     string `json:"productId,omitempty"`
