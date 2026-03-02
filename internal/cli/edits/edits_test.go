@@ -12,20 +12,24 @@ import (
 )
 
 type fakeClient struct {
-	create     gpc.EditInfo
-	createErr  error
-	get        gpc.EditInfo
-	getErr     error
-	validate   error
-	commit     gpc.EditInfo
-	commitErr  error
-	deleteErr  error
-	listing    gpc.ListingInfo
-	listings   []gpc.ListingInfo
-	listErr    error
-	updateErr  error
-	delListErr error
-	delAllErr  error
+	create           gpc.EditInfo
+	createErr        error
+	get              gpc.EditInfo
+	getErr           error
+	validate         error
+	commit           gpc.EditInfo
+	commitErr        error
+	deleteErr        error
+	appDetails       gpc.AppDetailsInfo
+	appDetailsErr    error
+	updateDetailsErr error
+	updateDetailsFn  func(packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
+	listing          gpc.ListingInfo
+	listings         []gpc.ListingInfo
+	listErr          error
+	updateErr        error
+	delListErr       error
+	delAllErr        error
 }
 
 func (f fakeClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, error) {
@@ -39,6 +43,15 @@ func (f fakeClient) CommitEdit(_ context.Context, _, _ string) (gpc.EditInfo, er
 	return f.commit, f.commitErr
 }
 func (f fakeClient) DeleteEdit(_ context.Context, _, _ string) error { return f.deleteErr }
+func (f fakeClient) GetAppDetails(_ context.Context, _, _ string) (gpc.AppDetailsInfo, error) {
+	return f.appDetails, f.appDetailsErr
+}
+func (f fakeClient) UpdateAppDetails(_ context.Context, packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error) {
+	if f.updateDetailsFn != nil {
+		return f.updateDetailsFn(packageName, editID, update)
+	}
+	return f.appDetails, f.updateDetailsErr
+}
 func (f fakeClient) GetListing(_ context.Context, _, _, _ string) (gpc.ListingInfo, error) {
 	return f.listing, f.listErr
 }
@@ -169,6 +182,105 @@ func TestEditsListingsGet(t *testing.T) {
 	}
 	if !strings.Contains(out, `"title":"PeakMe"`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsDetailsGet_ReturnsDetails(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				appDetails: gpc.AppDetailsInfo{
+					DefaultLanguage: "en-US",
+					ContactEmail:    "support@example.com",
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(t, deps, "details", "get", "--package-name", "com.example.app", "--edit-id", "edit-1")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"defaultLanguage":"en-US"`) || !strings.Contains(out, `"contactEmail":"support@example.com"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsDetailsGet_RequiresEditID(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(t, deps, "details", "get", "--package-name", "com.example.app")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--edit-id is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEditsDetailsUpdate_ReturnsStatusUpdated(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				updateDetailsFn: func(_, _ string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error) {
+					if update.ContactEmail != "support@example.com" {
+						t.Fatalf("unexpected contact email: %q", update.ContactEmail)
+					}
+					return gpc.AppDetailsInfo{
+						DefaultLanguage: "en-US",
+						ContactEmail:    update.ContactEmail,
+					}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"details",
+		"update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--contact-email", "support@example.com",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"updated"`) || !strings.Contains(out, `"contactEmail":"support@example.com"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsDetailsUpdate_ReturnsAPIError(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{updateDetailsErr: errors.New("invalid details payload")}, nil
+		},
+	}
+
+	_, err := runEdits(
+		t,
+		deps,
+		"details",
+		"update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--contact-email", "support@example.com",
+	)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "failed to update app details") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

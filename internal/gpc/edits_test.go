@@ -36,6 +36,12 @@ func TestEditMethods_RejectMissingClient(t *testing.T) {
 	if err := c.DeleteAllListings(context.Background(), "com.example.app", "edit-1"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from DeleteAllListings, got %v", err)
 	}
+	if _, err := c.GetAppDetails(context.Background(), "com.example.app", "edit-1"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from GetAppDetails, got %v", err)
+	}
+	if _, err := c.UpdateAppDetails(context.Background(), "com.example.app", "edit-1", AppDetailsUpdate{ContactEmail: "help@example.com"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from UpdateAppDetails, got %v", err)
+	}
 }
 
 func TestEditMethods_ValidateArgs(t *testing.T) {
@@ -92,6 +98,15 @@ func TestListingMethods_ValidateArgs(t *testing.T) {
 	if err := c.DeleteAllListings(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "edit id is required") {
 		t.Fatalf("unexpected DeleteAllListings edit id error: %v", err)
 	}
+	if _, err := c.GetAppDetails(context.Background(), "", "edit-1"); err == nil || !strings.Contains(err.Error(), "package name is required") {
+		t.Fatalf("unexpected GetAppDetails package error: %v", err)
+	}
+	if _, err := c.GetAppDetails(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "edit id is required") {
+		t.Fatalf("unexpected GetAppDetails edit id error: %v", err)
+	}
+	if _, err := c.UpdateAppDetails(context.Background(), "com.example.app", "edit-1", AppDetailsUpdate{}); err == nil || !strings.Contains(err.Error(), "at least one app detail field must be provided") {
+		t.Fatalf("unexpected UpdateAppDetails empty update error: %v", err)
+	}
 }
 
 func TestListingInfoFromListing(t *testing.T) {
@@ -103,5 +118,17 @@ func TestListingInfoFromListing(t *testing.T) {
 	})
 	if got.Language != "en-US" || got.Title != "PeakMe" {
 		t.Fatalf("unexpected listing map: %+v", got)
+	}
+}
+
+func TestAppDetailsInfoFromDetails(t *testing.T) {
+	got := appDetailsInfoFromDetails(&androidpublisher.AppDetails{
+		DefaultLanguage: "en-US",
+		ContactEmail:    "support@example.com",
+		ContactPhone:    "+48123456789",
+		ContactWebsite:  "https://example.com",
+	})
+	if got.DefaultLanguage != "en-US" || got.ContactEmail != "support@example.com" || got.ContactWebsite != "https://example.com" {
+		t.Fatalf("unexpected app details map: %+v", got)
 	}
 }

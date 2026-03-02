@@ -27,6 +27,20 @@ type ListingUpdate struct {
 	FullDescription  string
 }
 
+type AppDetailsInfo struct {
+	DefaultLanguage string `json:"defaultLanguage,omitempty"`
+	ContactEmail    string `json:"contactEmail,omitempty"`
+	ContactPhone    string `json:"contactPhone,omitempty"`
+	ContactWebsite  string `json:"contactWebsite,omitempty"`
+}
+
+type AppDetailsUpdate struct {
+	DefaultLanguage string
+	ContactEmail    string
+	ContactPhone    string
+	ContactWebsite  string
+}
+
 type TrackInfo struct {
 	Name     string             `json:"name"`
 	Releases []TrackReleaseInfo `json:"releases,omitempty"`
