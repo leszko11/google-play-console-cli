@@ -51,6 +51,18 @@ func TestEditMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.GetCountryAvailability(context.Background(), "com.example.app", "edit-1", "production"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from GetCountryAvailability, got %v", err)
 	}
+	if _, err := c.ListImages(context.Background(), "com.example.app", "edit-1", "en-US", "phoneScreenshots"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from ListImages, got %v", err)
+	}
+	if _, err := c.UploadImage(context.Background(), "com.example.app", "edit-1", "en-US", "phoneScreenshots", "/tmp/image.png"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from UploadImage, got %v", err)
+	}
+	if err := c.DeleteImage(context.Background(), "com.example.app", "edit-1", "en-US", "phoneScreenshots", "image-1"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from DeleteImage, got %v", err)
+	}
+	if _, err := c.DeleteAllImages(context.Background(), "com.example.app", "edit-1", "en-US", "phoneScreenshots"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from DeleteAllImages, got %v", err)
+	}
 }
 
 func TestEditMethods_ValidateArgs(t *testing.T) {
@@ -125,6 +137,18 @@ func TestListingMethods_ValidateArgs(t *testing.T) {
 	if _, err := c.GetCountryAvailability(context.Background(), "com.example.app", "edit-1", ""); err == nil || !strings.Contains(err.Error(), "track is required") {
 		t.Fatalf("unexpected GetCountryAvailability track error: %v", err)
 	}
+	if _, err := c.ListImages(context.Background(), "com.example.app", "edit-1", "en-US", ""); err == nil || !strings.Contains(err.Error(), "image type is required") {
+		t.Fatalf("unexpected ListImages image type error: %v", err)
+	}
+	if _, err := c.UploadImage(context.Background(), "com.example.app", "edit-1", "en-US", "phoneScreenshots", ""); err == nil || !strings.Contains(err.Error(), "image path is required") {
+		t.Fatalf("unexpected UploadImage file error: %v", err)
+	}
+	if err := c.DeleteImage(context.Background(), "com.example.app", "edit-1", "en-US", "phoneScreenshots", ""); err == nil || !strings.Contains(err.Error(), "image id is required") {
+		t.Fatalf("unexpected DeleteImage image id error: %v", err)
+	}
+	if _, err := c.DeleteAllImages(context.Background(), "com.example.app", "edit-1", "en-US", ""); err == nil || !strings.Contains(err.Error(), "image type is required") {
+		t.Fatalf("unexpected DeleteAllImages image type error: %v", err)
+	}
 }
 
 func TestListingInfoFromListing(t *testing.T) {
@@ -171,5 +195,17 @@ func TestCountryAvailabilityInfoFromTrackCountryAvailability(t *testing.T) {
 	})
 	if got.Track != "production" || !got.RestOfWorld || len(got.Countries) != 2 {
 		t.Fatalf("unexpected country availability map: %+v", got)
+	}
+}
+
+func TestImageInfoFromImage(t *testing.T) {
+	got := imageInfoFromImage(&androidpublisher.Image{
+		Id:     "image-1",
+		Sha1:   "sha1",
+		Sha256: "sha256",
+		Url:    "https://example.com/image.png",
+	})
+	if got.ID != "image-1" || got.SHA1 != "sha1" || got.SHA256 != "sha256" || got.URL != "https://example.com/image.png" {
+		t.Fatalf("unexpected image map: %+v", got)
 	}
 }

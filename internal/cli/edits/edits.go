@@ -4,14 +4,19 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"image"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
+
+	_ "image/jpeg"
+	_ "image/png"
 )
 
 type Client interface {
@@ -30,6 +35,10 @@ type Client interface {
 	UpdateListing(ctx context.Context, packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
 	DeleteListing(ctx context.Context, packageName, editID, language string) error
 	DeleteAllListings(ctx context.Context, packageName, editID string) error
+	ListImages(ctx context.Context, packageName, editID, language, imageType string) ([]gpc.ImageInfo, error)
+	UploadImage(ctx context.Context, packageName, editID, language, imageType, imagePath string) (gpc.ImageInfo, error)
+	DeleteImage(ctx context.Context, packageName, editID, language, imageType, imageID string) error
+	DeleteAllImages(ctx context.Context, packageName, editID, language, imageType string) ([]gpc.ImageInfo, error)
 }
 
 type Deps struct {
@@ -56,6 +65,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newTestersCommand(deps),
 			newCountryAvailabilityCommand(deps),
 			newListingsCommand(deps),
+			newImagesCommand(deps),
 		},
 	}
 }
@@ -270,6 +280,226 @@ func newListingsCommand(deps Deps) *ffcli.Command {
 			newListingsDeleteAllCommand(deps),
 		},
 	}
+}
+
+func newImagesCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "images",
+		ShortHelp: "Manage store listing images inside an edit",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newImagesListCommand(deps),
+			newImagesUploadCommand(deps),
+			newImagesDeleteCommand(deps),
+			newImagesDeleteAllCommand(deps),
+		},
+	}
+}
+
+func newImagesListCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, locale, imageType string
+	addImageSharedFlags(fs, &packageName, &editID, &locale, &imageType)
+
+	return &ffcli.Command{
+		Name:      "list",
+		ShortHelp: "List images for one locale/type inside an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			locale = strings.TrimSpace(locale)
+			if locale == "" {
+				return fmt.Errorf("--locale is required")
+			}
+			imageType, err = validateImageType(imageType)
+			if err != nil {
+				return err
+			}
+
+			images, err := client.ListImages(requestCtx, pkg, editID, locale, imageType)
+			if err != nil {
+				return fmt.Errorf("failed to list images: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"locale":      locale,
+				"imageType":   imageType,
+				"images":      images,
+			})
+		},
+	}
+}
+
+func newImagesUploadCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("upload", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, locale, imageType, imagePath string
+	addImageSharedFlags(fs, &packageName, &editID, &locale, &imageType)
+	fs.StringVar(&imagePath, "file", "", "Path to image file (PNG/JPEG)")
+
+	return &ffcli.Command{
+		Name:      "upload",
+		ShortHelp: "Upload one image inside an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, true)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			locale = strings.TrimSpace(locale)
+			if locale == "" {
+				return fmt.Errorf("--locale is required")
+			}
+			imageType, err = validateImageType(imageType)
+			if err != nil {
+				return err
+			}
+			imagePath = strings.TrimSpace(imagePath)
+			if imagePath == "" {
+				return fmt.Errorf("--file is required")
+			}
+			if err := validateImageUploadFile(imageType, imagePath); err != nil {
+				return err
+			}
+
+			imageInfo, err := client.UploadImage(requestCtx, pkg, editID, locale, imageType, imagePath)
+			if err != nil {
+				return fmt.Errorf("failed to upload image: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"locale":      locale,
+				"imageType":   imageType,
+				"image":       imageInfo,
+				"status":      "uploaded",
+			})
+		},
+	}
+}
+
+func newImagesDeleteCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, locale, imageType, imageID string
+	addImageSharedFlags(fs, &packageName, &editID, &locale, &imageType)
+	fs.StringVar(&imageID, "image-id", "", "Image ID to delete")
+
+	return &ffcli.Command{
+		Name:      "delete",
+		ShortHelp: "Delete one image inside an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			locale = strings.TrimSpace(locale)
+			if locale == "" {
+				return fmt.Errorf("--locale is required")
+			}
+			imageType, err = validateImageType(imageType)
+			if err != nil {
+				return err
+			}
+			imageID = strings.TrimSpace(imageID)
+			if imageID == "" {
+				return fmt.Errorf("--image-id is required")
+			}
+
+			if err := client.DeleteImage(requestCtx, pkg, editID, locale, imageType, imageID); err != nil {
+				return fmt.Errorf("failed to delete image: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"locale":      locale,
+				"imageType":   imageType,
+				"imageId":     imageID,
+				"status":      "deleted",
+			})
+		},
+	}
+}
+
+func newImagesDeleteAllCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("delete-all", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, locale, imageType string
+	addImageSharedFlags(fs, &packageName, &editID, &locale, &imageType)
+
+	return &ffcli.Command{
+		Name:      "delete-all",
+		ShortHelp: "Delete all images for one locale/type inside an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			locale = strings.TrimSpace(locale)
+			if locale == "" {
+				return fmt.Errorf("--locale is required")
+			}
+			imageType, err = validateImageType(imageType)
+			if err != nil {
+				return err
+			}
+
+			deleted, err := client.DeleteAllImages(requestCtx, pkg, editID, locale, imageType)
+			if err != nil {
+				return fmt.Errorf("failed to delete all images: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"locale":      locale,
+				"imageType":   imageType,
+				"images":      deleted,
+				"status":      "deleted_all",
+			})
+		},
+	}
+}
+
+func addImageSharedFlags(fs *flag.FlagSet, packageName, editID, locale, imageType *string) {
+	fs.StringVar(packageName, "package-name", "", "Package name")
+	fs.StringVar(editID, "edit-id", "", "Edit ID")
+	fs.StringVar(locale, "locale", "", "Listing locale (BCP-47, e.g. en-US)")
+	fs.StringVar(imageType, "image-type", "", "Image type (icon, featureGraphic, phoneScreenshots, ...)")
 }
 
 func newDetailsCommand(deps Deps) *ffcli.Command {
@@ -560,6 +790,95 @@ func parseCommaSeparated(raw string) []string {
 		out = append(out, value)
 	}
 	return out
+}
+
+var validImageTypes = map[string]struct{}{
+	"featureGraphic":       {},
+	"icon":                 {},
+	"phoneScreenshots":     {},
+	"promoGraphic":         {},
+	"sevenInchScreenshots": {},
+	"tenInchScreenshots":   {},
+	"tvBanner":             {},
+	"tvScreenshots":        {},
+	"wearScreenshots":      {},
+}
+
+const validImageTypesHelp = "featureGraphic, icon, phoneScreenshots, promoGraphic, sevenInchScreenshots, tenInchScreenshots, tvBanner, tvScreenshots, wearScreenshots"
+
+func validateImageType(raw string) (string, error) {
+	imageType := strings.TrimSpace(raw)
+	if imageType == "" {
+		return "", fmt.Errorf("--image-type is required")
+	}
+	if _, ok := validImageTypes[imageType]; !ok {
+		return "", fmt.Errorf("--image-type must be one of: %s", validImageTypesHelp)
+	}
+	return imageType, nil
+}
+
+func validateImageUploadFile(imageType, imagePath string) error {
+	ext := strings.ToLower(strings.TrimSpace(filepath.Ext(imagePath)))
+	switch ext {
+	case ".png", ".jpg", ".jpeg":
+	default:
+		return fmt.Errorf("--file must use one of: .png, .jpg, .jpeg")
+	}
+
+	stat, err := os.Stat(imagePath)
+	if err != nil {
+		return fmt.Errorf("stat --file: %w", err)
+	}
+	if stat.IsDir() {
+		return fmt.Errorf("--file must point to an image file, got directory")
+	}
+
+	file, err := os.Open(imagePath)
+	if err != nil {
+		return fmt.Errorf("open --file: %w", err)
+	}
+	defer file.Close()
+
+	cfg, format, err := image.DecodeConfig(file)
+	if err != nil {
+		return fmt.Errorf("--file must be a valid PNG or JPEG image: %w", err)
+	}
+	format = strings.ToLower(strings.TrimSpace(format))
+	if format != "png" && format != "jpeg" {
+		return fmt.Errorf("--file must be PNG or JPEG, got %q", format)
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 {
+		return fmt.Errorf("--file has invalid dimensions %dx%d", cfg.Width, cfg.Height)
+	}
+
+	if imageType == "icon" {
+		if format != "png" {
+			return fmt.Errorf("--image-type icon requires a PNG file")
+		}
+		if cfg.Width != 512 || cfg.Height != 512 {
+			return fmt.Errorf("--image-type icon requires dimensions 512x512, got %dx%d", cfg.Width, cfg.Height)
+		}
+	}
+	if imageType == "featureGraphic" && (cfg.Width != 1024 || cfg.Height != 500) {
+		return fmt.Errorf("--image-type featureGraphic requires dimensions 1024x500, got %dx%d", cfg.Width, cfg.Height)
+	}
+	if imageType == "tvBanner" && (cfg.Width != 1280 || cfg.Height != 720) {
+		return fmt.Errorf("--image-type tvBanner requires dimensions 1280x720, got %dx%d", cfg.Width, cfg.Height)
+	}
+	if isScreenshotImageType(imageType) && (cfg.Width < 320 || cfg.Width > 3840 || cfg.Height < 320 || cfg.Height > 3840) {
+		return fmt.Errorf("--image-type %s requires width/height in range 320-3840, got %dx%d", imageType, cfg.Width, cfg.Height)
+	}
+
+	return nil
+}
+
+func isScreenshotImageType(imageType string) bool {
+	switch imageType {
+	case "phoneScreenshots", "sevenInchScreenshots", "tenInchScreenshots", "tvScreenshots", "wearScreenshots":
+		return true
+	default:
+		return false
+	}
 }
 
 func newListingsGetCommand(deps Deps) *ffcli.Command {

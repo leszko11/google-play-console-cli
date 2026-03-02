@@ -86,6 +86,10 @@ gpc edits listings get --package-name com.example.app --edit-id <edit-id> --loca
 gpc edits listings update --package-name com.example.app --edit-id <edit-id> --locale en-US --title "My App Test"
 gpc edits listings delete --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings delete-all --package-name com.example.app --edit-id <edit-id>
+gpc edits images list --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
+gpc edits images upload --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type icon --file /path/to/icon-512.png
+gpc edits images delete --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots --image-id <image-id>
+gpc edits images delete-all --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
 gpc edits validate --package-name com.example.app --edit-id <edit-id>
 gpc edits commit --package-name com.example.app --edit-id <edit-id> --confirm
 gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
@@ -145,6 +149,10 @@ gpc --paginate purchases voided list --package-name com.example.app --max-result
   - `gpc edits listings update ...` should return `status: updated` inside an edit.
   - `gpc edits listings delete ...` should return `status: deleted`.
   - `gpc edits listings delete-all ...` should return `status: deleted_all`.
+  - `gpc edits images list ...` should return image metadata for locale + image type.
+  - `gpc edits images upload ...` should return `status: uploaded`; invalid type/dimensions should fail before API call.
+  - `gpc edits images delete ...` should return `status: deleted`.
+  - `gpc edits images delete-all ...` should return `status: deleted_all`.
   - `gpc edits commit ... --confirm` should be required for publishing changes.
   - `gpc tracks list ...` should return track JSON for the given edit.
   - `gpc tracks promote ...` should copy release metadata from source track to target track within the edit.

@@ -11,6 +11,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Edit transactions and listing updates (`edits`)
 - Testers and country availability inside edits
 - Track management inside edits (`tracks list/get/update/promote`)
+- Store images inside edits (`edits images list/upload/delete/delete-all`)
 - Binary uploads in edits (`apks list/upload`, `bundles list/upload`)
 - Deobfuscation mapping upload (`deobfuscation upload`)
 - End-to-end deploy orchestration (`deploy`)
@@ -21,8 +22,8 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 
 ## Not Yet Implemented
 
-- Store listing/image management
-- Monetization and reporting commands
+- One-time products and legacy in-app-products command groups
+- Users, grants, internal app sharing, and reporting surfaces
 
 ## Build
 
@@ -90,6 +91,21 @@ gpc edits listings update \
 gpc edits listings list --package-name com.example.app --edit-id <edit-id>
 gpc edits listings delete --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings delete-all --package-name com.example.app --edit-id <edit-id>
+
+# Manage store images in an edit
+gpc edits images list --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
+gpc edits images upload --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type icon --file /path/to/icon-512.png
+gpc edits images delete --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots --image-id <image-id>
+gpc edits images delete-all --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
+
+# Local image validation (pre-API)
+# - Supported image types: featureGraphic, icon, phoneScreenshots, promoGraphic,
+#   sevenInchScreenshots, tenInchScreenshots, tvBanner, tvScreenshots, wearScreenshots
+# - Supported file formats: PNG, JPG, JPEG
+# - icon: PNG and exactly 512x512
+# - featureGraphic: exactly 1024x500
+# - tvBanner: exactly 1280x720
+# - screenshot types: each side in range 320-3840
 
 # Commit or delete edits are destructive and require explicit confirmation
 gpc edits commit --package-name com.example.app --edit-id <edit-id> --confirm
