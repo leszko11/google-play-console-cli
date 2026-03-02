@@ -210,6 +210,12 @@ type APKInfo struct {
 	SHA256      string `json:"sha256,omitempty"`
 }
 
+type InternalSharingArtifactInfo struct {
+	DownloadURL            string `json:"downloadUrl,omitempty"`
+	CertificateFingerprint string `json:"certificateFingerprint,omitempty"`
+	SHA256                 string `json:"sha256,omitempty"`
+}
+
 type DeobfuscationFileInfo struct {
 	SymbolType string `json:"symbolType,omitempty"`
 }

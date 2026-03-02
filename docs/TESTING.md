@@ -134,6 +134,8 @@ gpc users delete --name developers/<developer-id>/users/<email> --confirm
 gpc grants create --parent developers/<developer-id>/users/<email> --input /path/to/grant.json
 gpc grants update --name developers/<developer-id>/users/<email>/grants/<package-name> --input /path/to/grant.json --update-mask appLevelPermissions
 gpc grants delete --name developers/<developer-id>/users/<email>/grants/<package-name> --confirm
+gpc internal-sharing upload --package-name com.example.app --apk /path/to/app.apk
+gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aab
 ```
 
 ## Expected Outcomes
@@ -199,3 +201,5 @@ gpc grants delete --name developers/<developer-id>/users/<email>/grants/<package
   - `gpc grants create ...` should return `status: created`.
   - `gpc grants update ...` should return `status: updated`.
   - `gpc grants delete ... --confirm` should return `status: deleted`.
+  - `gpc internal-sharing upload --apk ...` should return `status: uploaded` and a download URL.
+  - `gpc internal-sharing upload --aab ...` should return `status: uploaded` and a download URL.
