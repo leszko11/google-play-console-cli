@@ -21,7 +21,10 @@ type Client interface {
 	CommitEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	GetListing(ctx context.Context, packageName, editID, language string) (gpc.ListingInfo, error)
+	ListListings(ctx context.Context, packageName, editID string) ([]gpc.ListingInfo, error)
 	UpdateListing(ctx context.Context, packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
+	DeleteListing(ctx context.Context, packageName, editID, language string) error
+	DeleteAllListings(ctx context.Context, packageName, editID string) error
 }
 
 type Deps struct {
@@ -252,8 +255,46 @@ func newListingsCommand(deps Deps) *ffcli.Command {
 		ShortHelp: "Manage listing changes inside an edit",
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
+			newListingsListCommand(deps),
 			newListingsGetCommand(deps),
 			newListingsUpdateCommand(deps),
+			newListingsDeleteCommand(deps),
+			newListingsDeleteAllCommand(deps),
+		},
+	}
+}
+
+func newListingsListCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+
+	return &ffcli.Command{
+		Name:      "list",
+		ShortHelp: "List localized listings in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			listings, err := client.ListListings(requestCtx, pkg, editID)
+			if err != nil {
+				return fmt.Errorf("failed to list listings: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"listings":    listings,
+			})
 		},
 	}
 }
@@ -341,6 +382,80 @@ func newListingsUpdateCommand(deps Deps) *ffcli.Command {
 				"editId":      editID,
 				"listing":     listing,
 				"status":      "updated",
+			})
+		},
+	}
+}
+
+func newListingsDeleteCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, locale string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&locale, "locale", "", "Listing locale (BCP-47, e.g. en-US)")
+
+	return &ffcli.Command{
+		Name:      "delete",
+		ShortHelp: "Delete one localized listing in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			locale = strings.TrimSpace(locale)
+			if locale == "" {
+				return fmt.Errorf("--locale is required")
+			}
+			if err := client.DeleteListing(requestCtx, pkg, editID, locale); err != nil {
+				return fmt.Errorf("failed to delete listing: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"locale":      locale,
+				"status":      "deleted",
+			})
+		},
+	}
+}
+
+func newListingsDeleteAllCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("delete-all", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+
+	return &ffcli.Command{
+		Name:      "delete-all",
+		ShortHelp: "Delete all localized listings in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return fmt.Errorf("--edit-id is required")
+			}
+			if err := client.DeleteAllListings(requestCtx, pkg, editID); err != nil {
+				return fmt.Errorf("failed to delete all listings: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"status":      "deleted_all",
 			})
 		},
 	}

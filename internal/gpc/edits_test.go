@@ -27,6 +27,15 @@ func TestEditMethods_RejectMissingClient(t *testing.T) {
 	if err := c.DeleteEdit(context.Background(), "com.example.app", "edit-1"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from DeleteEdit, got %v", err)
 	}
+	if _, err := c.ListListings(context.Background(), "com.example.app", "edit-1"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from ListListings, got %v", err)
+	}
+	if err := c.DeleteListing(context.Background(), "com.example.app", "edit-1", "en-US"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from DeleteListing, got %v", err)
+	}
+	if err := c.DeleteAllListings(context.Background(), "com.example.app", "edit-1"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from DeleteAllListings, got %v", err)
+	}
 }
 
 func TestEditMethods_ValidateArgs(t *testing.T) {
@@ -70,6 +79,18 @@ func TestListingMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.UpdateListing(context.Background(), "com.example.app", "edit-1", "en-US", ListingUpdate{}); err == nil || !strings.Contains(err.Error(), "at least one listing field must be provided") {
 		t.Fatalf("unexpected UpdateListing error: %v", err)
+	}
+	if _, err := c.ListListings(context.Background(), "", "edit-1"); err == nil || !strings.Contains(err.Error(), "package name is required") {
+		t.Fatalf("unexpected ListListings package error: %v", err)
+	}
+	if _, err := c.ListListings(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "edit id is required") {
+		t.Fatalf("unexpected ListListings edit id error: %v", err)
+	}
+	if err := c.DeleteListing(context.Background(), "com.example.app", "edit-1", ""); err == nil || !strings.Contains(err.Error(), "language is required") {
+		t.Fatalf("unexpected DeleteListing language error: %v", err)
+	}
+	if err := c.DeleteAllListings(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "edit id is required") {
+		t.Fatalf("unexpected DeleteAllListings edit id error: %v", err)
 	}
 }
 

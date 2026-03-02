@@ -12,17 +12,20 @@ import (
 )
 
 type fakeClient struct {
-	create    gpc.EditInfo
-	createErr error
-	get       gpc.EditInfo
-	getErr    error
-	validate  error
-	commit    gpc.EditInfo
-	commitErr error
-	deleteErr error
-	listing   gpc.ListingInfo
-	listErr   error
-	updateErr error
+	create     gpc.EditInfo
+	createErr  error
+	get        gpc.EditInfo
+	getErr     error
+	validate   error
+	commit     gpc.EditInfo
+	commitErr  error
+	deleteErr  error
+	listing    gpc.ListingInfo
+	listings   []gpc.ListingInfo
+	listErr    error
+	updateErr  error
+	delListErr error
+	delAllErr  error
 }
 
 func (f fakeClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, error) {
@@ -39,9 +42,14 @@ func (f fakeClient) DeleteEdit(_ context.Context, _, _ string) error { return f.
 func (f fakeClient) GetListing(_ context.Context, _, _, _ string) (gpc.ListingInfo, error) {
 	return f.listing, f.listErr
 }
+func (f fakeClient) ListListings(_ context.Context, _, _ string) ([]gpc.ListingInfo, error) {
+	return f.listings, f.listErr
+}
 func (f fakeClient) UpdateListing(_ context.Context, _, _, _ string, _ gpc.ListingUpdate) (gpc.ListingInfo, error) {
 	return f.listing, f.updateErr
 }
+func (f fakeClient) DeleteListing(_ context.Context, _, _, _ string) error  { return f.delListErr }
+func (f fakeClient) DeleteAllListings(_ context.Context, _, _ string) error { return f.delAllErr }
 
 func runEdits(t *testing.T, deps Deps, args ...string) (string, error) {
 	t.Helper()
@@ -164,6 +172,23 @@ func TestEditsListingsGet(t *testing.T) {
 	}
 }
 
+func TestEditsListingsList(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{listings: []gpc.ListingInfo{{Language: "en-US", Title: "PeakMe"}, {Language: "pl-PL", Title: "PeakMe PL"}}}, nil
+		},
+	}
+
+	out, err := runEdits(t, deps, "listings", "list", "--package-name", "com.example.app", "--edit-id", "edit-1")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"language":"en-US"`) || !strings.Contains(out, `"language":"pl-PL"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
 func TestEditsListingsUpdate_ReturnsStatusUpdated(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
@@ -178,5 +203,56 @@ func TestEditsListingsUpdate_ReturnsStatusUpdated(t *testing.T) {
 	}
 	if !strings.Contains(out, `"status":"updated"`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsListingsDelete_ReturnsStatusDeleted(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	out, err := runEdits(t, deps, "listings", "delete", "--package-name", "com.example.app", "--edit-id", "edit-1", "--locale", "en-US")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"deleted"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsListingsDeleteAll_ReturnsStatusDeletedAll(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	out, err := runEdits(t, deps, "listings", "delete-all", "--package-name", "com.example.app", "--edit-id", "edit-1")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"deleted_all"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsListingsDelete_RequiresLocale(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(t, deps, "listings", "delete", "--package-name", "com.example.app", "--edit-id", "edit-1")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--locale is required") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
