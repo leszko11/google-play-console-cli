@@ -61,8 +61,15 @@ func mapAPIError(statusCode int, msg string) error {
 	case 403:
 		return fmt.Errorf("%w: %s", ErrAccessDenied, msg)
 	case 404:
+		if isPackageBootstrapNotReady(msg) {
+			return fmt.Errorf("%w: %s\nhint: this package is not initialized in Google Play yet. Upload the first APK or AAB once in Play Console, then retry. Also verify the service account has access to this app.", ErrPackageNotFound, msg)
+		}
 		return fmt.Errorf("%w: %s", ErrPackageNotFound, msg)
 	default:
 		return fmt.Errorf("androidpublisher api error (%d): %s", statusCode, msg)
 	}
+}
+
+func isPackageBootstrapNotReady(msg string) bool {
+	return strings.Contains(strings.ToLower(msg), "package not found")
 }

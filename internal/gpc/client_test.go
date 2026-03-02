@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -22,8 +23,21 @@ func TestVerifyPackageAccess_MapsForbidden(t *testing.T) {
 }
 
 func TestVerifyPackageAccess_MapsNotFound(t *testing.T) {
-	err := mapAPIError(http.StatusNotFound, "not found")
+	err := mapAPIError(http.StatusNotFound, "Package not found: com.example.app.")
 	if !errors.Is(err, ErrPackageNotFound) {
 		t.Fatalf("expected ErrPackageNotFound, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "hint: this package is not initialized in Google Play yet") {
+		t.Fatalf("expected bootstrap hint for package-not-found error, got %v", err)
+	}
+}
+
+func TestVerifyPackageAccess_MapsOtherNotFoundWithoutBootstrapHint(t *testing.T) {
+	err := mapAPIError(http.StatusNotFound, "Edit not found")
+	if !errors.Is(err, ErrPackageNotFound) {
+		t.Fatalf("expected ErrPackageNotFound, got %v", err)
+	}
+	if strings.Contains(err.Error(), "this package is not initialized in Google Play yet") {
+		t.Fatalf("expected no bootstrap hint for non-package not found error, got %v", err)
 	}
 }
