@@ -76,8 +76,11 @@ gpc apps get --package-name com.example.app --output json
 gpc apps remove-package --package-name com.example.app
 gpc edits create --package-name com.example.app
 gpc edits get --package-name com.example.app --edit-id <edit-id>
+gpc edits listings list --package-name com.example.app --edit-id <edit-id>
 gpc edits listings get --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings update --package-name com.example.app --edit-id <edit-id> --locale en-US --title "My App Test"
+gpc edits listings delete --package-name com.example.app --edit-id <edit-id> --locale en-US
+gpc edits listings delete-all --package-name com.example.app --edit-id <edit-id>
 gpc edits validate --package-name com.example.app --edit-id <edit-id>
 gpc edits commit --package-name com.example.app --edit-id <edit-id> --confirm
 gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
@@ -105,7 +108,10 @@ gpc deploy --package-name com.example.app --aab /path/to/app.aab --track interna
   - `gpc auth init --service-account <valid-file>` should succeed.
   - `gpc apps get --package-name <valid-package>` should return app JSON with `packageName`.
   - `gpc edits create --package-name <valid-package>` should return a JSON edit object with `id`.
+  - `gpc edits listings list ...` should return localized listings for the edit.
   - `gpc edits listings update ...` should return `status: updated` inside an edit.
+  - `gpc edits listings delete ...` should return `status: deleted`.
+  - `gpc edits listings delete-all ...` should return `status: deleted_all`.
   - `gpc edits commit ... --confirm` should be required for publishing changes.
   - `gpc tracks list ...` should return track JSON for the given edit.
   - `gpc tracks promote ...` should copy release metadata from source track to target track within the edit.

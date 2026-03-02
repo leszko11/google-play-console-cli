@@ -128,6 +128,31 @@ func (c *Client) GetListing(ctx context.Context, packageName, editID, language s
 	return listingInfoFromListing(listing), nil
 }
 
+func (c *Client) ListListings(ctx context.Context, packageName, editID string) ([]ListingInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return nil, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return nil, fmt.Errorf("edit id is required")
+	}
+	if c == nil || c.service == nil {
+		return nil, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Edits.Listings.List(packageName, editID).Context(ctx).Do()
+	if err != nil {
+		return nil, mapGoogleAPIError(err)
+	}
+
+	listings := make([]ListingInfo, 0, len(resp.Listings))
+	for _, listing := range resp.Listings {
+		listings = append(listings, listingInfoFromListing(listing))
+	}
+	return listings, nil
+}
+
 func (c *Client) UpdateListing(ctx context.Context, packageName, editID, language string, update ListingUpdate) (ListingInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -162,6 +187,48 @@ func (c *Client) UpdateListing(ctx context.Context, packageName, editID, languag
 		return ListingInfo{}, mapGoogleAPIError(err)
 	}
 	return listingInfoFromListing(listing), nil
+}
+
+func (c *Client) DeleteListing(ctx context.Context, packageName, editID, language string) error {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return fmt.Errorf("edit id is required")
+	}
+	language = strings.TrimSpace(language)
+	if language == "" {
+		return fmt.Errorf("language is required")
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := c.service.Edits.Listings.Delete(packageName, editID, language).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
+func (c *Client) DeleteAllListings(ctx context.Context, packageName, editID string) error {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return fmt.Errorf("edit id is required")
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := c.service.Edits.Listings.Deleteall(packageName, editID).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
 }
 
 func editInfoFromAppEdit(edit *androidpublisher.AppEdit) EditInfo {

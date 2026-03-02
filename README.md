@@ -70,6 +70,11 @@ gpc edits listings update \
   --locale en-US \
   --title "My App Title"
 
+# List / delete localized listings in an edit
+gpc edits listings list --package-name com.example.app --edit-id <edit-id>
+gpc edits listings delete --package-name com.example.app --edit-id <edit-id> --locale en-US
+gpc edits listings delete-all --package-name com.example.app --edit-id <edit-id>
+
 # Commit or delete edits are destructive and require explicit confirmation
 gpc edits commit --package-name com.example.app --edit-id <edit-id> --confirm
 gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
