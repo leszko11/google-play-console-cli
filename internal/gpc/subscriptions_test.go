@@ -30,6 +30,15 @@ func TestSubscriptionMethods_RejectMissingClient(t *testing.T) {
 	if err := c.ArchiveSubscription(context.Background(), "com.example.app", "premium_monthly"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from ArchiveSubscription, got %v", err)
 	}
+	if _, err := c.ActivateSubscriptionBasePlan(context.Background(), "com.example.app", "premium_monthly", "monthly"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from ActivateSubscriptionBasePlan, got %v", err)
+	}
+	if _, err := c.DeactivateSubscriptionBasePlan(context.Background(), "com.example.app", "premium_monthly", "monthly"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from DeactivateSubscriptionBasePlan, got %v", err)
+	}
+	if err := c.DeleteSubscriptionBasePlan(context.Background(), "com.example.app", "premium_monthly", "monthly"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from DeleteSubscriptionBasePlan, got %v", err)
+	}
 	if _, err := c.ListSubscriptionOffers(context.Background(), "com.example.app", "premium_monthly", "monthly", 50, "", false); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from ListSubscriptionOffers, got %v", err)
 	}
@@ -73,6 +82,15 @@ func TestSubscriptionMethods_ValidateArgs(t *testing.T) {
 	}
 	if err := c.ArchiveSubscription(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "product id is required") {
 		t.Fatalf("unexpected ArchiveSubscription product id error: %v", err)
+	}
+	if _, err := c.ActivateSubscriptionBasePlan(context.Background(), "com.example.app", "premium_monthly", ""); err == nil || !strings.Contains(err.Error(), "base plan id is required") {
+		t.Fatalf("unexpected ActivateSubscriptionBasePlan base plan id error: %v", err)
+	}
+	if _, err := c.DeactivateSubscriptionBasePlan(context.Background(), "com.example.app", "", "monthly"); err == nil || !strings.Contains(err.Error(), "product id is required") {
+		t.Fatalf("unexpected DeactivateSubscriptionBasePlan product id error: %v", err)
+	}
+	if err := c.DeleteSubscriptionBasePlan(context.Background(), "com.example.app", "premium_monthly", ""); err == nil || !strings.Contains(err.Error(), "base plan id is required") {
+		t.Fatalf("unexpected DeleteSubscriptionBasePlan base plan id error: %v", err)
 	}
 	if _, err := c.ListSubscriptionOffers(context.Background(), "com.example.app", "", "monthly", 50, "", false); err == nil || !strings.Contains(err.Error(), "product id is required") {
 		t.Fatalf("unexpected ListSubscriptionOffers product id error: %v", err)
@@ -164,5 +182,25 @@ func TestSubscriptionOfferInfoFromOffer(t *testing.T) {
 	})
 	if got.PackageName != "com.example.app" || got.OfferID != "offer1" || got.PhaseCount != 2 || got.TagCount != 1 {
 		t.Fatalf("unexpected offer map: %+v", got)
+	}
+}
+
+func TestSubscriptionInfosFromSlice(t *testing.T) {
+	got := subscriptionInfosFromSlice([]*androidpublisher.Subscription{
+		{
+			PackageName: "com.example.app",
+			ProductId:   "premium_monthly",
+			BasePlans:   []*androidpublisher.BasePlan{{BasePlanId: "monthly"}},
+		},
+		nil,
+	})
+	if len(got) != 2 {
+		t.Fatalf("unexpected mapped count: %+v", got)
+	}
+	if got[0].ProductID != "premium_monthly" || got[0].BasePlanCount != 1 {
+		t.Fatalf("unexpected first mapped subscription: %+v", got[0])
+	}
+	if got[1] != (SubscriptionInfo{}) {
+		t.Fatalf("unexpected nil mapping result: %+v", got[1])
 	}
 }

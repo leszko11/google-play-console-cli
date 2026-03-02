@@ -132,6 +132,11 @@ gpc subscriptions update --package-name com.example.app --product-id premium_mon
 gpc subscriptions delete --package-name com.example.app --product-id premium_monthly --confirm
 gpc subscriptions archive --package-name com.example.app --product-id premium_monthly --confirm
 
+# Manage subscription base plans
+gpc subscriptions base-plans activate --package-name com.example.app --product-id premium_monthly --base-plan-id monthly
+gpc subscriptions base-plans deactivate --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --confirm
+gpc subscriptions base-plans delete --package-name com.example.app --product-id premium_monthly --base-plan-id legacy --confirm
+
 # Manage subscription offers
 gpc subscriptions offers list --package-name com.example.app --product-id premium_monthly --base-plan-id monthly
 gpc subscriptions offers get --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro
