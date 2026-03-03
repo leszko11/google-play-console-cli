@@ -193,6 +193,148 @@ func (c *Client) ListOneTimeProductOffers(ctx context.Context, packageName, prod
 	}
 }
 
+func (c *Client) BatchGetOneTimeProductOffers(ctx context.Context, packageName, productID, purchaseOptionID string, offerIDs []string) (OneTimeProductOffersListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("product id is required")
+	}
+	purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+	if purchaseOptionID == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("purchase option id is required")
+	}
+
+	requests := make([]*androidpublisher.GetOneTimeProductOfferRequest, 0, len(offerIDs))
+	for _, rawID := range offerIDs {
+		offerID := strings.TrimSpace(rawID)
+		if offerID == "" {
+			continue
+		}
+		requests = append(requests, &androidpublisher.GetOneTimeProductOfferRequest{
+			PackageName:      packageName,
+			ProductId:        productID,
+			PurchaseOptionId: purchaseOptionID,
+			OfferId:          offerID,
+		})
+	}
+	if len(requests) == 0 {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("at least one offer id is required")
+	}
+	if len(requests) > 100 {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("offer id count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return OneTimeProductOffersListInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Monetization.Onetimeproducts.PurchaseOptions.Offers.BatchGet(
+		packageName,
+		productID,
+		purchaseOptionID,
+		&androidpublisher.BatchGetOneTimeProductOffersRequest{
+			Requests: requests,
+		},
+	).Context(ctx).Do()
+	if err != nil {
+		return OneTimeProductOffersListInfo{}, mapGoogleAPIError(err)
+	}
+	return oneTimeProductOffersListInfoFromResponse(&androidpublisher.ListOneTimeProductOffersResponse{
+		OneTimeProductOffers: resp.OneTimeProductOffers,
+	}), nil
+}
+
+func (c *Client) BatchUpdateOneTimeProductOffers(ctx context.Context, packageName, productID, purchaseOptionID string, requests []*androidpublisher.UpdateOneTimeProductOfferRequest) (OneTimeProductOffersListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("product id is required")
+	}
+	purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+	if purchaseOptionID == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("purchase option id is required")
+	}
+	filteredRequests := make([]*androidpublisher.UpdateOneTimeProductOfferRequest, 0, len(requests))
+	for _, request := range requests {
+		if request == nil {
+			continue
+		}
+		filteredRequests = append(filteredRequests, request)
+	}
+	if len(filteredRequests) == 0 {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("at least one batch update request is required")
+	}
+	if len(filteredRequests) > 100 {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("batch update request count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return OneTimeProductOffersListInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Monetization.Onetimeproducts.PurchaseOptions.Offers.BatchUpdate(
+		packageName,
+		productID,
+		purchaseOptionID,
+		&androidpublisher.BatchUpdateOneTimeProductOffersRequest{
+			Requests: filteredRequests,
+		},
+	).Context(ctx).Do()
+	if err != nil {
+		return OneTimeProductOffersListInfo{}, mapGoogleAPIError(err)
+	}
+	return oneTimeProductOffersListInfoFromResponse(&androidpublisher.ListOneTimeProductOffersResponse{
+		OneTimeProductOffers: resp.OneTimeProductOffers,
+	}), nil
+}
+
+func (c *Client) BatchDeleteOneTimeProductOffers(ctx context.Context, packageName, productID, purchaseOptionID string, requests []*androidpublisher.DeleteOneTimeProductOfferRequest) error {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return fmt.Errorf("product id is required")
+	}
+	purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+	if purchaseOptionID == "" {
+		return fmt.Errorf("purchase option id is required")
+	}
+	filteredRequests := make([]*androidpublisher.DeleteOneTimeProductOfferRequest, 0, len(requests))
+	for _, request := range requests {
+		if request == nil {
+			continue
+		}
+		filteredRequests = append(filteredRequests, request)
+	}
+	if len(filteredRequests) == 0 {
+		return fmt.Errorf("at least one batch delete request is required")
+	}
+	if len(filteredRequests) > 100 {
+		return fmt.Errorf("batch delete request count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := c.service.Monetization.Onetimeproducts.PurchaseOptions.Offers.BatchDelete(
+		packageName,
+		productID,
+		purchaseOptionID,
+		&androidpublisher.BatchDeleteOneTimeProductOffersRequest{
+			Requests: filteredRequests,
+		},
+	).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
 func (c *Client) ActivateOneTimeProductOffer(ctx context.Context, packageName, productID, purchaseOptionID, offerID string) (OneTimeProductOfferInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {

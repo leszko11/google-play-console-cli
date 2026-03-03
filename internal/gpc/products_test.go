@@ -31,6 +31,15 @@ func TestOneTimeProductMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.ListOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", 0, "", false); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from ListOneTimeProductOffers, got %v", err)
 	}
+	if _, err := c.BatchGetOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", []string{"offer_intro"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchGetOneTimeProductOffers, got %v", err)
+	}
+	if _, err := c.BatchUpdateOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", []*androidpublisher.UpdateOneTimeProductOfferRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchUpdateOneTimeProductOffers, got %v", err)
+	}
+	if err := c.BatchDeleteOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", []*androidpublisher.DeleteOneTimeProductOfferRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchDeleteOneTimeProductOffers, got %v", err)
+	}
 	if _, err := c.ActivateOneTimeProductOffer(context.Background(), "com.example.app", "coins_100", "buy", "offer_intro"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from ActivateOneTimeProductOffer, got %v", err)
 	}
@@ -89,6 +98,36 @@ func TestOneTimeProductMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.ListOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", -1, "", false); err == nil || !strings.Contains(err.Error(), "page size must be greater than or equal to zero") {
 		t.Fatalf("unexpected ListOneTimeProductOffers page size error: %v", err)
+	}
+	if _, err := c.BatchGetOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", nil); err == nil || !strings.Contains(err.Error(), "at least one offer id is required") {
+		t.Fatalf("unexpected BatchGetOneTimeProductOffers empty IDs error: %v", err)
+	}
+	tooManyOfferIDs := make([]string, 101)
+	for i := range tooManyOfferIDs {
+		tooManyOfferIDs[i] = "offer"
+	}
+	if _, err := c.BatchGetOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", tooManyOfferIDs); err == nil || !strings.Contains(err.Error(), "offer id count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchGetOneTimeProductOffers count error: %v", err)
+	}
+	if _, err := c.BatchUpdateOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", nil); err == nil || !strings.Contains(err.Error(), "at least one batch update request is required") {
+		t.Fatalf("unexpected BatchUpdateOneTimeProductOffers empty request error: %v", err)
+	}
+	tooManyUpdateRequests := make([]*androidpublisher.UpdateOneTimeProductOfferRequest, 101)
+	for i := range tooManyUpdateRequests {
+		tooManyUpdateRequests[i] = &androidpublisher.UpdateOneTimeProductOfferRequest{}
+	}
+	if _, err := c.BatchUpdateOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", tooManyUpdateRequests); err == nil || !strings.Contains(err.Error(), "batch update request count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchUpdateOneTimeProductOffers count error: %v", err)
+	}
+	if err := c.BatchDeleteOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", nil); err == nil || !strings.Contains(err.Error(), "at least one batch delete request is required") {
+		t.Fatalf("unexpected BatchDeleteOneTimeProductOffers empty request error: %v", err)
+	}
+	tooManyDeleteRequests := make([]*androidpublisher.DeleteOneTimeProductOfferRequest, 101)
+	for i := range tooManyDeleteRequests {
+		tooManyDeleteRequests[i] = &androidpublisher.DeleteOneTimeProductOfferRequest{}
+	}
+	if err := c.BatchDeleteOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", tooManyDeleteRequests); err == nil || !strings.Contains(err.Error(), "batch delete request count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchDeleteOneTimeProductOffers count error: %v", err)
 	}
 	if _, err := c.ActivateOneTimeProductOffer(context.Background(), "com.example.app", "coins_100", "buy", ""); err == nil || !strings.Contains(err.Error(), "offer id is required") {
 		t.Fatalf("unexpected ActivateOneTimeProductOffer offer id error: %v", err)
