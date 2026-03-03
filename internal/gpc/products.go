@@ -69,6 +69,101 @@ func (c *Client) GetOneTimeProduct(ctx context.Context, packageName, productID s
 	return oneTimeProductInfoFromProduct(product), nil
 }
 
+func (c *Client) BatchGetOneTimeProducts(ctx context.Context, packageName string, productIDs []string) (OneTimeProductsListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return OneTimeProductsListInfo{}, fmt.Errorf("package name is required")
+	}
+	filteredProductIDs := make([]string, 0, len(productIDs))
+	for _, rawID := range productIDs {
+		productID := strings.TrimSpace(rawID)
+		if productID == "" {
+			continue
+		}
+		filteredProductIDs = append(filteredProductIDs, productID)
+	}
+	if len(filteredProductIDs) == 0 {
+		return OneTimeProductsListInfo{}, fmt.Errorf("at least one product id is required")
+	}
+	if len(filteredProductIDs) > 100 {
+		return OneTimeProductsListInfo{}, fmt.Errorf("product id count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return OneTimeProductsListInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Monetization.Onetimeproducts.BatchGet(packageName).ProductIds(filteredProductIDs...).Context(ctx).Do()
+	if err != nil {
+		return OneTimeProductsListInfo{}, mapGoogleAPIError(err)
+	}
+	return oneTimeProductsListInfoFromResponse(&androidpublisher.ListOneTimeProductsResponse{
+		OneTimeProducts: resp.OneTimeProducts,
+	}), nil
+}
+
+func (c *Client) BatchUpdateOneTimeProducts(ctx context.Context, packageName string, requests []*androidpublisher.UpdateOneTimeProductRequest) (OneTimeProductsListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return OneTimeProductsListInfo{}, fmt.Errorf("package name is required")
+	}
+	filteredRequests := make([]*androidpublisher.UpdateOneTimeProductRequest, 0, len(requests))
+	for _, request := range requests {
+		if request == nil {
+			continue
+		}
+		filteredRequests = append(filteredRequests, request)
+	}
+	if len(filteredRequests) == 0 {
+		return OneTimeProductsListInfo{}, fmt.Errorf("at least one batch update request is required")
+	}
+	if len(filteredRequests) > 100 {
+		return OneTimeProductsListInfo{}, fmt.Errorf("batch update request count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return OneTimeProductsListInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Monetization.Onetimeproducts.BatchUpdate(packageName, &androidpublisher.BatchUpdateOneTimeProductsRequest{
+		Requests: filteredRequests,
+	}).Context(ctx).Do()
+	if err != nil {
+		return OneTimeProductsListInfo{}, mapGoogleAPIError(err)
+	}
+	return oneTimeProductsListInfoFromResponse(&androidpublisher.ListOneTimeProductsResponse{
+		OneTimeProducts: resp.OneTimeProducts,
+	}), nil
+}
+
+func (c *Client) BatchDeleteOneTimeProducts(ctx context.Context, packageName string, requests []*androidpublisher.DeleteOneTimeProductRequest) error {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return fmt.Errorf("package name is required")
+	}
+	filteredRequests := make([]*androidpublisher.DeleteOneTimeProductRequest, 0, len(requests))
+	for _, request := range requests {
+		if request == nil {
+			continue
+		}
+		filteredRequests = append(filteredRequests, request)
+	}
+	if len(filteredRequests) == 0 {
+		return fmt.Errorf("at least one batch delete request is required")
+	}
+	if len(filteredRequests) > 100 {
+		return fmt.Errorf("batch delete request count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := c.service.Monetization.Onetimeproducts.BatchDelete(packageName, &androidpublisher.BatchDeleteOneTimeProductsRequest{
+		Requests: filteredRequests,
+	}).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
 func (c *Client) CreateOneTimeProduct(ctx context.Context, packageName string, product *androidpublisher.OneTimeProduct) (OneTimeProductInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {

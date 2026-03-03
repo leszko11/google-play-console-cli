@@ -19,6 +19,15 @@ func TestOneTimeProductMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.GetOneTimeProduct(context.Background(), "com.example.app", "coins_100"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from GetOneTimeProduct, got %v", err)
 	}
+	if _, err := c.BatchGetOneTimeProducts(context.Background(), "com.example.app", []string{"coins_100"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchGetOneTimeProducts, got %v", err)
+	}
+	if _, err := c.BatchUpdateOneTimeProducts(context.Background(), "com.example.app", []*androidpublisher.UpdateOneTimeProductRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchUpdateOneTimeProducts, got %v", err)
+	}
+	if err := c.BatchDeleteOneTimeProducts(context.Background(), "com.example.app", []*androidpublisher.DeleteOneTimeProductRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchDeleteOneTimeProducts, got %v", err)
+	}
 	if _, err := c.CreateOneTimeProduct(context.Background(), "com.example.app", payload); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from CreateOneTimeProduct, got %v", err)
 	}
@@ -71,6 +80,36 @@ func TestOneTimeProductMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.GetOneTimeProduct(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "product id is required") {
 		t.Fatalf("unexpected GetOneTimeProduct product id error: %v", err)
+	}
+	if _, err := c.BatchGetOneTimeProducts(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "at least one product id is required") {
+		t.Fatalf("unexpected BatchGetOneTimeProducts empty IDs error: %v", err)
+	}
+	tooManyProductIDs := make([]string, 101)
+	for i := range tooManyProductIDs {
+		tooManyProductIDs[i] = "coins"
+	}
+	if _, err := c.BatchGetOneTimeProducts(context.Background(), "com.example.app", tooManyProductIDs); err == nil || !strings.Contains(err.Error(), "product id count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchGetOneTimeProducts count error: %v", err)
+	}
+	if _, err := c.BatchUpdateOneTimeProducts(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "at least one batch update request is required") {
+		t.Fatalf("unexpected BatchUpdateOneTimeProducts empty request error: %v", err)
+	}
+	tooManyProductUpdateRequests := make([]*androidpublisher.UpdateOneTimeProductRequest, 101)
+	for i := range tooManyProductUpdateRequests {
+		tooManyProductUpdateRequests[i] = &androidpublisher.UpdateOneTimeProductRequest{}
+	}
+	if _, err := c.BatchUpdateOneTimeProducts(context.Background(), "com.example.app", tooManyProductUpdateRequests); err == nil || !strings.Contains(err.Error(), "batch update request count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchUpdateOneTimeProducts count error: %v", err)
+	}
+	if err := c.BatchDeleteOneTimeProducts(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "at least one batch delete request is required") {
+		t.Fatalf("unexpected BatchDeleteOneTimeProducts empty request error: %v", err)
+	}
+	tooManyProductDeleteRequests := make([]*androidpublisher.DeleteOneTimeProductRequest, 101)
+	for i := range tooManyProductDeleteRequests {
+		tooManyProductDeleteRequests[i] = &androidpublisher.DeleteOneTimeProductRequest{}
+	}
+	if err := c.BatchDeleteOneTimeProducts(context.Background(), "com.example.app", tooManyProductDeleteRequests); err == nil || !strings.Contains(err.Error(), "batch delete request count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchDeleteOneTimeProducts count error: %v", err)
 	}
 	if _, err := c.CreateOneTimeProduct(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "one-time product payload is required") {
 		t.Fatalf("unexpected CreateOneTimeProduct payload error: %v", err)

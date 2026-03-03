@@ -19,6 +19,9 @@ import (
 type Client interface {
 	ListOneTimeProducts(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.OneTimeProductsListInfo, error)
 	GetOneTimeProduct(ctx context.Context, packageName, productID string) (gpc.OneTimeProductInfo, error)
+	BatchGetOneTimeProducts(ctx context.Context, packageName string, productIDs []string) (gpc.OneTimeProductsListInfo, error)
+	BatchUpdateOneTimeProducts(ctx context.Context, packageName string, requests []*androidpublisher.UpdateOneTimeProductRequest) (gpc.OneTimeProductsListInfo, error)
+	BatchDeleteOneTimeProducts(ctx context.Context, packageName string, requests []*androidpublisher.DeleteOneTimeProductRequest) error
 	CreateOneTimeProduct(ctx context.Context, packageName string, product *androidpublisher.OneTimeProduct) (gpc.OneTimeProductInfo, error)
 	UpdateOneTimeProduct(ctx context.Context, packageName, productID string, product *androidpublisher.OneTimeProduct, updateMask string) (gpc.OneTimeProductInfo, error)
 	DeleteOneTimeProduct(ctx context.Context, packageName, productID string) error
@@ -51,6 +54,9 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newListCommand(deps),
 			newGetCommand(deps),
+			newBatchGetCommand(deps),
+			newBatchUpdateCommand(deps),
+			newBatchDeleteCommand(deps),
 			newCreateCommand(deps),
 			newUpdateCommand(deps),
 			newDeleteCommand(deps),
@@ -147,6 +153,119 @@ func newGetCommand(deps Deps) *ffcli.Command {
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"product":     product,
+			})
+		},
+	}
+}
+
+func newBatchGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productIDsCSV string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productIDsCSV, "product-ids", "", "Comma-separated one-time product IDs")
+
+	return &ffcli.Command{
+		Name:      "batch-get",
+		ShortHelp: "Batch-get one-time products by product IDs",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			productIDsCSV = strings.TrimSpace(productIDsCSV)
+			if productIDsCSV == "" {
+				return fmt.Errorf("--product-ids is required")
+			}
+			productIDs := strings.Split(productIDsCSV, ",")
+
+			result, err := client.BatchGetOneTimeProducts(requestCtx, pkg, productIDs)
+			if err != nil {
+				return fmt.Errorf("failed to batch-get one-time products: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"products":    result.Products,
+			})
+		},
+	}
+}
+
+func newBatchUpdateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-update", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, inputPath string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&inputPath, "input", "", "Path to one-time products batch update JSON payload (use - for stdin)")
+
+	return &ffcli.Command{
+		Name:      "batch-update",
+		ShortHelp: "Batch create or update one-time products",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			payload, err := readOneTimeProductsBatchUpdatePayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			result, err := client.BatchUpdateOneTimeProducts(requestCtx, pkg, payload.Requests)
+			if err != nil {
+				return fmt.Errorf("failed to batch-update one-time products: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"products":    result.Products,
+				"status":      "updated",
+			})
+		},
+	}
+}
+
+func newBatchDeleteCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-delete", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, inputPath string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&inputPath, "input", "", "Path to one-time products batch delete JSON payload (use - for stdin)")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deleting the one-time products (required)")
+
+	return &ffcli.Command{
+		Name:      "batch-delete",
+		ShortHelp: "Batch delete one-time products",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			payload, err := readOneTimeProductsBatchDeletePayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to batch-delete one-time products")
+			}
+			if err := client.BatchDeleteOneTimeProducts(requestCtx, pkg, payload.Requests); err != nil {
+				return fmt.Errorf("failed to batch-delete one-time products: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":  pkg,
+				"deletedCount": len(payload.Requests),
+				"status":       "deleted",
 			})
 		},
 	}
@@ -845,6 +964,66 @@ func readOneTimeProductPayload(inputPath string, stdin io.Reader) (*androidpubli
 		return nil, fmt.Errorf("invalid one-time product JSON payload: %w", err)
 	}
 	return &product, nil
+}
+
+func readOneTimeProductsBatchUpdatePayload(inputPath string, stdin io.Reader) (*androidpublisher.BatchUpdateOneTimeProductsRequest, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var raw []byte
+	var err error
+	if inputPath == "-" {
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		raw, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input: %w", err)
+		}
+	}
+
+	var payload androidpublisher.BatchUpdateOneTimeProductsRequest
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("invalid one-time products batch update JSON payload: %w", err)
+	}
+	return &payload, nil
+}
+
+func readOneTimeProductsBatchDeletePayload(inputPath string, stdin io.Reader) (*androidpublisher.BatchDeleteOneTimeProductsRequest, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var raw []byte
+	var err error
+	if inputPath == "-" {
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		raw, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input: %w", err)
+		}
+	}
+
+	var payload androidpublisher.BatchDeleteOneTimeProductsRequest
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("invalid one-time products batch delete JSON payload: %w", err)
+	}
+	return &payload, nil
 }
 
 func readOneTimeProductOffersBatchUpdatePayload(inputPath string, stdin io.Reader) (*androidpublisher.BatchUpdateOneTimeProductOffersRequest, error) {
