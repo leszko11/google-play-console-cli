@@ -45,6 +45,9 @@ func TestSubscriptionMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.GetSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", "offer1"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from GetSubscriptionOffer, got %v", err)
 	}
+	if _, err := c.BatchGetSubscriptionOffers(context.Background(), "com.example.app", "premium_monthly", "monthly", []string{"offer1"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchGetSubscriptionOffers, got %v", err)
+	}
 	if _, err := c.CreateSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", &androidpublisher.SubscriptionOffer{}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from CreateSubscriptionOffer, got %v", err)
 	}
@@ -103,6 +106,16 @@ func TestSubscriptionMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.GetSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", ""); err == nil || !strings.Contains(err.Error(), "offer id is required") {
 		t.Fatalf("unexpected GetSubscriptionOffer offer id error: %v", err)
+	}
+	if _, err := c.BatchGetSubscriptionOffers(context.Background(), "com.example.app", "premium_monthly", "monthly", nil); err == nil || !strings.Contains(err.Error(), "at least one offer id is required") {
+		t.Fatalf("unexpected BatchGetSubscriptionOffers empty IDs error: %v", err)
+	}
+	tooManyIDs := make([]string, 101)
+	for i := range tooManyIDs {
+		tooManyIDs[i] = "offer"
+	}
+	if _, err := c.BatchGetSubscriptionOffers(context.Background(), "com.example.app", "premium_monthly", "monthly", tooManyIDs); err == nil || !strings.Contains(err.Error(), "offer id count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchGetSubscriptionOffers count error: %v", err)
 	}
 	if _, err := c.CreateSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", nil); err == nil || !strings.Contains(err.Error(), "subscription offer payload is required") {
 		t.Fatalf("unexpected CreateSubscriptionOffer payload error: %v", err)

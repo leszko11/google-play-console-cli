@@ -29,6 +29,8 @@ type fakeClient struct {
 	archiveErr         error
 	offersList         gpc.SubscriptionOffersListInfo
 	offersListErr      error
+	offersBatchGet     gpc.SubscriptionOffersListInfo
+	offersBatchGetErr  error
 	offerGet           gpc.SubscriptionOfferInfo
 	offerGetErr        error
 	offerCreate        gpc.SubscriptionOfferInfo
@@ -54,6 +56,7 @@ type fakeClient struct {
 	productID  string
 	basePlanID string
 	offerID    string
+	offerIDs   []string
 	updateMask string
 }
 
@@ -122,6 +125,13 @@ func (f *fakeClient) GetSubscriptionOffer(_ context.Context, _ string, productID
 	f.basePlanID = basePlanID
 	f.offerID = offerID
 	return f.offerGet, f.offerGetErr
+}
+
+func (f *fakeClient) BatchGetSubscriptionOffers(_ context.Context, _ string, productID, basePlanID string, offerIDs []string) (gpc.SubscriptionOffersListInfo, error) {
+	f.productID = productID
+	f.basePlanID = basePlanID
+	f.offerIDs = append([]string(nil), offerIDs...)
+	return f.offersBatchGet, f.offersBatchGetErr
 }
 
 func (f *fakeClient) CreateSubscriptionOffer(_ context.Context, _ string, productID, basePlanID string, offer *androidpublisher.SubscriptionOffer) (gpc.SubscriptionOfferInfo, error) {
@@ -469,6 +479,63 @@ func TestSubscriptionsOffersCreate_ReturnsStatusCreated(t *testing.T) {
 	}
 	if fc.capturedOfferInput == nil || fc.capturedOfferInput.OfferId != "intro" {
 		t.Fatalf("unexpected offer payload parsed: %+v", fc.capturedOfferInput)
+	}
+}
+
+func TestSubscriptionsOffersBatchGet_RequiresOfferIDs(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runSubscriptions(
+		t,
+		deps,
+		"offers", "batch-get",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--base-plan-id", "monthly",
+	)
+	if err == nil || !strings.Contains(err.Error(), "--offer-ids is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSubscriptionsOffersBatchGet_ReturnsOffers(t *testing.T) {
+	fc := &fakeClient{
+		offersBatchGet: gpc.SubscriptionOffersListInfo{
+			Offers: []gpc.SubscriptionOfferInfo{
+				{PackageName: "com.example.app", ProductID: "premium_monthly", BasePlanID: "monthly", OfferID: "intro"},
+				{PackageName: "com.example.app", ProductID: "premium_monthly", BasePlanID: "monthly", OfferID: "loyalty"},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(
+		t,
+		deps,
+		"offers", "batch-get",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--base-plan-id", "monthly",
+		"--offer-ids", "intro,loyalty",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"offerId":"intro"`) || !strings.Contains(out, `"offerId":"loyalty"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if len(fc.offerIDs) != 2 || fc.offerIDs[0] != "intro" || fc.offerIDs[1] != "loyalty" {
+		t.Fatalf("unexpected offer IDs passed to client: %+v", fc.offerIDs)
 	}
 }
 

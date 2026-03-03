@@ -119,6 +119,7 @@ gpc subscriptions base-plans deactivate --package-name com.example.app --product
 gpc subscriptions base-plans delete --package-name com.example.app --product-id premium_monthly --base-plan-id legacy --confirm
 gpc subscriptions offers list --package-name com.example.app --product-id premium_monthly --base-plan-id monthly
 gpc subscriptions offers get --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro
+gpc subscriptions offers batch-get --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-ids intro,loyalty
 gpc subscriptions offers activate --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro
 gpc subscriptions offers deactivate --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --confirm
 gpc subscriptions offers create --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --input /path/to/offer.json
@@ -210,6 +211,7 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc subscriptions base-plans delete ... --confirm` should return `status: deleted`.
   - `gpc subscriptions offers list ...` should return offers and optional `nextPageToken`.
   - `gpc subscriptions offers get ...` should return one offer.
+  - `gpc subscriptions offers batch-get ...` should return the requested offers in one call.
   - `gpc subscriptions offers activate ...` should return `status: activated`.
   - `gpc subscriptions offers deactivate ... --confirm` should return `status: deactivated`.
   - `gpc subscriptions offers create ...` should return `status: created`.

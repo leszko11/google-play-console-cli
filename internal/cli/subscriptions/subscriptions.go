@@ -29,6 +29,7 @@ type Client interface {
 
 	ListSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionOffersListInfo, error)
 	GetSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error)
+	BatchGetSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, offerIDs []string) (gpc.SubscriptionOffersListInfo, error)
 	ActivateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error)
 	DeactivateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error)
 	CreateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID string, offer *androidpublisher.SubscriptionOffer) (gpc.SubscriptionOfferInfo, error)
@@ -465,6 +466,7 @@ func newOffersCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newOffersListCommand(deps),
 			newOffersGetCommand(deps),
+			newOffersBatchGetCommand(deps),
 			newOffersActivateCommand(deps),
 			newOffersDeactivateCommand(deps),
 			newOffersCreateCommand(deps),
@@ -607,6 +609,54 @@ func newOffersCreateCommand(deps Deps) *ffcli.Command {
 				"packageName": pkg,
 				"offer":       created,
 				"status":      "created",
+			})
+		},
+	}
+}
+
+func newOffersBatchGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, basePlanID, offerIDsCSV string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
+	fs.StringVar(&offerIDsCSV, "offer-ids", "", "Comma-separated offer IDs")
+
+	return &ffcli.Command{
+		Name:      "batch-get",
+		ShortHelp: "Batch-get subscription offers",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			basePlanID = strings.TrimSpace(basePlanID)
+			if basePlanID == "" {
+				return fmt.Errorf("--base-plan-id is required")
+			}
+			offerIDsCSV = strings.TrimSpace(offerIDsCSV)
+			if offerIDsCSV == "" {
+				return fmt.Errorf("--offer-ids is required")
+			}
+			offerIDs := strings.Split(offerIDsCSV, ",")
+
+			result, err := client.BatchGetSubscriptionOffers(requestCtx, pkg, productID, basePlanID, offerIDs)
+			if err != nil {
+				return fmt.Errorf("failed to batch-get subscription offers: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"productId":   productID,
+				"basePlanId":  basePlanID,
+				"offers":      result.Offers,
 			})
 		},
 	}
