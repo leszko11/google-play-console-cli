@@ -33,6 +33,10 @@ type fakeClient struct {
 	offerGetErr        error
 	offerCreate        gpc.SubscriptionOfferInfo
 	offerCreateErr     error
+	offerActivate      gpc.SubscriptionOfferInfo
+	offerActivateErr   error
+	offerDeactivate    gpc.SubscriptionOfferInfo
+	offerDeactivateErr error
 	offerUpdate        gpc.SubscriptionOfferInfo
 	offerUpdateErr     error
 	offerDeleteErr     error
@@ -125,6 +129,20 @@ func (f *fakeClient) CreateSubscriptionOffer(_ context.Context, _ string, produc
 	f.basePlanID = basePlanID
 	f.capturedOfferInput = offer
 	return f.offerCreate, f.offerCreateErr
+}
+
+func (f *fakeClient) ActivateSubscriptionOffer(_ context.Context, _ string, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error) {
+	f.productID = productID
+	f.basePlanID = basePlanID
+	f.offerID = offerID
+	return f.offerActivate, f.offerActivateErr
+}
+
+func (f *fakeClient) DeactivateSubscriptionOffer(_ context.Context, _ string, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error) {
+	f.productID = productID
+	f.basePlanID = basePlanID
+	f.offerID = offerID
+	return f.offerDeactivate, f.offerDeactivateErr
 }
 
 func (f *fakeClient) UpdateSubscriptionOffer(_ context.Context, _ string, productID, basePlanID, offerID string, offer *androidpublisher.SubscriptionOffer, updateMask string) (gpc.SubscriptionOfferInfo, error) {
@@ -451,5 +469,102 @@ func TestSubscriptionsOffersCreate_ReturnsStatusCreated(t *testing.T) {
 	}
 	if fc.capturedOfferInput == nil || fc.capturedOfferInput.OfferId != "intro" {
 		t.Fatalf("unexpected offer payload parsed: %+v", fc.capturedOfferInput)
+	}
+}
+
+func TestSubscriptionsOffersActivate_ReturnsStatusActivated(t *testing.T) {
+	fc := &fakeClient{
+		offerActivate: gpc.SubscriptionOfferInfo{
+			PackageName: "com.example.app",
+			ProductID:   "premium_monthly",
+			BasePlanID:  "monthly",
+			OfferID:     "intro",
+			State:       "ACTIVE",
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(
+		t,
+		deps,
+		"offers", "activate",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--base-plan-id", "monthly",
+		"--offer-id", "intro",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"activated"`) || !strings.Contains(out, `"offerId":"intro"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.productID != "premium_monthly" || fc.basePlanID != "monthly" || fc.offerID != "intro" {
+		t.Fatalf("unexpected captured IDs: product=%s basePlan=%s offer=%s", fc.productID, fc.basePlanID, fc.offerID)
+	}
+}
+
+func TestSubscriptionsOffersDeactivate_RequiresConfirm(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runSubscriptions(
+		t,
+		deps,
+		"offers", "deactivate",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--base-plan-id", "monthly",
+		"--offer-id", "intro",
+	)
+	if err == nil || !strings.Contains(err.Error(), "--confirm is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSubscriptionsOffersDeactivate_ReturnsStatusDeactivated(t *testing.T) {
+	fc := &fakeClient{
+		offerDeactivate: gpc.SubscriptionOfferInfo{
+			PackageName: "com.example.app",
+			ProductID:   "premium_monthly",
+			BasePlanID:  "monthly",
+			OfferID:     "intro",
+			State:       "INACTIVE",
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(
+		t,
+		deps,
+		"offers", "deactivate",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--base-plan-id", "monthly",
+		"--offer-id", "intro",
+		"--confirm",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"deactivated"`) || !strings.Contains(out, `"offerId":"intro"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.productID != "premium_monthly" || fc.basePlanID != "monthly" || fc.offerID != "intro" {
+		t.Fatalf("unexpected captured IDs: product=%s basePlan=%s offer=%s", fc.productID, fc.basePlanID, fc.offerID)
 	}
 }

@@ -51,6 +51,12 @@ func TestSubscriptionMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.UpdateSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", "offer1", &androidpublisher.SubscriptionOffer{}, "phases"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from UpdateSubscriptionOffer, got %v", err)
 	}
+	if _, err := c.ActivateSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", "offer1"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from ActivateSubscriptionOffer, got %v", err)
+	}
+	if _, err := c.DeactivateSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", "offer1"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from DeactivateSubscriptionOffer, got %v", err)
+	}
 	if err := c.DeleteSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", "offer1"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from DeleteSubscriptionOffer, got %v", err)
 	}
@@ -103,6 +109,12 @@ func TestSubscriptionMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.UpdateSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", "offer1", &androidpublisher.SubscriptionOffer{}, ""); err == nil || !strings.Contains(err.Error(), "update mask is required") {
 		t.Fatalf("unexpected UpdateSubscriptionOffer update mask error: %v", err)
+	}
+	if _, err := c.ActivateSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "", "offer1"); err == nil || !strings.Contains(err.Error(), "base plan id is required") {
+		t.Fatalf("unexpected ActivateSubscriptionOffer base plan id error: %v", err)
+	}
+	if _, err := c.DeactivateSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", ""); err == nil || !strings.Contains(err.Error(), "offer id is required") {
+		t.Fatalf("unexpected DeactivateSubscriptionOffer offer id error: %v", err)
 	}
 	if err := c.DeleteSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", ""); err == nil || !strings.Contains(err.Error(), "offer id is required") {
 		t.Fatalf("unexpected DeleteSubscriptionOffer offer id error: %v", err)

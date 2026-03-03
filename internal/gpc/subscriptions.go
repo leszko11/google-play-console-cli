@@ -390,6 +390,74 @@ func (c *Client) UpdateSubscriptionOffer(ctx context.Context, packageName, produ
 	return subscriptionOfferInfoFromOffer(updated), nil
 }
 
+func (c *Client) ActivateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (SubscriptionOfferInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return SubscriptionOfferInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return SubscriptionOfferInfo{}, fmt.Errorf("product id is required")
+	}
+	basePlanID = strings.TrimSpace(basePlanID)
+	if basePlanID == "" {
+		return SubscriptionOfferInfo{}, fmt.Errorf("base plan id is required")
+	}
+	offerID = strings.TrimSpace(offerID)
+	if offerID == "" {
+		return SubscriptionOfferInfo{}, fmt.Errorf("offer id is required")
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionOfferInfo{}, ErrInvalidCredentials
+	}
+
+	offer, err := c.service.Monetization.Subscriptions.BasePlans.Offers.Activate(
+		packageName,
+		productID,
+		basePlanID,
+		offerID,
+		&androidpublisher.ActivateSubscriptionOfferRequest{},
+	).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionOfferInfo{}, mapGoogleAPIError(err)
+	}
+	return subscriptionOfferInfoFromOffer(offer), nil
+}
+
+func (c *Client) DeactivateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (SubscriptionOfferInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return SubscriptionOfferInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return SubscriptionOfferInfo{}, fmt.Errorf("product id is required")
+	}
+	basePlanID = strings.TrimSpace(basePlanID)
+	if basePlanID == "" {
+		return SubscriptionOfferInfo{}, fmt.Errorf("base plan id is required")
+	}
+	offerID = strings.TrimSpace(offerID)
+	if offerID == "" {
+		return SubscriptionOfferInfo{}, fmt.Errorf("offer id is required")
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionOfferInfo{}, ErrInvalidCredentials
+	}
+
+	offer, err := c.service.Monetization.Subscriptions.BasePlans.Offers.Deactivate(
+		packageName,
+		productID,
+		basePlanID,
+		offerID,
+		&androidpublisher.DeactivateSubscriptionOfferRequest{},
+	).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionOfferInfo{}, mapGoogleAPIError(err)
+	}
+	return subscriptionOfferInfoFromOffer(offer), nil
+}
+
 func (c *Client) DeleteSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) error {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
