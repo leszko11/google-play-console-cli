@@ -193,6 +193,15 @@ type SubscriptionPurchaseInfo struct {
 	LineItemCount        int    `json:"lineItemCount,omitempty"`
 }
 
+type SubscriptionItemExpiryInfo struct {
+	ProductID  string `json:"productId,omitempty"`
+	ExpiryTime string `json:"expiryTime,omitempty"`
+}
+
+type SubscriptionDeferInfo struct {
+	ItemExpiryTimeDetails []SubscriptionItemExpiryInfo `json:"itemExpiryTimeDetails,omitempty"`
+}
+
 type VoidedPurchaseInfo struct {
 	OrderID            string `json:"orderId,omitempty"`
 	PurchaseToken      string `json:"purchaseToken,omitempty"`

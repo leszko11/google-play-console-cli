@@ -3,6 +3,7 @@ package gpc
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"google.golang.org/api/androidpublisher/v3"
@@ -15,6 +16,8 @@ const (
 	RevocationRefundTypeFull     = "full"
 	RevocationRefundTypeProrated = "prorated"
 )
+
+var protoDurationPattern = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?s$`)
 
 func (c *Client) GetProductPurchase(ctx context.Context, packageName, productID, token string) (ProductPurchaseInfo, error) {
 	packageName = strings.TrimSpace(packageName)
@@ -176,6 +179,44 @@ func (c *Client) RevokeSubscriptionPurchase(ctx context.Context, packageName, to
 	return nil
 }
 
+func (c *Client) DeferSubscriptionPurchase(ctx context.Context, packageName, token, etag, deferDuration string, validateOnly bool) (SubscriptionDeferInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return SubscriptionDeferInfo{}, fmt.Errorf("package name is required")
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return SubscriptionDeferInfo{}, fmt.Errorf("purchase token is required")
+	}
+	etag = strings.TrimSpace(etag)
+	if etag == "" {
+		return SubscriptionDeferInfo{}, fmt.Errorf("etag is required")
+	}
+	deferDuration = strings.TrimSpace(deferDuration)
+	if deferDuration == "" {
+		return SubscriptionDeferInfo{}, fmt.Errorf("defer duration is required")
+	}
+	if !protoDurationPattern.MatchString(deferDuration) {
+		return SubscriptionDeferInfo{}, fmt.Errorf("invalid defer duration format: expected protobuf duration ending with 's' (for example 604800s)")
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionDeferInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Purchases.Subscriptionsv2.Defer(packageName, token, &androidpublisher.DeferSubscriptionPurchaseRequest{
+		DeferralContext: &androidpublisher.DeferralContext{
+			Etag:          etag,
+			DeferDuration: deferDuration,
+			ValidateOnly:  validateOnly,
+		},
+	}).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionDeferInfo{}, mapGoogleAPIError(err)
+	}
+
+	return subscriptionDeferInfoFromResponse(resp), nil
+}
+
 func (c *Client) ListVoidedPurchases(ctx context.Context, packageName string, query VoidedPurchasesQuery) (VoidedPurchasesListInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -285,6 +326,26 @@ func subscriptionPurchaseInfoFromSubscriptionPurchaseV2(purchase *androidpublish
 		StartTime:            purchase.StartTime,
 		LineItemCount:        len(purchase.LineItems),
 	}
+}
+
+func subscriptionDeferInfoFromResponse(resp *androidpublisher.DeferSubscriptionPurchaseResponse) SubscriptionDeferInfo {
+	if resp == nil {
+		return SubscriptionDeferInfo{}
+	}
+	result := SubscriptionDeferInfo{
+		ItemExpiryTimeDetails: make([]SubscriptionItemExpiryInfo, 0, len(resp.ItemExpiryTimeDetails)),
+	}
+	for _, item := range resp.ItemExpiryTimeDetails {
+		if item == nil {
+			result.ItemExpiryTimeDetails = append(result.ItemExpiryTimeDetails, SubscriptionItemExpiryInfo{})
+			continue
+		}
+		result.ItemExpiryTimeDetails = append(result.ItemExpiryTimeDetails, SubscriptionItemExpiryInfo{
+			ProductID:  item.ProductId,
+			ExpiryTime: item.ExpiryTime,
+		})
+	}
+	return result
 }
 
 func voidedPurchasesListInfoFromResponse(resp *androidpublisher.VoidedPurchasesListResponse) VoidedPurchasesListInfo {
