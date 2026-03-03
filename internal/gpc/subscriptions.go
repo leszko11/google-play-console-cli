@@ -325,6 +325,54 @@ func (c *Client) GetSubscriptionOffer(ctx context.Context, packageName, productI
 	return subscriptionOfferInfoFromOffer(offer), nil
 }
 
+func (c *Client) BatchGetSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, offerIDs []string) (SubscriptionOffersListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return SubscriptionOffersListInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return SubscriptionOffersListInfo{}, fmt.Errorf("product id is required")
+	}
+	basePlanID = strings.TrimSpace(basePlanID)
+	if basePlanID == "" {
+		return SubscriptionOffersListInfo{}, fmt.Errorf("base plan id is required")
+	}
+
+	requests := make([]*androidpublisher.GetSubscriptionOfferRequest, 0, len(offerIDs))
+	for _, rawID := range offerIDs {
+		offerID := strings.TrimSpace(rawID)
+		if offerID == "" {
+			continue
+		}
+		requests = append(requests, &androidpublisher.GetSubscriptionOfferRequest{
+			PackageName: packageName,
+			ProductId:   productID,
+			BasePlanId:  basePlanID,
+			OfferId:     offerID,
+		})
+	}
+	if len(requests) == 0 {
+		return SubscriptionOffersListInfo{}, fmt.Errorf("at least one offer id is required")
+	}
+	if len(requests) > 100 {
+		return SubscriptionOffersListInfo{}, fmt.Errorf("offer id count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionOffersListInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Monetization.Subscriptions.BasePlans.Offers.BatchGet(packageName, productID, basePlanID, &androidpublisher.BatchGetSubscriptionOffersRequest{
+		Requests: requests,
+	}).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionOffersListInfo{}, mapGoogleAPIError(err)
+	}
+	return subscriptionOffersListInfoFromResponse(&androidpublisher.ListSubscriptionOffersResponse{
+		SubscriptionOffers: resp.SubscriptionOffers,
+	}), nil
+}
+
 func (c *Client) CreateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID string, offer *androidpublisher.SubscriptionOffer) (SubscriptionOfferInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
