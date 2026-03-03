@@ -17,18 +17,26 @@ import (
 )
 
 type fakeClient struct {
-	list      gpc.OneTimeProductsListInfo
-	listErr   error
-	get       gpc.OneTimeProductInfo
-	getErr    error
-	create    gpc.OneTimeProductInfo
-	createErr error
-	update    gpc.OneTimeProductInfo
-	updateErr error
-	deleteErr error
+	list           gpc.OneTimeProductsListInfo
+	listErr        error
+	get            gpc.OneTimeProductInfo
+	getErr         error
+	batchGet       gpc.OneTimeProductsListInfo
+	batchGetErr    error
+	batchUpdate    gpc.OneTimeProductsListInfo
+	batchUpdateErr error
+	batchDeleteErr error
+	create         gpc.OneTimeProductInfo
+	createErr      error
+	update         gpc.OneTimeProductInfo
+	updateErr      error
+	deleteErr      error
 
-	createFn func(packageName string, product *androidpublisher.OneTimeProduct) (gpc.OneTimeProductInfo, error)
-	updateFn func(packageName, productID string, product *androidpublisher.OneTimeProduct, updateMask string) (gpc.OneTimeProductInfo, error)
+	createFn      func(packageName string, product *androidpublisher.OneTimeProduct) (gpc.OneTimeProductInfo, error)
+	updateFn      func(packageName, productID string, product *androidpublisher.OneTimeProduct, updateMask string) (gpc.OneTimeProductInfo, error)
+	batchGetFn    func(packageName string, productIDs []string) (gpc.OneTimeProductsListInfo, error)
+	batchUpdateFn func(packageName string, requests []*androidpublisher.UpdateOneTimeProductRequest) (gpc.OneTimeProductsListInfo, error)
+	batchDeleteFn func(packageName string, requests []*androidpublisher.DeleteOneTimeProductRequest) error
 
 	offers               gpc.OneTimeProductOffersListInfo
 	offer                gpc.OneTimeProductOfferInfo
@@ -68,6 +76,27 @@ func (f fakeClient) ListOneTimeProducts(_ context.Context, _ string, pageSize in
 
 func (f fakeClient) GetOneTimeProduct(_ context.Context, _, _ string) (gpc.OneTimeProductInfo, error) {
 	return f.get, f.getErr
+}
+
+func (f fakeClient) BatchGetOneTimeProducts(_ context.Context, packageName string, productIDs []string) (gpc.OneTimeProductsListInfo, error) {
+	if f.batchGetFn != nil {
+		return f.batchGetFn(packageName, productIDs)
+	}
+	return f.batchGet, f.batchGetErr
+}
+
+func (f fakeClient) BatchUpdateOneTimeProducts(_ context.Context, packageName string, requests []*androidpublisher.UpdateOneTimeProductRequest) (gpc.OneTimeProductsListInfo, error) {
+	if f.batchUpdateFn != nil {
+		return f.batchUpdateFn(packageName, requests)
+	}
+	return f.batchUpdate, f.batchUpdateErr
+}
+
+func (f fakeClient) BatchDeleteOneTimeProducts(_ context.Context, packageName string, requests []*androidpublisher.DeleteOneTimeProductRequest) error {
+	if f.batchDeleteFn != nil {
+		return f.batchDeleteFn(packageName, requests)
+	}
+	return f.batchDeleteErr
 }
 
 func (f fakeClient) CreateOneTimeProduct(_ context.Context, packageName string, product *androidpublisher.OneTimeProduct) (gpc.OneTimeProductInfo, error) {
@@ -230,6 +259,122 @@ func TestProductsGet_RequiresProductID(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--product-id is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestProductsBatchGet_RequiresProductIDs(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runProducts(t, deps, "batch-get", "--package-name", "com.example.app")
+	if err == nil || !strings.Contains(err.Error(), "--product-ids is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestProductsBatchGet_ReturnsProducts(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				batchGetFn: func(packageName string, productIDs []string) (gpc.OneTimeProductsListInfo, error) {
+					if packageName != "com.example.app" {
+						t.Fatalf("unexpected package name: %q", packageName)
+					}
+					if len(productIDs) != 2 || productIDs[0] != "coins_100" || productIDs[1] != "coins_500" {
+						t.Fatalf("unexpected product IDs: %+v", productIDs)
+					}
+					return gpc.OneTimeProductsListInfo{
+						Products: []gpc.OneTimeProductInfo{{ProductID: "coins_100"}, {ProductID: "coins_500"}},
+					}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runProducts(t, deps, "batch-get", "--package-name", "com.example.app", "--product-ids", "coins_100,coins_500")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"productId":"coins_100"`) || !strings.Contains(out, `"productId":"coins_500"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestProductsBatchUpdate_ReturnsUpdated(t *testing.T) {
+	inputPath := writeJSON(t, `{"requests":[{"allowMissing":true,"oneTimeProduct":{"packageName":"com.example.app","productId":"coins_100"}}]}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				batchUpdateFn: func(packageName string, requests []*androidpublisher.UpdateOneTimeProductRequest) (gpc.OneTimeProductsListInfo, error) {
+					if packageName != "com.example.app" {
+						t.Fatalf("unexpected package name: %q", packageName)
+					}
+					if len(requests) != 1 || requests[0].OneTimeProduct == nil || requests[0].OneTimeProduct.ProductId != "coins_100" {
+						t.Fatalf("unexpected requests: %+v", requests)
+					}
+					return gpc.OneTimeProductsListInfo{
+						Products: []gpc.OneTimeProductInfo{{ProductID: "coins_100"}},
+					}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runProducts(t, deps, "batch-update", "--package-name", "com.example.app", "--input", inputPath)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"updated"`) || !strings.Contains(out, `"productId":"coins_100"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestProductsBatchDelete_RequiresConfirm(t *testing.T) {
+	inputPath := writeJSON(t, `{"requests":[{"packageName":"com.example.app","productId":"coins_100"}]}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runProducts(t, deps, "batch-delete", "--package-name", "com.example.app", "--input", inputPath)
+	if err == nil || !strings.Contains(err.Error(), "--confirm is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestProductsBatchDelete_ReturnsDeleted(t *testing.T) {
+	inputPath := writeJSON(t, `{"requests":[{"packageName":"com.example.app","productId":"coins_100"},{"packageName":"com.example.app","productId":"coins_500"}]}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				batchDeleteFn: func(packageName string, requests []*androidpublisher.DeleteOneTimeProductRequest) error {
+					if packageName != "com.example.app" {
+						t.Fatalf("unexpected package name: %q", packageName)
+					}
+					if len(requests) != 2 || requests[0].ProductId != "coins_100" || requests[1].ProductId != "coins_500" {
+						t.Fatalf("unexpected requests: %+v", requests)
+					}
+					return nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runProducts(t, deps, "batch-delete", "--package-name", "com.example.app", "--input", inputPath, "--confirm")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"deleted"`) || !strings.Contains(out, `"deletedCount":2`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
 

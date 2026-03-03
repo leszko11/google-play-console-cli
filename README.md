@@ -152,8 +152,11 @@ gpc subscriptions offers delete --package-name com.example.app --product-id prem
 # One-time product management
 gpc products list --package-name com.example.app --page-size 100
 gpc products get --package-name com.example.app --product-id coins_100
+gpc products batch-get --package-name com.example.app --product-ids coins_100,coins_500
 gpc products create --package-name com.example.app --input /path/to/one-time-product.json
+gpc products batch-update --package-name com.example.app --input /path/to/one-time-products-batch-update.json
 gpc products update --package-name com.example.app --product-id coins_100 --input /path/to/one-time-product.json --update-mask listings,purchaseOptions
+gpc products batch-delete --package-name com.example.app --input /path/to/one-time-products-batch-delete.json --confirm
 gpc products delete --package-name com.example.app --product-id coins_100 --confirm
 
 # One-time product offers management
