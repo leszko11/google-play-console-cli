@@ -123,9 +123,11 @@ gpc reviews reply --package-name com.example.app --review-id <review-id> --reply
 # List/get subscription products
 gpc subscriptions list --package-name com.example.app --page-size 100
 gpc subscriptions get --package-name com.example.app --product-id premium_monthly
+gpc subscriptions batch-get --package-name com.example.app --product-ids premium_monthly,premium_yearly
 
 # Create/update subscriptions from JSON payload files
 gpc subscriptions create --package-name com.example.app --input /path/to/subscription.json
+gpc subscriptions batch-update --package-name com.example.app --input /path/to/subscriptions-batch-update.json
 gpc subscriptions update --package-name com.example.app --product-id premium_monthly --input /path/to/subscription.json
 
 # Delete/archive subscriptions (explicit confirmation required)
