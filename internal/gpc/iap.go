@@ -69,6 +69,33 @@ func (c *Client) GetIAP(ctx context.Context, packageName, sku string) (IAPInfo, 
 	return iapInfoFromProduct(product), nil
 }
 
+func (c *Client) BatchGetIAPs(ctx context.Context, packageName string, skus []string) (IAPsListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return IAPsListInfo{}, fmt.Errorf("package name is required")
+	}
+	filteredSkus := make([]string, 0, len(skus))
+	for _, sku := range skus {
+		trimmed := strings.TrimSpace(sku)
+		if trimmed == "" {
+			continue
+		}
+		filteredSkus = append(filteredSkus, trimmed)
+	}
+	if len(filteredSkus) == 0 {
+		return IAPsListInfo{}, fmt.Errorf("at least one sku is required")
+	}
+	if c == nil || c.service == nil {
+		return IAPsListInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Inappproducts.BatchGet(packageName).Sku(filteredSkus...).Context(ctx).Do()
+	if err != nil {
+		return IAPsListInfo{}, mapGoogleAPIError(err)
+	}
+	return iapsListInfoFromProducts(resp.Inappproduct), nil
+}
+
 func (c *Client) CreateIAP(ctx context.Context, packageName string, product *androidpublisher.InAppProduct) (IAPInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -86,6 +113,37 @@ func (c *Client) CreateIAP(ctx context.Context, packageName string, product *and
 		return IAPInfo{}, mapGoogleAPIError(err)
 	}
 	return iapInfoFromProduct(created), nil
+}
+
+func (c *Client) BatchUpdateIAPs(ctx context.Context, packageName string, requests []*androidpublisher.InappproductsUpdateRequest) (IAPsListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return IAPsListInfo{}, fmt.Errorf("package name is required")
+	}
+	filteredRequests := make([]*androidpublisher.InappproductsUpdateRequest, 0, len(requests))
+	for _, request := range requests {
+		if request == nil {
+			continue
+		}
+		filteredRequests = append(filteredRequests, request)
+	}
+	if len(filteredRequests) == 0 {
+		return IAPsListInfo{}, fmt.Errorf("at least one batch update request is required")
+	}
+	if len(filteredRequests) > 100 {
+		return IAPsListInfo{}, fmt.Errorf("batch update request count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return IAPsListInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Inappproducts.BatchUpdate(packageName, &androidpublisher.InappproductsBatchUpdateRequest{
+		Requests: filteredRequests,
+	}).Context(ctx).Do()
+	if err != nil {
+		return IAPsListInfo{}, mapGoogleAPIError(err)
+	}
+	return iapsListInfoFromProducts(resp.Inappproducts), nil
 }
 
 func (c *Client) UpdateIAP(ctx context.Context, packageName, sku string, product *androidpublisher.InAppProduct) (IAPInfo, error) {
@@ -109,6 +167,36 @@ func (c *Client) UpdateIAP(ctx context.Context, packageName, sku string, product
 		return IAPInfo{}, mapGoogleAPIError(err)
 	}
 	return iapInfoFromProduct(updated), nil
+}
+
+func (c *Client) BatchDeleteIAPs(ctx context.Context, packageName string, requests []*androidpublisher.InappproductsDeleteRequest) error {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return fmt.Errorf("package name is required")
+	}
+	filteredRequests := make([]*androidpublisher.InappproductsDeleteRequest, 0, len(requests))
+	for _, request := range requests {
+		if request == nil {
+			continue
+		}
+		filteredRequests = append(filteredRequests, request)
+	}
+	if len(filteredRequests) == 0 {
+		return fmt.Errorf("at least one batch delete request is required")
+	}
+	if len(filteredRequests) > 100 {
+		return fmt.Errorf("batch delete request count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := c.service.Inappproducts.BatchDelete(packageName, &androidpublisher.InappproductsBatchDeleteRequest{
+		Requests: filteredRequests,
+	}).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
 }
 
 func (c *Client) DeleteIAP(ctx context.Context, packageName, sku string) error {
@@ -150,11 +238,25 @@ func iapsListInfoFromResponse(resp *androidpublisher.InappproductsListResponse) 
 		nextToken = resp.TokenPagination.NextPageToken
 	}
 	result := IAPsListInfo{
-		Products:      make([]IAPInfo, 0, len(resp.Inappproduct)),
+		Products:      iapInfosFromProducts(resp.Inappproduct),
 		NextPageToken: nextToken,
 	}
-	for _, product := range resp.Inappproduct {
-		result.Products = append(result.Products, iapInfoFromProduct(product))
+	return result
+}
+
+func iapsListInfoFromProducts(products []*androidpublisher.InAppProduct) IAPsListInfo {
+	return IAPsListInfo{
+		Products: iapInfosFromProducts(products),
+	}
+}
+
+func iapInfosFromProducts(products []*androidpublisher.InAppProduct) []IAPInfo {
+	if len(products) == 0 {
+		return nil
+	}
+	result := make([]IAPInfo, 0, len(products))
+	for _, product := range products {
+		result = append(result, iapInfoFromProduct(product))
 	}
 	return result
 }

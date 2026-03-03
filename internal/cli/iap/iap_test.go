@@ -17,19 +17,27 @@ import (
 )
 
 type fakeClient struct {
-	list      gpc.IAPsListInfo
-	listErr   error
-	get       gpc.IAPInfo
-	getErr    error
-	create    gpc.IAPInfo
-	createErr error
-	update    gpc.IAPInfo
-	updateErr error
-	deleteErr error
+	list           gpc.IAPsListInfo
+	listErr        error
+	get            gpc.IAPInfo
+	getErr         error
+	batchGet       gpc.IAPsListInfo
+	batchGetErr    error
+	create         gpc.IAPInfo
+	createErr      error
+	batchUpdate    gpc.IAPsListInfo
+	batchUpdateErr error
+	update         gpc.IAPInfo
+	updateErr      error
+	batchDeleteErr error
+	deleteErr      error
 
-	createFn func(packageName string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
-	updateFn func(packageName, sku string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
-	capture  *iapListCapture
+	createFn      func(packageName string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
+	batchGetFn    func(packageName string, skus []string) (gpc.IAPsListInfo, error)
+	batchUpdateFn func(packageName string, requests []*androidpublisher.InappproductsUpdateRequest) (gpc.IAPsListInfo, error)
+	updateFn      func(packageName, sku string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
+	batchDeleteFn func(packageName string, requests []*androidpublisher.InappproductsDeleteRequest) error
+	capture       *iapListCapture
 }
 
 func (f fakeClient) ListIAPs(_ context.Context, _ string, maxResults int64, pageToken string, paginate bool) (gpc.IAPsListInfo, error) {
@@ -45,6 +53,13 @@ func (f fakeClient) GetIAP(_ context.Context, _, _ string) (gpc.IAPInfo, error) 
 	return f.get, f.getErr
 }
 
+func (f fakeClient) BatchGetIAPs(_ context.Context, packageName string, skus []string) (gpc.IAPsListInfo, error) {
+	if f.batchGetFn != nil {
+		return f.batchGetFn(packageName, skus)
+	}
+	return f.batchGet, f.batchGetErr
+}
+
 func (f fakeClient) CreateIAP(_ context.Context, packageName string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error) {
 	if f.createFn != nil {
 		return f.createFn(packageName, product)
@@ -52,11 +67,25 @@ func (f fakeClient) CreateIAP(_ context.Context, packageName string, product *an
 	return f.create, f.createErr
 }
 
+func (f fakeClient) BatchUpdateIAPs(_ context.Context, packageName string, requests []*androidpublisher.InappproductsUpdateRequest) (gpc.IAPsListInfo, error) {
+	if f.batchUpdateFn != nil {
+		return f.batchUpdateFn(packageName, requests)
+	}
+	return f.batchUpdate, f.batchUpdateErr
+}
+
 func (f fakeClient) UpdateIAP(_ context.Context, packageName, sku string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error) {
 	if f.updateFn != nil {
 		return f.updateFn(packageName, sku, product)
 	}
 	return f.update, f.updateErr
+}
+
+func (f fakeClient) BatchDeleteIAPs(_ context.Context, packageName string, requests []*androidpublisher.InappproductsDeleteRequest) error {
+	if f.batchDeleteFn != nil {
+		return f.batchDeleteFn(packageName, requests)
+	}
+	return f.batchDeleteErr
 }
 
 func (f fakeClient) DeleteIAP(_ context.Context, _, _ string) error { return f.deleteErr }
@@ -151,6 +180,55 @@ func TestIAPGet_RequiresSKU(t *testing.T) {
 	}
 }
 
+func TestIAPBatchGet_RequiresSKUs(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runIAP(t, deps, "batch-get", "--package-name", "com.example.app")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--skus is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestIAPBatchGet_ReturnsProducts(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				batchGetFn: func(packageName string, skus []string) (gpc.IAPsListInfo, error) {
+					if packageName != "com.example.app" {
+						t.Fatalf("unexpected package name: %q", packageName)
+					}
+					if len(skus) != 2 || skus[0] != "coins_100" || skus[1] != "coins_500" {
+						t.Fatalf("unexpected skus: %+v", skus)
+					}
+					return gpc.IAPsListInfo{
+						Products: []gpc.IAPInfo{
+							{SKU: "coins_100"},
+							{SKU: "coins_500"},
+						},
+					}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runIAP(t, deps, "batch-get", "--package-name", "com.example.app", "--skus", "coins_100,coins_500")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"sku":"coins_100"`) || !strings.Contains(out, `"sku":"coins_500"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
 func TestIAPCreate_ReturnsCreated(t *testing.T) {
 	inputPath := writeJSON(t, `{"sku":"coins_100","packageName":"com.example.app"}`)
 	deps := Deps{
@@ -207,6 +285,99 @@ func TestIAPUpdate_ReturnsUpdated(t *testing.T) {
 		t.Fatalf("command failed: %v", err)
 	}
 	if !strings.Contains(out, `"status":"updated"`) || !strings.Contains(out, `"sku":"coins_100"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestIAPBatchUpdate_ReturnsUpdated(t *testing.T) {
+	inputPath := writeJSON(t, `{"requests":[{"packageName":"com.example.app","sku":"coins_100","inappproduct":{"packageName":"com.example.app","sku":"coins_100","status":"active"}}]}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				batchUpdateFn: func(packageName string, requests []*androidpublisher.InappproductsUpdateRequest) (gpc.IAPsListInfo, error) {
+					if packageName != "com.example.app" {
+						t.Fatalf("unexpected package name: %q", packageName)
+					}
+					if len(requests) != 1 || requests[0].Sku != "coins_100" {
+						t.Fatalf("unexpected requests: %+v", requests)
+					}
+					return gpc.IAPsListInfo{Products: []gpc.IAPInfo{{SKU: "coins_100", Status: "active"}}}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runIAP(
+		t,
+		deps,
+		"batch-update",
+		"--package-name", "com.example.app",
+		"--input", inputPath,
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"updated"`) || !strings.Contains(out, `"sku":"coins_100"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestIAPBatchDelete_RequiresConfirm(t *testing.T) {
+	inputPath := writeJSON(t, `{"requests":[{"packageName":"com.example.app","sku":"coins_100"}]}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runIAP(
+		t,
+		deps,
+		"batch-delete",
+		"--package-name", "com.example.app",
+		"--input", inputPath,
+	)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--confirm is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestIAPBatchDelete_ReturnsDeleted(t *testing.T) {
+	inputPath := writeJSON(t, `{"requests":[{"packageName":"com.example.app","sku":"coins_100"},{"packageName":"com.example.app","sku":"coins_500"}]}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				batchDeleteFn: func(packageName string, requests []*androidpublisher.InappproductsDeleteRequest) error {
+					if packageName != "com.example.app" {
+						t.Fatalf("unexpected package name: %q", packageName)
+					}
+					if len(requests) != 2 {
+						t.Fatalf("unexpected request count: %d", len(requests))
+					}
+					return nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runIAP(
+		t,
+		deps,
+		"batch-delete",
+		"--package-name", "com.example.app",
+		"--input", inputPath,
+		"--confirm",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"deleted"`) || !strings.Contains(out, `"deletedCount":2`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
