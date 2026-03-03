@@ -177,6 +177,8 @@ gpc purchases products acknowledge --package-name com.example.app --product-id p
 gpc purchases products consume --package-name com.example.app --product-id premium --token <purchase-token> --confirm
 gpc purchases subscriptions get --package-name com.example.app --token <subscription-token>
 gpc purchases subscriptions cancel --package-name com.example.app --token <subscription-token> --confirm
+gpc purchases subscriptions defer --package-name com.example.app --token <subscription-token> --etag <etag> --defer-duration 604800s --confirm
+gpc purchases subscriptions defer --package-name com.example.app --token <subscription-token> --etag <etag> --defer-duration 604800s --validate-only
 gpc purchases subscriptions revoke --package-name com.example.app --token <subscription-token> --refund-type full --confirm
 gpc purchases voided list --package-name com.example.app --max-results 100
 

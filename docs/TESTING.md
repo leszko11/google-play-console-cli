@@ -146,6 +146,8 @@ gpc purchases products acknowledge --package-name com.example.app --product-id p
 gpc purchases products consume --package-name com.example.app --product-id premium --token <purchase-token> --confirm
 gpc purchases subscriptions get --package-name com.example.app --token <subscription-token>
 gpc purchases subscriptions cancel --package-name com.example.app --token <subscription-token> --confirm
+gpc purchases subscriptions defer --package-name com.example.app --token <subscription-token> --etag <etag> --defer-duration 604800s --confirm
+gpc purchases subscriptions defer --package-name com.example.app --token <subscription-token> --etag <etag> --defer-duration 604800s --validate-only
 gpc purchases subscriptions revoke --package-name com.example.app --token <subscription-token> --refund-type full --confirm
 gpc purchases voided list --package-name com.example.app --max-results 100
 gpc --paginate purchases voided list --package-name com.example.app --max-results 100
@@ -235,6 +237,8 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc purchases products consume ... --confirm` should return `status: consumed`.
   - `gpc purchases subscriptions get ...` should return subscription purchase details.
   - `gpc purchases subscriptions cancel ... --confirm` should return `status: canceled`.
+  - `gpc purchases subscriptions defer ... --confirm` should return `status: deferred`.
+  - `gpc purchases subscriptions defer ... --validate-only` should return `status: validated`.
   - `gpc purchases subscriptions revoke ... --confirm` should return `status: revoked`.
   - `gpc purchases voided list ...` should return voided purchases and optional `nextToken`.
   - `gpc --paginate purchases voided list ...` should aggregate all pages and return empty `nextToken`.

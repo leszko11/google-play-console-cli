@@ -21,6 +21,7 @@ type Client interface {
 
 	GetSubscriptionPurchase(ctx context.Context, packageName, token string) (gpc.SubscriptionPurchaseInfo, error)
 	CancelSubscriptionPurchase(ctx context.Context, packageName, token, cancellationType string) error
+	DeferSubscriptionPurchase(ctx context.Context, packageName, token, etag, deferDuration string, validateOnly bool) (gpc.SubscriptionDeferInfo, error)
 	RevokeSubscriptionPurchase(ctx context.Context, packageName, token, refundType string) error
 
 	ListVoidedPurchases(ctx context.Context, packageName string, query gpc.VoidedPurchasesQuery) (gpc.VoidedPurchasesListInfo, error)
@@ -224,6 +225,7 @@ func newSubscriptionsCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newSubscriptionsGetCommand(deps),
 			newSubscriptionsCancelCommand(deps),
+			newSubscriptionsDeferCommand(deps),
 			newSubscriptionsRevokeCommand(deps),
 		},
 	}
@@ -349,6 +351,68 @@ func newSubscriptionsRevokeCommand(deps Deps) *ffcli.Command {
 				"token":       token,
 				"refundType":  refundType,
 				"status":      "revoked",
+			})
+		},
+	}
+}
+
+func newSubscriptionsDeferCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("defer", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, token, etag, deferDuration string
+	var validateOnly, confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&token, "token", "", "Purchase token")
+	fs.StringVar(&etag, "etag", "", "Current subscription etag from purchases subscriptions get")
+	fs.StringVar(&deferDuration, "defer-duration", "", "Deferral duration (protobuf format, for example 604800s)")
+	fs.BoolVar(&validateOnly, "validate-only", false, "Validate deferral request without applying changes")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deferring the subscription purchase (required unless --validate-only)")
+
+	return &ffcli.Command{
+		Name:      "defer",
+		ShortHelp: "Defer a subscription renewal",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			token = strings.TrimSpace(token)
+			if token == "" {
+				return fmt.Errorf("--token is required")
+			}
+			etag = strings.TrimSpace(etag)
+			if etag == "" {
+				return fmt.Errorf("--etag is required")
+			}
+			deferDuration = strings.TrimSpace(deferDuration)
+			if deferDuration == "" {
+				return fmt.Errorf("--defer-duration is required")
+			}
+			if !validateOnly && !confirm {
+				return fmt.Errorf("--confirm is required to defer subscription purchase %q", token)
+			}
+
+			result, err := client.DeferSubscriptionPurchase(requestCtx, pkg, token, etag, deferDuration, validateOnly)
+			if err != nil {
+				return fmt.Errorf("failed to defer subscription purchase: %w", err)
+			}
+
+			status := "deferred"
+			if validateOnly {
+				status = "validated"
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":           pkg,
+				"token":                 token,
+				"etag":                  etag,
+				"deferDuration":         deferDuration,
+				"validateOnly":          validateOnly,
+				"itemExpiryTimeDetails": result.ItemExpiryTimeDetails,
+				"status":                status,
 			})
 		},
 	}

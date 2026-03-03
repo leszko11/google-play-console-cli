@@ -21,6 +21,8 @@ type fakeClient struct {
 	subscriptionPurchase gpc.SubscriptionPurchaseInfo
 	subscriptionErr      error
 	cancelErr            error
+	deferResult          gpc.SubscriptionDeferInfo
+	deferErr             error
 	revokeErr            error
 	voided               gpc.VoidedPurchasesListInfo
 	voidedErr            error
@@ -28,6 +30,9 @@ type fakeClient struct {
 	capturedToken        string
 	capturedPayload      string
 	capturedCancelType   string
+	capturedEtag         string
+	capturedDeferDur     string
+	capturedValidateOnly bool
 	capturedRefundType   string
 	capturedVoidedQuery  gpc.VoidedPurchasesQuery
 }
@@ -60,6 +65,14 @@ func (f *fakeClient) CancelSubscriptionPurchase(_ context.Context, _, token, can
 	f.capturedToken = token
 	f.capturedCancelType = cancellationType
 	return f.cancelErr
+}
+
+func (f *fakeClient) DeferSubscriptionPurchase(_ context.Context, _, token, etag, deferDuration string, validateOnly bool) (gpc.SubscriptionDeferInfo, error) {
+	f.capturedToken = token
+	f.capturedEtag = etag
+	f.capturedDeferDur = deferDuration
+	f.capturedValidateOnly = validateOnly
+	return f.deferResult, f.deferErr
 }
 
 func (f *fakeClient) RevokeSubscriptionPurchase(_ context.Context, _, token, refundType string) error {
@@ -166,6 +179,64 @@ func TestPurchasesSubscriptionsRevoke_ReturnsStatus(t *testing.T) {
 	}
 	if fc.capturedRefundType != "full" {
 		t.Fatalf("unexpected refund type: %s", fc.capturedRefundType)
+	}
+}
+
+func TestPurchasesSubscriptionsDefer_RequiresConfirm(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runPurchases(
+		t,
+		deps,
+		"subscriptions", "defer",
+		"--package-name", "com.example.app",
+		"--token", "tok-1",
+		"--etag", "etag-1",
+		"--defer-duration", "604800s",
+	)
+	if err == nil || !strings.Contains(err.Error(), "--confirm is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPurchasesSubscriptionsDefer_ValidateOnly(t *testing.T) {
+	fc := &fakeClient{
+		deferResult: gpc.SubscriptionDeferInfo{
+			ItemExpiryTimeDetails: []gpc.SubscriptionItemExpiryInfo{
+				{ProductID: "premium_monthly", ExpiryTime: "2026-04-01T00:00:00Z"},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runPurchases(
+		t,
+		deps,
+		"subscriptions", "defer",
+		"--package-name", "com.example.app",
+		"--token", "tok-1",
+		"--etag", "etag-1",
+		"--defer-duration", "604800s",
+		"--validate-only",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"validated"`) || !strings.Contains(out, `"productId":"premium_monthly"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if !fc.capturedValidateOnly || fc.capturedEtag != "etag-1" || fc.capturedDeferDur != "604800s" {
+		t.Fatalf("unexpected defer args: validateOnly=%v etag=%s deferDuration=%s", fc.capturedValidateOnly, fc.capturedEtag, fc.capturedDeferDur)
 	}
 }
 
