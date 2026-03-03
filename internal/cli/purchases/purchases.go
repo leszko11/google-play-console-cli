@@ -2,6 +2,7 @@ package purchases
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -467,6 +468,9 @@ func newVoidedListCommand(deps Deps) *ffcli.Command {
 				Paginate:                          shared.ActiveGlobalFlags().Paginate,
 			})
 			if err != nil {
+				if errors.Is(err, gpc.ErrPackageNotFound) {
+					return fmt.Errorf("failed to list voided purchases: %w\nhint: this endpoint can return package-not-found when the package has no supported billing history for this API view. Verify package name and financial permissions, then retry later after billing activity", err)
+				}
 				return fmt.Errorf("failed to list voided purchases: %w", err)
 			}
 

@@ -33,6 +33,7 @@ Optional environment variables:
 
 - `GPC_BIN`: compiled `gpc` binary path. If unset, scripts use `mise x go@1.24 -- go run .`.
 - `GPC_CONFIG_PATH`: config path for isolated smoke runs.
+- `GPC_TEST_DEVELOPER_ID`: optional developer ID passed to `auth init` to avoid interactive prompt in smoke scripts.
 - `GPC_ENABLE_PHASE3=1`: enables phase 3 in `smoke-test-all.sh`.
 - `GPC_TEST_AAB` or `GPC_TEST_APK`: exactly one is required for phase 3.
 - `GPC_EXPECT_VERSION_CODE`: optional assertion for phase-3 version code.

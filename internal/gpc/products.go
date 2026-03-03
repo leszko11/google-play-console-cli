@@ -3,6 +3,7 @@ package gpc
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"google.golang.org/api/androidpublisher/v3"
@@ -29,7 +30,7 @@ func (c *Client) ListOneTimeProducts(ctx context.Context, packageName string, pa
 		return oneTimeProductsListInfoFromResponse(resp), nil
 	}
 
-	result := OneTimeProductsListInfo{}
+	result := OneTimeProductsListInfo{Products: make([]OneTimeProductInfo, 0)}
 	nextToken := pageToken
 	for {
 		resp, err := c.oneTimeProductsListCall(ctx, packageName, pageSize, nextToken).Do()
@@ -179,15 +180,60 @@ func (c *Client) CreateOneTimeProduct(ctx context.Context, packageName string, p
 	if c == nil || c.service == nil {
 		return OneTimeProductInfo{}, ErrInvalidCredentials
 	}
+	updateMask := oneTimeProductUpdateMask(product)
+	if updateMask == "" {
+		return OneTimeProductInfo{}, fmt.Errorf("one-time product payload must include at least one mutable field")
+	}
+	regionsVersion, err := c.resolveRegionsVersion(ctx, packageName, regionsVersionFromOneTimeProduct(product))
+	if err != nil {
+		return OneTimeProductInfo{}, err
+	}
 
 	created, err := c.service.Monetization.Onetimeproducts.Patch(packageName, productID, product).
 		AllowMissing(true).
+		UpdateMask(updateMask).
+		RegionsVersionVersion(regionsVersion).
 		Context(ctx).
 		Do()
 	if err != nil {
 		return OneTimeProductInfo{}, mapGoogleAPIError(err)
 	}
 	return oneTimeProductInfoFromProduct(created), nil
+}
+
+func oneTimeProductUpdateMask(product *androidpublisher.OneTimeProduct) string {
+	if product == nil {
+		return ""
+	}
+	paths := make([]string, 0, 5)
+	if len(product.Listings) > 0 {
+		paths = append(paths, "listings")
+	}
+	if len(product.PurchaseOptions) > 0 {
+		paths = append(paths, "purchaseOptions")
+	}
+	if len(product.OfferTags) > 0 {
+		paths = append(paths, "offerTags")
+	}
+	if product.RestrictedPaymentCountries != nil {
+		paths = append(paths, "restrictedPaymentCountries")
+	}
+	if product.TaxAndComplianceSettings != nil {
+		paths = append(paths, "taxAndComplianceSettings")
+	}
+	if len(paths) == 0 {
+		return ""
+	}
+	slices.Sort(paths)
+	return strings.Join(paths, ",")
+}
+
+func regionsVersionFromOneTimeProduct(product *androidpublisher.OneTimeProduct) string {
+	if product == nil || product.RegionsVersion == nil {
+		return ""
+	}
+	version := strings.TrimSpace(product.RegionsVersion.Version)
+	return version
 }
 
 func (c *Client) UpdateOneTimeProduct(ctx context.Context, packageName, productID string, product *androidpublisher.OneTimeProduct, updateMask string) (OneTimeProductInfo, error) {
@@ -209,9 +255,14 @@ func (c *Client) UpdateOneTimeProduct(ctx context.Context, packageName, productI
 	if c == nil || c.service == nil {
 		return OneTimeProductInfo{}, ErrInvalidCredentials
 	}
+	regionsVersion, err := c.resolveRegionsVersion(ctx, packageName, regionsVersionFromOneTimeProduct(product))
+	if err != nil {
+		return OneTimeProductInfo{}, err
+	}
 
 	updated, err := c.service.Monetization.Onetimeproducts.Patch(packageName, productID, product).
 		UpdateMask(updateMask).
+		RegionsVersionVersion(regionsVersion).
 		Context(ctx).
 		Do()
 	if err != nil {
@@ -268,7 +319,7 @@ func (c *Client) ListOneTimeProductOffers(ctx context.Context, packageName, prod
 		return oneTimeProductOffersListInfoFromResponse(resp), nil
 	}
 
-	result := OneTimeProductOffersListInfo{}
+	result := OneTimeProductOffersListInfo{Offers: make([]OneTimeProductOfferInfo, 0)}
 	nextToken := pageToken
 	for {
 		resp, err := c.oneTimeProductOffersListCall(ctx, packageName, productID, purchaseOptionID, pageSize, nextToken).Do()

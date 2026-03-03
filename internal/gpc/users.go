@@ -29,7 +29,7 @@ func (c *Client) ListUsers(ctx context.Context, developerID string, pageSize int
 		return usersListInfoFromResponse(resp), nil
 	}
 
-	result := UsersListInfo{}
+	result := UsersListInfo{Users: make([]UserInfo, 0)}
 	nextToken := pageToken
 	for {
 		resp, err := c.usersListCall(ctx, parent, pageSize, nextToken).Do()

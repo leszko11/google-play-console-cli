@@ -132,6 +132,7 @@ gpc subscriptions batch-get --package-name com.example.app --product-ids premium
 gpc subscriptions create --package-name com.example.app --input /path/to/subscription.json
 gpc subscriptions batch-update --package-name com.example.app --input /path/to/subscriptions-batch-update.json
 gpc subscriptions update --package-name com.example.app --product-id premium_monthly --input /path/to/subscription.json
+# Note: create/update auto-resolve the active Play regions version via API.
 
 # Delete/archive subscriptions (explicit confirmation required)
 gpc subscriptions delete --package-name com.example.app --product-id premium_monthly --confirm
@@ -152,6 +153,7 @@ gpc subscriptions offers deactivate --package-name com.example.app --product-id 
 gpc subscriptions offers create --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --input /path/to/offer.json
 gpc subscriptions offers update --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --input /path/to/offer.json --update-mask phases,regionalConfigs
 gpc subscriptions offers delete --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --confirm
+# Note: offer create/update auto-resolve the active Play regions version via API.
 
 # One-time product management
 gpc products list --package-name com.example.app --page-size 100
@@ -162,6 +164,7 @@ gpc products batch-update --package-name com.example.app --input /path/to/one-ti
 gpc products update --package-name com.example.app --product-id coins_100 --input /path/to/one-time-product.json --update-mask listings,purchaseOptions
 gpc products batch-delete --package-name com.example.app --input /path/to/one-time-products-batch-delete.json --confirm
 gpc products delete --package-name com.example.app --product-id coins_100 --confirm
+# Note: create/update auto-resolve the active Play regions version via API (or use payload `regionsVersion.version` when provided).
 
 # One-time product offers management
 gpc products offers list --package-name com.example.app --product-id coins_100 --purchase-option-id buy
