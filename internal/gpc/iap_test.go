@@ -19,11 +19,20 @@ func TestIAPMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.GetIAP(context.Background(), "com.example.app", "coins_100"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from GetIAP, got %v", err)
 	}
+	if _, err := c.BatchGetIAPs(context.Background(), "com.example.app", []string{"coins_100"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchGetIAPs, got %v", err)
+	}
 	if _, err := c.CreateIAP(context.Background(), "com.example.app", payload); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from CreateIAP, got %v", err)
 	}
+	if _, err := c.BatchUpdateIAPs(context.Background(), "com.example.app", []*androidpublisher.InappproductsUpdateRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchUpdateIAPs, got %v", err)
+	}
 	if _, err := c.UpdateIAP(context.Background(), "com.example.app", "coins_100", payload); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from UpdateIAP, got %v", err)
+	}
+	if err := c.BatchDeleteIAPs(context.Background(), "com.example.app", []*androidpublisher.InappproductsDeleteRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchDeleteIAPs, got %v", err)
 	}
 	if err := c.DeleteIAP(context.Background(), "com.example.app", "coins_100"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from DeleteIAP, got %v", err)
@@ -42,14 +51,37 @@ func TestIAPMethods_ValidateArgs(t *testing.T) {
 	if _, err := c.GetIAP(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "sku is required") {
 		t.Fatalf("unexpected GetIAP sku error: %v", err)
 	}
+	if _, err := c.BatchGetIAPs(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "at least one sku is required") {
+		t.Fatalf("unexpected BatchGetIAPs sku error: %v", err)
+	}
 	if _, err := c.CreateIAP(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "in-app product payload is required") {
 		t.Fatalf("unexpected CreateIAP payload error: %v", err)
+	}
+	if _, err := c.BatchUpdateIAPs(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "at least one batch update request is required") {
+		t.Fatalf("unexpected BatchUpdateIAPs empty request error: %v", err)
+	}
+	batchUpdateRequests := make([]*androidpublisher.InappproductsUpdateRequest, 101)
+	for i := range batchUpdateRequests {
+		batchUpdateRequests[i] = &androidpublisher.InappproductsUpdateRequest{}
+	}
+	if _, err := c.BatchUpdateIAPs(context.Background(), "com.example.app", batchUpdateRequests); err == nil || !strings.Contains(err.Error(), "batch update request count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchUpdateIAPs request count error: %v", err)
 	}
 	if _, err := c.UpdateIAP(context.Background(), "com.example.app", "", &androidpublisher.InAppProduct{}); err == nil || !strings.Contains(err.Error(), "sku is required") {
 		t.Fatalf("unexpected UpdateIAP sku error: %v", err)
 	}
 	if _, err := c.UpdateIAP(context.Background(), "com.example.app", "coins_100", nil); err == nil || !strings.Contains(err.Error(), "in-app product payload is required") {
 		t.Fatalf("unexpected UpdateIAP payload error: %v", err)
+	}
+	if err := c.BatchDeleteIAPs(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "at least one batch delete request is required") {
+		t.Fatalf("unexpected BatchDeleteIAPs empty request error: %v", err)
+	}
+	batchDeleteRequests := make([]*androidpublisher.InappproductsDeleteRequest, 101)
+	for i := range batchDeleteRequests {
+		batchDeleteRequests[i] = &androidpublisher.InappproductsDeleteRequest{}
+	}
+	if err := c.BatchDeleteIAPs(context.Background(), "com.example.app", batchDeleteRequests); err == nil || !strings.Contains(err.Error(), "batch delete request count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchDeleteIAPs request count error: %v", err)
 	}
 	if err := c.DeleteIAP(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "sku is required") {
 		t.Fatalf("unexpected DeleteIAP sku error: %v", err)
@@ -81,6 +113,25 @@ func TestIAPsListInfoFromResponse(t *testing.T) {
 	}
 	if got.Products[0].SKU != "coins_100" || got.Products[0].PriceCount != 1 {
 		t.Fatalf("unexpected iap map: %+v", got.Products[0])
+	}
+}
+
+func TestIAPsListInfoFromProducts(t *testing.T) {
+	got := iapsListInfoFromProducts([]*androidpublisher.InAppProduct{
+		{
+			PackageName: "com.example.app",
+			Sku:         "coins_100",
+		},
+		nil,
+	})
+	if len(got.Products) != 2 {
+		t.Fatalf("unexpected iap list size: %+v", got)
+	}
+	if got.Products[0].SKU != "coins_100" {
+		t.Fatalf("unexpected first mapped product: %+v", got.Products[0])
+	}
+	if got.Products[1] != (IAPInfo{}) {
+		t.Fatalf("unexpected nil product mapping: %+v", got.Products[1])
 	}
 }
 

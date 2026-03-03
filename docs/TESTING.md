@@ -139,8 +139,11 @@ gpc products purchase-options deactivate --package-name com.example.app --produc
 gpc products purchase-options delete --package-name com.example.app --product-id coins_100 --purchase-option-id buy --confirm
 gpc iap list --package-name com.example.app --max-results 100
 gpc iap get --package-name com.example.app --sku coins_100
+gpc iap batch-get --package-name com.example.app --skus coins_100,coins_500
 gpc iap create --package-name com.example.app --input /path/to/inappproduct.json
+gpc iap batch-update --package-name com.example.app --input /path/to/inappproducts-batch-update.json
 gpc iap update --package-name com.example.app --sku coins_100 --input /path/to/inappproduct.json
+gpc iap batch-delete --package-name com.example.app --input /path/to/inappproducts-batch-delete.json --confirm
 gpc iap delete --package-name com.example.app --sku coins_100 --confirm
 gpc purchases products get --package-name com.example.app --product-id premium --token <purchase-token>
 gpc purchases products acknowledge --package-name com.example.app --product-id premium --token <purchase-token>
@@ -231,8 +234,11 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc products purchase-options delete ... --confirm` should return `status: deleted`.
   - `gpc iap list ...` should return legacy in-app products and optional `nextPageToken`.
   - `gpc iap get ...` should return one legacy in-app product.
+  - `gpc iap batch-get ...` should return requested legacy in-app products.
   - `gpc iap create ...` should return `status: created`.
+  - `gpc iap batch-update ...` should return `status: updated`.
   - `gpc iap update ...` should return `status: updated`.
+  - `gpc iap batch-delete ... --confirm` should return `status: deleted`.
   - `gpc iap delete ... --confirm` should return `status: deleted`.
   - `gpc purchases products get ...` should return one-time purchase details.
   - `gpc purchases products acknowledge ...` should return `status: acknowledged`.

@@ -168,8 +168,11 @@ gpc products purchase-options delete --package-name com.example.app --product-id
 # Legacy in-app product management
 gpc iap list --package-name com.example.app --max-results 100
 gpc iap get --package-name com.example.app --sku coins_100
+gpc iap batch-get --package-name com.example.app --skus coins_100,coins_500
 gpc iap create --package-name com.example.app --input /path/to/inappproduct.json
+gpc iap batch-update --package-name com.example.app --input /path/to/inappproducts-batch-update.json
 gpc iap update --package-name com.example.app --sku coins_100 --input /path/to/inappproduct.json
+gpc iap batch-delete --package-name com.example.app --input /path/to/inappproducts-batch-delete.json --confirm
 gpc iap delete --package-name com.example.app --sku coins_100 --confirm
 
 # Purchase management

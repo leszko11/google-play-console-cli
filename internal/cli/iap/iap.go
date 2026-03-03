@@ -19,8 +19,11 @@ import (
 type Client interface {
 	ListIAPs(ctx context.Context, packageName string, maxResults int64, pageToken string, paginate bool) (gpc.IAPsListInfo, error)
 	GetIAP(ctx context.Context, packageName, sku string) (gpc.IAPInfo, error)
+	BatchGetIAPs(ctx context.Context, packageName string, skus []string) (gpc.IAPsListInfo, error)
 	CreateIAP(ctx context.Context, packageName string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
+	BatchUpdateIAPs(ctx context.Context, packageName string, requests []*androidpublisher.InappproductsUpdateRequest) (gpc.IAPsListInfo, error)
 	UpdateIAP(ctx context.Context, packageName, sku string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
+	BatchDeleteIAPs(ctx context.Context, packageName string, requests []*androidpublisher.InappproductsDeleteRequest) error
 	DeleteIAP(ctx context.Context, packageName, sku string) error
 }
 
@@ -41,8 +44,11 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newListCommand(deps),
 			newGetCommand(deps),
+			newBatchGetCommand(deps),
 			newCreateCommand(deps),
 			newUpdateCommand(deps),
+			newBatchUpdateCommand(deps),
+			newBatchDeleteCommand(deps),
 			newDeleteCommand(deps),
 		},
 	}
@@ -176,6 +182,41 @@ func newCreateCommand(deps Deps) *ffcli.Command {
 	}
 }
 
+func newBatchGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, skusCSV string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&skusCSV, "skus", "", "Comma-separated in-app product SKUs")
+
+	return &ffcli.Command{
+		Name:      "batch-get",
+		ShortHelp: "Get multiple legacy in-app products by SKU",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			skusCSV = strings.TrimSpace(skusCSV)
+			if skusCSV == "" {
+				return fmt.Errorf("--skus is required")
+			}
+			result, err := client.BatchGetIAPs(requestCtx, pkg, strings.Split(skusCSV, ","))
+			if err != nil {
+				return fmt.Errorf("failed to batch-get in-app products: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"products":    result.Products,
+			})
+		},
+	}
+}
+
 func newUpdateCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
@@ -212,6 +253,82 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 				"packageName": pkg,
 				"product":     updated,
 				"status":      "updated",
+			})
+		},
+	}
+}
+
+func newBatchUpdateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-update", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, inputPath string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&inputPath, "input", "", "Path to in-app products batch update JSON payload (use - for stdin)")
+
+	return &ffcli.Command{
+		Name:      "batch-update",
+		ShortHelp: "Create or update multiple legacy in-app products",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			payload, err := readIAPBatchUpdatePayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			result, err := client.BatchUpdateIAPs(requestCtx, pkg, payload.Requests)
+			if err != nil {
+				return fmt.Errorf("failed to batch-update in-app products: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"products":    result.Products,
+				"status":      "updated",
+			})
+		},
+	}
+}
+
+func newBatchDeleteCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-delete", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, inputPath string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&inputPath, "input", "", "Path to in-app products batch delete JSON payload (use - for stdin)")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deleting the in-app products (required)")
+
+	return &ffcli.Command{
+		Name:      "batch-delete",
+		ShortHelp: "Delete multiple legacy in-app products",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			payload, err := readIAPBatchDeletePayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to batch-delete in-app products")
+			}
+			if err := client.BatchDeleteIAPs(requestCtx, pkg, payload.Requests); err != nil {
+				return fmt.Errorf("failed to batch-delete in-app products: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":  pkg,
+				"deletedCount": len(payload.Requests),
+				"status":       "deleted",
 			})
 		},
 	}
@@ -302,4 +419,64 @@ func readIAPPayload(inputPath string, stdin io.Reader) (*androidpublisher.InAppP
 		return nil, fmt.Errorf("invalid in-app product JSON payload: %w", err)
 	}
 	return &product, nil
+}
+
+func readIAPBatchUpdatePayload(inputPath string, stdin io.Reader) (*androidpublisher.InappproductsBatchUpdateRequest, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var raw []byte
+	var err error
+	if inputPath == "-" {
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		raw, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input: %w", err)
+		}
+	}
+
+	var payload androidpublisher.InappproductsBatchUpdateRequest
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("invalid in-app products batch update JSON payload: %w", err)
+	}
+	return &payload, nil
+}
+
+func readIAPBatchDeletePayload(inputPath string, stdin io.Reader) (*androidpublisher.InappproductsBatchDeleteRequest, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var raw []byte
+	var err error
+	if inputPath == "-" {
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		raw, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input: %w", err)
+		}
+	}
+
+	var payload androidpublisher.InappproductsBatchDeleteRequest
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("invalid in-app products batch delete JSON payload: %w", err)
+	}
+	return &payload, nil
 }
