@@ -54,6 +54,9 @@ func TestSubscriptionMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.BatchGetSubscriptionOffers(context.Background(), "com.example.app", "premium_monthly", "monthly", []string{"offer1"}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from BatchGetSubscriptionOffers, got %v", err)
 	}
+	if _, err := c.BatchUpdateSubscriptionOffers(context.Background(), "com.example.app", "premium_monthly", "monthly", []*androidpublisher.UpdateSubscriptionOfferRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchUpdateSubscriptionOffers, got %v", err)
+	}
 	if _, err := c.CreateSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", &androidpublisher.SubscriptionOffer{}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from CreateSubscriptionOffer, got %v", err)
 	}
@@ -142,6 +145,16 @@ func TestSubscriptionMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.BatchGetSubscriptionOffers(context.Background(), "com.example.app", "premium_monthly", "monthly", tooManyIDs); err == nil || !strings.Contains(err.Error(), "offer id count must be less than or equal to 100") {
 		t.Fatalf("unexpected BatchGetSubscriptionOffers count error: %v", err)
+	}
+	if _, err := c.BatchUpdateSubscriptionOffers(context.Background(), "com.example.app", "premium_monthly", "monthly", nil); err == nil || !strings.Contains(err.Error(), "at least one batch update request is required") {
+		t.Fatalf("unexpected BatchUpdateSubscriptionOffers empty request error: %v", err)
+	}
+	tooManyOfferUpdateRequests := make([]*androidpublisher.UpdateSubscriptionOfferRequest, 101)
+	for i := range tooManyOfferUpdateRequests {
+		tooManyOfferUpdateRequests[i] = &androidpublisher.UpdateSubscriptionOfferRequest{}
+	}
+	if _, err := c.BatchUpdateSubscriptionOffers(context.Background(), "com.example.app", "premium_monthly", "monthly", tooManyOfferUpdateRequests); err == nil || !strings.Contains(err.Error(), "batch update request count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchUpdateSubscriptionOffers count error: %v", err)
 	}
 	if _, err := c.CreateSubscriptionOffer(context.Background(), "com.example.app", "premium_monthly", "monthly", nil); err == nil || !strings.Contains(err.Error(), "subscription offer payload is required") {
 		t.Fatalf("unexpected CreateSubscriptionOffer payload error: %v", err)

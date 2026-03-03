@@ -32,6 +32,7 @@ type Client interface {
 	ListSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionOffersListInfo, error)
 	GetSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error)
 	BatchGetSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, offerIDs []string) (gpc.SubscriptionOffersListInfo, error)
+	BatchUpdateSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, requests []*androidpublisher.UpdateSubscriptionOfferRequest) (gpc.SubscriptionOffersListInfo, error)
 	ActivateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error)
 	DeactivateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error)
 	CreateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID string, offer *androidpublisher.SubscriptionOffer) (gpc.SubscriptionOfferInfo, error)
@@ -543,6 +544,7 @@ func newOffersCommand(deps Deps) *ffcli.Command {
 			newOffersListCommand(deps),
 			newOffersGetCommand(deps),
 			newOffersBatchGetCommand(deps),
+			newOffersBatchUpdateCommand(deps),
 			newOffersActivateCommand(deps),
 			newOffersDeactivateCommand(deps),
 			newOffersCreateCommand(deps),
@@ -733,6 +735,54 @@ func newOffersBatchGetCommand(deps Deps) *ffcli.Command {
 				"productId":   productID,
 				"basePlanId":  basePlanID,
 				"offers":      result.Offers,
+			})
+		},
+	}
+}
+
+func newOffersBatchUpdateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-update", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, basePlanID, inputPath string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
+	fs.StringVar(&inputPath, "input", "", "Path to subscription offers batch update JSON payload (use - for stdin)")
+
+	return &ffcli.Command{
+		Name:      "batch-update",
+		ShortHelp: "Batch create or update subscription offers",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			basePlanID = strings.TrimSpace(basePlanID)
+			if basePlanID == "" {
+				return fmt.Errorf("--base-plan-id is required")
+			}
+			payload, err := readSubscriptionOffersBatchUpdatePayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+
+			result, err := client.BatchUpdateSubscriptionOffers(requestCtx, pkg, productID, basePlanID, payload.Requests)
+			if err != nil {
+				return fmt.Errorf("failed to batch-update subscription offers: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"productId":   productID,
+				"basePlanId":  basePlanID,
+				"offers":      result.Offers,
+				"status":      "updated",
 			})
 		},
 	}
@@ -1018,6 +1068,36 @@ func readSubscriptionOfferPayload(inputPath string, stdin io.Reader) (*androidpu
 		return nil, fmt.Errorf("invalid subscription offer JSON payload: %w", err)
 	}
 	return &offer, nil
+}
+
+func readSubscriptionOffersBatchUpdatePayload(inputPath string, stdin io.Reader) (*androidpublisher.BatchUpdateSubscriptionOffersRequest, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var raw []byte
+	var err error
+	if inputPath == "-" {
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		raw, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input: %w", err)
+		}
+	}
+
+	var payload androidpublisher.BatchUpdateSubscriptionOffersRequest
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("invalid subscription offers batch update JSON payload: %w", err)
+	}
+	return &payload, nil
 }
 
 func readSubscriptionBatchUpdatePayload(inputPath string, stdin io.Reader) (*androidpublisher.BatchUpdateSubscriptionsRequest, error) {
