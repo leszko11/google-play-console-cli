@@ -64,3 +64,36 @@ func TestMapAPIError_PermissionLikeMessageAddsHint(t *testing.T) {
 		t.Fatalf("expected permission hint for permission-like message, got %v", err)
 	}
 }
+
+func TestMapAPIError_ForbiddenWithoutPermissionSignalHasNoPermissionHint(t *testing.T) {
+	err := mapAPIError(http.StatusForbidden, "Version code 1772439125 has already been used.")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("expected non-permission 403 to avoid ErrAccessDenied wrapping, got %v", err)
+	}
+	if strings.Contains(err.Error(), "missing Play Console permissions") {
+		t.Fatalf("expected no permission hint for non-permission 403, got %v", err)
+	}
+}
+
+func TestMapAPIError_LegacyIAPMigrationHint(t *testing.T) {
+	err := mapAPIError(http.StatusForbidden, "Please migrate to the new publishing API.")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "gpc products") {
+		t.Fatalf("expected migration hint, got %v", err)
+	}
+}
+
+func TestMapAPIError_APKUploadNotAllowedHint(t *testing.T) {
+	err := mapAPIError(http.StatusForbidden, "APKs are not allowed for this application.")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "accepts Android App Bundles only") {
+		t.Fatalf("expected APK upload hint, got %v", err)
+	}
+}
