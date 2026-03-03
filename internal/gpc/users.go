@@ -13,8 +13,8 @@ func (c *Client) ListUsers(ctx context.Context, developerID string, pageSize int
 	if err != nil {
 		return UsersListInfo{}, err
 	}
-	if pageSize < 0 {
-		return UsersListInfo{}, fmt.Errorf("page size must be greater than or equal to zero")
+	if pageSize < -1 {
+		return UsersListInfo{}, fmt.Errorf("page size must be -1 or greater")
 	}
 	pageToken = strings.TrimSpace(pageToken)
 	if c == nil || c.service == nil {
@@ -120,7 +120,7 @@ func normalizeDeveloperParent(developerID string) (string, error) {
 
 func (c *Client) usersListCall(ctx context.Context, parent string, pageSize int64, pageToken string) *androidpublisher.UsersListCall {
 	call := c.service.Users.List(parent).Context(ctx)
-	if pageSize > 0 {
+	if pageSize != 0 {
 		call.PageSize(pageSize)
 	}
 	if pageToken != "" {

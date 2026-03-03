@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"context"
+	"io"
 	"testing"
 	"time"
 
@@ -60,6 +61,54 @@ func TestAuthInitStoresProfileMetadata(t *testing.T) {
 	if stored.Profiles["default"].ServiceAccountPath != "/tmp/sa.json" {
 		t.Fatalf("unexpected path: %+v", stored.Profiles["default"])
 	}
+	if stored.Profiles["default"].DeveloperID != "" {
+		t.Fatalf("expected empty developer id, got %+v", stored.Profiles["default"])
+	}
+}
+
+func TestAuthInitStoresDeveloperID(t *testing.T) {
+	var stored config.Config
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return stored, nil },
+		SaveConfig: func(cfg config.Config) error {
+			stored = cfg
+			return nil
+		},
+		NewClient: func(context.Context, gpc.CredentialInput) (PackageVerifier, error) {
+			return fakeClient{}, nil
+		},
+		Now: func() time.Time { return time.Date(2026, 2, 6, 1, 2, 3, 0, time.UTC) },
+	}
+
+	runAuth(t, deps, "init", "--service-account", "/tmp/sa.json", "--developer-id", "developers/123")
+
+	if stored.Profiles["default"].DeveloperID != "123" {
+		t.Fatalf("unexpected developer id: %+v", stored.Profiles["default"])
+	}
+}
+
+func TestAuthInitPromptsForDeveloperID(t *testing.T) {
+	var stored config.Config
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return stored, nil },
+		SaveConfig: func(cfg config.Config) error {
+			stored = cfg
+			return nil
+		},
+		NewClient: func(context.Context, gpc.CredentialInput) (PackageVerifier, error) {
+			return fakeClient{}, nil
+		},
+		PromptID: func(_ io.Reader, _ io.Writer) (string, error) {
+			return "9023817352750250026", nil
+		},
+		Now: func() time.Time { return time.Date(2026, 2, 6, 1, 2, 3, 0, time.UTC) },
+	}
+
+	runAuth(t, deps, "init", "--service-account", "/tmp/sa.json")
+
+	if stored.Profiles["default"].DeveloperID != "9023817352750250026" {
+		t.Fatalf("unexpected developer id: %+v", stored.Profiles["default"])
+	}
 }
 
 func TestAuthStatusPrintsActiveProfileJSON(t *testing.T) {
@@ -68,7 +117,7 @@ func TestAuthStatusPrintsActiveProfileJSON(t *testing.T) {
 			return config.Config{
 				ActiveProfile: "default",
 				Profiles: map[string]config.Profile{
-					"default": {ServiceAccountPath: "/tmp/sa.json"},
+					"default": {ServiceAccountPath: "/tmp/sa.json", DeveloperID: "9023817352750250026"},
 				},
 			}, nil
 		},
@@ -76,6 +125,9 @@ func TestAuthStatusPrintsActiveProfileJSON(t *testing.T) {
 
 	out := runAuth(t, deps, "status")
 	if !bytes.Contains([]byte(out), []byte(`"activeProfile":"default"`)) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if !bytes.Contains([]byte(out), []byte(`"developerId":"9023817352750250026"`)) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }

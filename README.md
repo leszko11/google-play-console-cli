@@ -54,6 +54,9 @@ gpc --version
 # Initialize credentials
 gpc auth init --service-account /path/to/service-account.json
 
+# Optional: save your developer account ID once for developer-level commands
+gpc auth init --service-account /path/to/service-account.json --developer-id 9023817352750250026
+
 # Show current auth profile
 gpc auth status
 
@@ -196,15 +199,25 @@ gpc purchases subscriptions revoke --package-name com.example.app --token <subsc
 gpc purchases voided list --package-name com.example.app --max-results 100
 
 # Account users management (developer-level, not package-level)
+# --developer-id can be omitted if saved via `gpc auth init --developer-id ...`
 gpc users list --developer-id <developer-id>
 gpc users create --developer-id <developer-id> --input /path/to/user.json
 gpc users update --name developers/<developer-id>/users/<email> --input /path/to/user.json --update-mask expirationTime
 gpc users delete --name developers/<developer-id>/users/<email> --confirm
 
+# Shortcut form for update/delete (uses stored auth developer ID)
+gpc users update --user-email dev@example.com --input /path/to/user.json --update-mask expirationTime
+gpc users delete --user-email dev@example.com --confirm
+
 # Per-app grants management under a user resource
 gpc grants create --parent developers/<developer-id>/users/<email> --input /path/to/grant.json
 gpc grants update --name developers/<developer-id>/users/<email>/grants/<package-name> --input /path/to/grant.json --update-mask appLevelPermissions
 gpc grants delete --name developers/<developer-id>/users/<email>/grants/<package-name> --confirm
+
+# Shortcut form (uses stored auth developer ID)
+gpc grants create --user-email dev@example.com --input /path/to/grant.json
+gpc grants update --user-email dev@example.com --package-name com.example.app --input /path/to/grant.json --update-mask appLevelPermissions
+gpc grants delete --user-email dev@example.com --package-name com.example.app --confirm
 
 # Internal app sharing upload (no edit required)
 gpc internal-sharing upload --package-name com.example.app --apk /path/to/app.apk
@@ -254,6 +267,12 @@ When `gpc` hits a `package not found` error in an interactive terminal and detec
 - asks for `aab`/`apk`, module, and variant
 - runs the Gradle task
 - prints the built artifact path you can upload manually in Play Console for one-time bootstrap
+
+## Finding Developer ID
+
+- In Play Console, open any URL under your account and copy the number in `developers/<id>`.
+- Example: `https://play.google.com/console/u/1/developers/9023817352750250026/app-list` → developer ID is `9023817352750250026`.
+- You can store it once with `gpc auth init --developer-id <id>` so `gpc users list/create` can use it by default.
 
 ## Global Flags
 

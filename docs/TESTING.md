@@ -24,6 +24,11 @@ Required environment variables:
 - `GPC_SERVICE_ACCOUNT`: absolute path to service-account JSON file.
 - `GPC_TEST_PACKAGE`: package used for verification.
 
+Developer account ID (for `users`/`grants` commands):
+
+- Copy numeric ID from Play Console URL segment `developers/<id>`.
+- Example: `https://play.google.com/console/u/1/developers/9023817352750250026/app-list`.
+
 Optional environment variables:
 
 - `GPC_BIN`: compiled `gpc` binary path. If unset, scripts use `mise x go@1.24 -- go run .`.
@@ -67,6 +72,7 @@ Phase 3 can be enabled via workflow-dispatch input `run_phase3=true`, with `aab_
 gpc --version
 gpc --help
 gpc auth init --service-account /path/to/service-account.json
+gpc auth init --service-account /path/to/service-account.json --developer-id <developer-id>
 gpc auth status
 gpc --package-name com.example.app --service-account /path/to/service-account.json --pretty apps get
 gpc apps add-package --package-name com.example.app
@@ -165,12 +171,19 @@ gpc purchases subscriptions revoke --package-name com.example.app --token <subsc
 gpc purchases voided list --package-name com.example.app --max-results 100
 gpc --paginate purchases voided list --package-name com.example.app --max-results 100
 gpc users list --developer-id <developer-id>
+gpc users list
 gpc users create --developer-id <developer-id> --input /path/to/user.json
+gpc users create --input /path/to/user.json
 gpc users update --name developers/<developer-id>/users/<email> --input /path/to/user.json --update-mask expirationTime
+gpc users update --user-email dev@example.com --input /path/to/user.json --update-mask expirationTime
 gpc users delete --name developers/<developer-id>/users/<email> --confirm
+gpc users delete --user-email dev@example.com --confirm
 gpc grants create --parent developers/<developer-id>/users/<email> --input /path/to/grant.json
 gpc grants update --name developers/<developer-id>/users/<email>/grants/<package-name> --input /path/to/grant.json --update-mask appLevelPermissions
 gpc grants delete --name developers/<developer-id>/users/<email>/grants/<package-name> --confirm
+gpc grants create --user-email dev@example.com --input /path/to/grant.json
+gpc grants update --user-email dev@example.com --package-name com.example.app --input /path/to/grant.json --update-mask appLevelPermissions
+gpc grants delete --user-email dev@example.com --package-name com.example.app --confirm
 gpc internal-sharing upload --package-name com.example.app --apk /path/to/app.apk
 gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aab
 ```
@@ -268,7 +281,7 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc purchases subscriptions revoke ... --confirm` should return `status: revoked`.
   - `gpc purchases voided list ...` should return voided purchases and optional `nextToken`.
   - `gpc --paginate purchases voided list ...` should aggregate all pages and return empty `nextToken`.
-  - `gpc users list ...` should return account users with optional `nextPageToken`.
+  - `gpc users list ...` should return account users with optional `nextPageToken` (use `--developer-id` or a stored `auth init --developer-id` default).
   - `gpc users create ...` should return `status: created`.
   - `gpc users update ...` should return `status: updated`.
   - `gpc users delete ... --confirm` should return `status: deleted`.

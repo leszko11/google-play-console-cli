@@ -44,5 +44,8 @@ func buildStatus(cfg config.Config) map[string]any {
 	out["authenticated"] = profile.ServiceAccountPath != ""
 	out["serviceAccountPath"] = profile.ServiceAccountPath
 	out["lastValidatedAt"] = profile.LastValidatedAt
+	if profile.DeveloperID != "" {
+		out["developerId"] = profile.DeveloperID
+	}
 	return out
 }

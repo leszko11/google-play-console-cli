@@ -21,7 +21,9 @@ type Deps struct {
 	SaveConfig func(config.Config) error
 	NewClient  func(context.Context, gpc.CredentialInput) (PackageVerifier, error)
 	LookupEnv  func(string) string
+	PromptID   func(stdin io.Reader, stderr io.Writer) (string, error)
 	Now        func() time.Time
+	Stdin      io.Reader
 	Stdout     io.Writer
 	Stderr     io.Writer
 }
@@ -59,6 +61,12 @@ func withDefaults(deps Deps) Deps {
 	}
 	if deps.Now == nil {
 		deps.Now = time.Now
+	}
+	if deps.PromptID == nil {
+		deps.PromptID = promptDeveloperID
+	}
+	if deps.Stdin == nil {
+		deps.Stdin = os.Stdin
 	}
 	if deps.Stdout == nil {
 		deps.Stdout = os.Stdout
