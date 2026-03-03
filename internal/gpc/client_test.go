@@ -20,6 +20,9 @@ func TestVerifyPackageAccess_MapsForbidden(t *testing.T) {
 	if !errors.Is(err, ErrAccessDenied) {
 		t.Fatalf("expected ErrAccessDenied, got %v", err)
 	}
+	if !strings.Contains(err.Error(), "missing Play Console permissions") {
+		t.Fatalf("expected permission hint for forbidden error, got %v", err)
+	}
 }
 
 func TestVerifyPackageAccess_MapsNotFound(t *testing.T) {
@@ -39,5 +42,25 @@ func TestVerifyPackageAccess_MapsOtherNotFoundWithoutBootstrapHint(t *testing.T)
 	}
 	if strings.Contains(err.Error(), "this package is not initialized in Google Play yet") {
 		t.Fatalf("expected no bootstrap hint for non-package not found error, got %v", err)
+	}
+}
+
+func TestMapAPIError_MapsUnauthorizedWithPermissionHint(t *testing.T) {
+	err := mapAPIError(http.StatusUnauthorized, "invalid credentials")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "missing Play Console permissions") {
+		t.Fatalf("expected permission hint for unauthorized error, got %v", err)
+	}
+}
+
+func TestMapAPIError_PermissionLikeMessageAddsHint(t *testing.T) {
+	err := mapAPIError(http.StatusBadRequest, "The caller does not have permission to access this resource.")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "missing Play Console permissions") {
+		t.Fatalf("expected permission hint for permission-like message, got %v", err)
 	}
 }

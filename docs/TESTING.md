@@ -195,6 +195,8 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc apps get` should fail with a clear auth/config error.
 - Invalid credentials:
   - `gpc auth init --service-account <bad-file>` should fail with a validation/auth error.
+- Permission errors:
+  - when output contains `access denied` / `missing Play Console permissions`, grant the service account in Play Console (`Users and permissions`) and ensure `Google Play Android Developer API` is enabled in the same GCP project.
 - Valid credentials:
   - `gpc auth init --service-account <valid-file>` should succeed.
   - `gpc apps get --package-name <valid-package>` should return app JSON with `packageName`.

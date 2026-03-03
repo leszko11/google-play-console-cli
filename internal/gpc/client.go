@@ -58,18 +58,36 @@ func mapGoogleAPIError(err error) error {
 
 func mapAPIError(statusCode int, msg string) error {
 	switch statusCode {
+	case 401:
+		return fmt.Errorf("androidpublisher api error (%d): %s\n%s", statusCode, msg, permissionSetupHint())
 	case 403:
-		return fmt.Errorf("%w: %s", ErrAccessDenied, msg)
+		return fmt.Errorf("%w: %s\n%s", ErrAccessDenied, msg, permissionSetupHint())
 	case 404:
 		if isPackageBootstrapNotReady(msg) {
 			return fmt.Errorf("%w: %s\nhint: this package is not initialized in Google Play yet. Upload the first APK or AAB once in Play Console, then retry. Also verify the service account has access to this app.", ErrPackageNotFound, msg)
 		}
 		return fmt.Errorf("%w: %s", ErrPackageNotFound, msg)
 	default:
+		if isPermissionErrorMessage(msg) {
+			return fmt.Errorf("androidpublisher api error (%d): %s\n%s", statusCode, msg, permissionSetupHint())
+		}
 		return fmt.Errorf("androidpublisher api error (%d): %s", statusCode, msg)
 	}
 }
 
 func isPackageBootstrapNotReady(msg string) bool {
 	return strings.Contains(strings.ToLower(msg), "package not found")
+}
+
+func isPermissionErrorMessage(msg string) bool {
+	lower := strings.ToLower(msg)
+	return strings.Contains(lower, "permission") ||
+		strings.Contains(lower, "forbidden") ||
+		strings.Contains(lower, "access denied") ||
+		strings.Contains(lower, "insufficient") ||
+		strings.Contains(lower, "not authorized")
+}
+
+func permissionSetupHint() string {
+	return "hint: this usually means missing Play Console permissions. In Play Console -> Users and permissions, grant the service account email access to the app (or account-wide for users/grants). Also ensure the Google Play Android Developer API is enabled in the same Google Cloud project as this service account."
 }

@@ -274,6 +274,17 @@ When `gpc` hits a `package not found` error in an interactive terminal and detec
 - Example: `https://play.google.com/console/u/1/developers/9023817352750250026/app-list` → developer ID is `9023817352750250026`.
 - You can store it once with `gpc auth init --developer-id <id>` so `gpc users list/create` can use it by default.
 
+## Permission Errors
+
+When CLI output includes `access denied` or `missing Play Console permissions`:
+
+- Open Play Console -> `Users and permissions`.
+- Add or edit your service account user and grant required permissions:
+  - app-level access for package commands (`apps`, `edits`, `tracks`, `deploy`, `reviews`, monetization),
+  - account-level access for `users`/`grants` commands.
+- In Google Cloud Console, verify `Google Play Android Developer API` is enabled in the same project that owns the service account JSON key.
+- Wait a minute for propagation, then retry.
+
 ## Global Flags
 
 - `--package-name`: default package for commands that support package-level operations.
