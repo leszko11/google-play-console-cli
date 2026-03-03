@@ -21,8 +21,12 @@ type fakeClient struct {
 	listErr            error
 	get                gpc.SubscriptionInfo
 	getErr             error
+	batchGet           gpc.SubscriptionsListInfo
+	batchGetErr        error
 	create             gpc.SubscriptionInfo
 	createErr          error
+	batchUpdate        gpc.SubscriptionsListInfo
+	batchUpdateErr     error
 	update             gpc.SubscriptionInfo
 	updateErr          error
 	deleteErr          error
@@ -53,11 +57,13 @@ type fakeClient struct {
 		pageTok  string
 		paginate bool
 	}
-	productID  string
-	basePlanID string
-	offerID    string
-	offerIDs   []string
-	updateMask string
+	productID      string
+	productIDs     []string
+	basePlanID     string
+	offerID        string
+	offerIDs       []string
+	updateMask     string
+	updateRequests []*androidpublisher.UpdateSubscriptionRequest
 }
 
 func (f *fakeClient) ListSubscriptions(_ context.Context, _ string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionsListInfo, error) {
@@ -72,9 +78,19 @@ func (f *fakeClient) GetSubscription(_ context.Context, _, productID string) (gp
 	return f.get, f.getErr
 }
 
+func (f *fakeClient) BatchGetSubscriptions(_ context.Context, _ string, productIDs []string) (gpc.SubscriptionsListInfo, error) {
+	f.productIDs = append([]string(nil), productIDs...)
+	return f.batchGet, f.batchGetErr
+}
+
 func (f *fakeClient) CreateSubscription(_ context.Context, _ string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error) {
 	f.capturedInput = subscription
 	return f.create, f.createErr
+}
+
+func (f *fakeClient) BatchUpdateSubscriptions(_ context.Context, _ string, requests []*androidpublisher.UpdateSubscriptionRequest) (gpc.SubscriptionsListInfo, error) {
+	f.updateRequests = append([]*androidpublisher.UpdateSubscriptionRequest(nil), requests...)
+	return f.batchUpdate, f.batchUpdateErr
 }
 
 func (f *fakeClient) UpdateSubscription(_ context.Context, _, productID string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error) {
@@ -208,6 +224,16 @@ func writeSubscriptionPayload(t *testing.T) string {
 	return path
 }
 
+func writeSubscriptionBatchUpdatePayload(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "subscription-batch-update.json")
+	payload := `{"requests":[{"subscription":{"packageName":"com.example.app","productId":"premium_monthly","listings":[{"languageCode":"en-US","title":"Premium"}]},"regionsVersion":{"version":"2022/02"},"updateMask":"listings"}]}`
+	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	return path
+}
+
 func writeOfferPayload(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "offer.json")
@@ -313,6 +339,54 @@ func TestSubscriptionsGet_ReturnsSubscription(t *testing.T) {
 	}
 }
 
+func TestSubscriptionsBatchGet_RequiresProductIDs(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runSubscriptions(t, deps, "batch-get", "--package-name", "com.example.app")
+	if err == nil || !strings.Contains(err.Error(), "--product-ids is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSubscriptionsBatchGet_ReturnsSubscriptions(t *testing.T) {
+	fc := &fakeClient{
+		batchGet: gpc.SubscriptionsListInfo{
+			Subscriptions: []gpc.SubscriptionInfo{
+				{PackageName: "com.example.app", ProductID: "premium_monthly"},
+				{PackageName: "com.example.app", ProductID: "premium_yearly"},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(
+		t,
+		deps,
+		"batch-get",
+		"--package-name", "com.example.app",
+		"--product-ids", "premium_monthly,premium_yearly",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"productId":"premium_monthly"`) || !strings.Contains(out, `"productId":"premium_yearly"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if len(fc.productIDs) != 2 || fc.productIDs[0] != "premium_monthly" || fc.productIDs[1] != "premium_yearly" {
+		t.Fatalf("unexpected product IDs passed to client: %+v", fc.productIDs)
+	}
+}
+
 func TestSubscriptionsList_ReturnsAPIError(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
@@ -357,6 +431,43 @@ func TestSubscriptionsCreate_ReturnsStatusCreated(t *testing.T) {
 	}
 	if fc.capturedInput == nil || fc.capturedInput.ProductId != "premium_monthly" {
 		t.Fatalf("unexpected payload parsed: %+v", fc.capturedInput)
+	}
+}
+
+func TestSubscriptionsBatchUpdate_ReturnsStatusUpdated(t *testing.T) {
+	payloadPath := writeSubscriptionBatchUpdatePayload(t)
+	fc := &fakeClient{
+		batchUpdate: gpc.SubscriptionsListInfo{
+			Subscriptions: []gpc.SubscriptionInfo{
+				{PackageName: "com.example.app", ProductID: "premium_monthly"},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(
+		t,
+		deps,
+		"batch-update",
+		"--package-name", "com.example.app",
+		"--input", payloadPath,
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"updated"`) || !strings.Contains(out, `"productId":"premium_monthly"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if len(fc.updateRequests) != 1 {
+		t.Fatalf("unexpected request count passed to client: %d", len(fc.updateRequests))
+	}
+	if fc.updateRequests[0] == nil || fc.updateRequests[0].Subscription == nil || fc.updateRequests[0].Subscription.ProductId != "premium_monthly" {
+		t.Fatalf("unexpected parsed update request: %+v", fc.updateRequests[0])
 	}
 }
 

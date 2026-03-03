@@ -18,6 +18,12 @@ func TestSubscriptionMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.GetSubscription(context.Background(), "com.example.app", "premium_monthly"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from GetSubscription, got %v", err)
 	}
+	if _, err := c.BatchGetSubscriptions(context.Background(), "com.example.app", []string{"premium_monthly"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchGetSubscriptions, got %v", err)
+	}
+	if _, err := c.BatchUpdateSubscriptions(context.Background(), "com.example.app", []*androidpublisher.UpdateSubscriptionRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchUpdateSubscriptions, got %v", err)
+	}
 	if _, err := c.CreateSubscription(context.Background(), "com.example.app", &androidpublisher.Subscription{ProductId: "premium_monthly"}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from CreateSubscription, got %v", err)
 	}
@@ -76,6 +82,26 @@ func TestSubscriptionMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.GetSubscription(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "product id is required") {
 		t.Fatalf("unexpected GetSubscription product id error: %v", err)
+	}
+	if _, err := c.BatchGetSubscriptions(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "at least one product id is required") {
+		t.Fatalf("unexpected BatchGetSubscriptions empty IDs error: %v", err)
+	}
+	tooManyProductIDs := make([]string, 101)
+	for i := range tooManyProductIDs {
+		tooManyProductIDs[i] = "premium"
+	}
+	if _, err := c.BatchGetSubscriptions(context.Background(), "com.example.app", tooManyProductIDs); err == nil || !strings.Contains(err.Error(), "product id count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchGetSubscriptions count error: %v", err)
+	}
+	if _, err := c.BatchUpdateSubscriptions(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "at least one batch update request is required") {
+		t.Fatalf("unexpected BatchUpdateSubscriptions empty request error: %v", err)
+	}
+	tooManyBatchUpdateRequests := make([]*androidpublisher.UpdateSubscriptionRequest, 101)
+	for i := range tooManyBatchUpdateRequests {
+		tooManyBatchUpdateRequests[i] = &androidpublisher.UpdateSubscriptionRequest{}
+	}
+	if _, err := c.BatchUpdateSubscriptions(context.Background(), "com.example.app", tooManyBatchUpdateRequests); err == nil || !strings.Contains(err.Error(), "batch update request count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchUpdateSubscriptions count error: %v", err)
 	}
 	if _, err := c.CreateSubscription(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "subscription payload is required") {
 		t.Fatalf("unexpected CreateSubscription payload error: %v", err)

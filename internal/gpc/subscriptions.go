@@ -69,6 +69,71 @@ func (c *Client) GetSubscription(ctx context.Context, packageName, productID str
 	return subscriptionInfoFromSubscription(subscription), nil
 }
 
+func (c *Client) BatchGetSubscriptions(ctx context.Context, packageName string, productIDs []string) (SubscriptionsListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return SubscriptionsListInfo{}, fmt.Errorf("package name is required")
+	}
+	filteredProductIDs := make([]string, 0, len(productIDs))
+	for _, rawID := range productIDs {
+		productID := strings.TrimSpace(rawID)
+		if productID == "" {
+			continue
+		}
+		filteredProductIDs = append(filteredProductIDs, productID)
+	}
+	if len(filteredProductIDs) == 0 {
+		return SubscriptionsListInfo{}, fmt.Errorf("at least one product id is required")
+	}
+	if len(filteredProductIDs) > 100 {
+		return SubscriptionsListInfo{}, fmt.Errorf("product id count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionsListInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Monetization.Subscriptions.BatchGet(packageName).ProductIds(filteredProductIDs...).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionsListInfo{}, mapGoogleAPIError(err)
+	}
+	return SubscriptionsListInfo{
+		Subscriptions: subscriptionInfosFromSlice(resp.Subscriptions),
+	}, nil
+}
+
+func (c *Client) BatchUpdateSubscriptions(ctx context.Context, packageName string, requests []*androidpublisher.UpdateSubscriptionRequest) (SubscriptionsListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return SubscriptionsListInfo{}, fmt.Errorf("package name is required")
+	}
+	filteredRequests := make([]*androidpublisher.UpdateSubscriptionRequest, 0, len(requests))
+	for _, request := range requests {
+		if request == nil {
+			continue
+		}
+		filteredRequests = append(filteredRequests, request)
+	}
+	if len(filteredRequests) == 0 {
+		return SubscriptionsListInfo{}, fmt.Errorf("at least one batch update request is required")
+	}
+	if len(filteredRequests) > 100 {
+		return SubscriptionsListInfo{}, fmt.Errorf("batch update request count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionsListInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Monetization.Subscriptions.BatchUpdate(packageName, &androidpublisher.BatchUpdateSubscriptionsRequest{
+		Requests: filteredRequests,
+	}).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionsListInfo{}, mapGoogleAPIError(err)
+	}
+	return SubscriptionsListInfo{
+		Subscriptions: subscriptionInfosFromSlice(resp.Subscriptions),
+	}, nil
+}
+
 func (c *Client) CreateSubscription(ctx context.Context, packageName string, subscription *androidpublisher.Subscription) (SubscriptionInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {

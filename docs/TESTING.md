@@ -110,7 +110,9 @@ gpc reviews reply --package-name com.example.app --review-id <review-id> --reply
 gpc subscriptions list --package-name com.example.app --page-size 100
 gpc --paginate subscriptions list --package-name com.example.app --page-size 100
 gpc subscriptions get --package-name com.example.app --product-id premium_monthly
+gpc subscriptions batch-get --package-name com.example.app --product-ids premium_monthly,premium_yearly
 gpc subscriptions create --package-name com.example.app --input /path/to/subscription.json
+gpc subscriptions batch-update --package-name com.example.app --input /path/to/subscriptions-batch-update.json
 gpc subscriptions update --package-name com.example.app --product-id premium_monthly --input /path/to/subscription.json
 gpc subscriptions delete --package-name com.example.app --product-id premium_monthly --confirm
 gpc subscriptions archive --package-name com.example.app --product-id premium_monthly --confirm
@@ -205,7 +207,9 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc subscriptions list ...` should return subscription products and optional `nextPageToken`.
   - `gpc --paginate subscriptions list ...` should aggregate all pages and return empty `nextPageToken`.
   - `gpc subscriptions get ...` should return a subscription for the requested `productId`.
+  - `gpc subscriptions batch-get ...` should return the requested subscriptions in one call.
   - `gpc subscriptions create ...` should return `status: created`.
+  - `gpc subscriptions batch-update ...` should return `status: updated`.
   - `gpc subscriptions update ...` should return `status: updated`.
   - `gpc subscriptions delete ... --confirm` should return `status: deleted`.
   - `gpc subscriptions archive ... --confirm` should return `status: archived`.
