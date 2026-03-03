@@ -133,6 +133,9 @@ gpc products create --package-name com.example.app --input /path/to/one-time-pro
 gpc products update --package-name com.example.app --product-id coins_100 --input /path/to/one-time-product.json --update-mask listings,purchaseOptions
 gpc products delete --package-name com.example.app --product-id coins_100 --confirm
 gpc products offers list --package-name com.example.app --product-id coins_100 --purchase-option-id buy
+gpc products offers batch-get --package-name com.example.app --product-id coins_100 --purchase-option-id buy --offer-ids offer_intro,offer_sale
+gpc products offers batch-update --package-name com.example.app --product-id coins_100 --purchase-option-id buy --input /path/to/offers-batch-update.json
+gpc products offers batch-delete --package-name com.example.app --product-id coins_100 --purchase-option-id buy --input /path/to/offers-batch-delete.json --confirm
 gpc products offers activate --package-name com.example.app --product-id coins_100 --purchase-option-id buy --offer-id offer_intro
 gpc products offers deactivate --package-name com.example.app --product-id coins_100 --purchase-option-id buy --offer-id offer_intro --confirm
 gpc products offers cancel --package-name com.example.app --product-id coins_100 --purchase-option-id buy --offer-id offer_preorder --confirm
@@ -230,6 +233,9 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc products update ...` should return `status: updated`.
   - `gpc products delete ... --confirm` should return `status: deleted`.
   - `gpc products offers list ...` should return offers and optional `nextPageToken`.
+  - `gpc products offers batch-get ...` should return the requested offers in one call.
+  - `gpc products offers batch-update ...` should return `status: updated`.
+  - `gpc products offers batch-delete ... --confirm` should return `status: deleted`.
   - `gpc products offers activate ...` should return `status: activated`.
   - `gpc products offers deactivate ... --confirm` should return `status: deactivated`.
   - `gpc products offers cancel ... --confirm` should return `status: canceled`.

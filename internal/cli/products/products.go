@@ -23,6 +23,9 @@ type Client interface {
 	UpdateOneTimeProduct(ctx context.Context, packageName, productID string, product *androidpublisher.OneTimeProduct, updateMask string) (gpc.OneTimeProductInfo, error)
 	DeleteOneTimeProduct(ctx context.Context, packageName, productID string) error
 	ListOneTimeProductOffers(ctx context.Context, packageName, productID, purchaseOptionID string, pageSize int64, pageToken string, paginate bool) (gpc.OneTimeProductOffersListInfo, error)
+	BatchGetOneTimeProductOffers(ctx context.Context, packageName, productID, purchaseOptionID string, offerIDs []string) (gpc.OneTimeProductOffersListInfo, error)
+	BatchUpdateOneTimeProductOffers(ctx context.Context, packageName, productID, purchaseOptionID string, requests []*androidpublisher.UpdateOneTimeProductOfferRequest) (gpc.OneTimeProductOffersListInfo, error)
+	BatchDeleteOneTimeProductOffers(ctx context.Context, packageName, productID, purchaseOptionID string, requests []*androidpublisher.DeleteOneTimeProductOfferRequest) error
 	ActivateOneTimeProductOffer(ctx context.Context, packageName, productID, purchaseOptionID, offerID string) (gpc.OneTimeProductOfferInfo, error)
 	DeactivateOneTimeProductOffer(ctx context.Context, packageName, productID, purchaseOptionID, offerID string) (gpc.OneTimeProductOfferInfo, error)
 	CancelOneTimeProductOffer(ctx context.Context, packageName, productID, purchaseOptionID, offerID string) (gpc.OneTimeProductOfferInfo, error)
@@ -274,6 +277,9 @@ func newOffersCommand(deps Deps) *ffcli.Command {
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
 			newOffersListCommand(deps),
+			newOffersBatchGetCommand(deps),
+			newOffersBatchUpdateCommand(deps),
+			newOffersBatchDeleteCommand(deps),
 			newOffersActivateCommand(deps),
 			newOffersDeactivateCommand(deps),
 			newOffersCancelCommand(deps),
@@ -326,6 +332,157 @@ func newOffersListCommand(deps Deps) *ffcli.Command {
 				"purchaseOptionId": purchaseOptionID,
 				"offers":           result.Offers,
 				"nextPageToken":    result.NextPageToken,
+			})
+		},
+	}
+}
+
+func newOffersBatchGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, purchaseOptionID, offerIDsCSV string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "One-time product ID")
+	fs.StringVar(&purchaseOptionID, "purchase-option-id", "", "Purchase option ID")
+	fs.StringVar(&offerIDsCSV, "offer-ids", "", "Comma-separated offer IDs")
+
+	return &ffcli.Command{
+		Name:      "batch-get",
+		ShortHelp: "Batch-get one-time product offers",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+			if purchaseOptionID == "" {
+				return fmt.Errorf("--purchase-option-id is required")
+			}
+			offerIDsCSV = strings.TrimSpace(offerIDsCSV)
+			if offerIDsCSV == "" {
+				return fmt.Errorf("--offer-ids is required")
+			}
+			offerIDs := strings.Split(offerIDsCSV, ",")
+
+			result, err := client.BatchGetOneTimeProductOffers(requestCtx, pkg, productID, purchaseOptionID, offerIDs)
+			if err != nil {
+				return fmt.Errorf("failed to batch-get one-time product offers: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":      pkg,
+				"productId":        productID,
+				"purchaseOptionId": purchaseOptionID,
+				"offers":           result.Offers,
+			})
+		},
+	}
+}
+
+func newOffersBatchUpdateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-update", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, purchaseOptionID, inputPath string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "One-time product ID")
+	fs.StringVar(&purchaseOptionID, "purchase-option-id", "", "Purchase option ID")
+	fs.StringVar(&inputPath, "input", "", "Path to one-time product offers batch update JSON payload (use - for stdin)")
+
+	return &ffcli.Command{
+		Name:      "batch-update",
+		ShortHelp: "Batch create or update one-time product offers",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+			if purchaseOptionID == "" {
+				return fmt.Errorf("--purchase-option-id is required")
+			}
+			payload, err := readOneTimeProductOffersBatchUpdatePayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+
+			result, err := client.BatchUpdateOneTimeProductOffers(requestCtx, pkg, productID, purchaseOptionID, payload.Requests)
+			if err != nil {
+				return fmt.Errorf("failed to batch-update one-time product offers: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":      pkg,
+				"productId":        productID,
+				"purchaseOptionId": purchaseOptionID,
+				"offers":           result.Offers,
+				"status":           "updated",
+			})
+		},
+	}
+}
+
+func newOffersBatchDeleteCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-delete", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, purchaseOptionID, inputPath string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "One-time product ID")
+	fs.StringVar(&purchaseOptionID, "purchase-option-id", "", "Purchase option ID")
+	fs.StringVar(&inputPath, "input", "", "Path to one-time product offers batch delete JSON payload (use - for stdin)")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deleting the offers (required)")
+
+	return &ffcli.Command{
+		Name:      "batch-delete",
+		ShortHelp: "Batch delete one-time product offers",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+			if purchaseOptionID == "" {
+				return fmt.Errorf("--purchase-option-id is required")
+			}
+			payload, err := readOneTimeProductOffersBatchDeletePayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to batch-delete offers for purchase option %q", purchaseOptionID)
+			}
+
+			if err := client.BatchDeleteOneTimeProductOffers(requestCtx, pkg, productID, purchaseOptionID, payload.Requests); err != nil {
+				return fmt.Errorf("failed to batch-delete one-time product offers: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":      pkg,
+				"productId":        productID,
+				"purchaseOptionId": purchaseOptionID,
+				"deletedCount":     len(payload.Requests),
+				"status":           "deleted",
 			})
 		},
 	}
@@ -688,4 +845,64 @@ func readOneTimeProductPayload(inputPath string, stdin io.Reader) (*androidpubli
 		return nil, fmt.Errorf("invalid one-time product JSON payload: %w", err)
 	}
 	return &product, nil
+}
+
+func readOneTimeProductOffersBatchUpdatePayload(inputPath string, stdin io.Reader) (*androidpublisher.BatchUpdateOneTimeProductOffersRequest, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var raw []byte
+	var err error
+	if inputPath == "-" {
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		raw, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input: %w", err)
+		}
+	}
+
+	var payload androidpublisher.BatchUpdateOneTimeProductOffersRequest
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("invalid one-time product offers batch update JSON payload: %w", err)
+	}
+	return &payload, nil
+}
+
+func readOneTimeProductOffersBatchDeletePayload(inputPath string, stdin io.Reader) (*androidpublisher.BatchDeleteOneTimeProductOffersRequest, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var raw []byte
+	var err error
+	if inputPath == "-" {
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		raw, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input: %w", err)
+		}
+	}
+
+	var payload androidpublisher.BatchDeleteOneTimeProductOffersRequest
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("invalid one-time product offers batch delete JSON payload: %w", err)
+	}
+	return &payload, nil
 }

@@ -30,12 +30,17 @@ type fakeClient struct {
 	createFn func(packageName string, product *androidpublisher.OneTimeProduct) (gpc.OneTimeProductInfo, error)
 	updateFn func(packageName, productID string, product *androidpublisher.OneTimeProduct, updateMask string) (gpc.OneTimeProductInfo, error)
 
-	offers           gpc.OneTimeProductOffersListInfo
-	offer            gpc.OneTimeProductOfferInfo
-	offersErr        error
-	activateOfferErr error
-	deactivateErr    error
-	cancelErr        error
+	offers               gpc.OneTimeProductOffersListInfo
+	offer                gpc.OneTimeProductOfferInfo
+	offersErr            error
+	offersBatchGet       gpc.OneTimeProductOffersListInfo
+	offersBatchGetErr    error
+	offersBatchUpdate    gpc.OneTimeProductOffersListInfo
+	offersBatchUpdateErr error
+	offersBatchDeleteErr error
+	activateOfferErr     error
+	deactivateErr        error
+	cancelErr            error
 
 	purchaseOptions          []gpc.OneTimeProductInfo
 	activatePurchaseOptErr   error
@@ -45,6 +50,9 @@ type fakeClient struct {
 	activatePurchaseOptFn   func(packageName, productID, purchaseOptionID string) ([]gpc.OneTimeProductInfo, error)
 	deactivatePurchaseOptFn func(packageName, productID, purchaseOptionID string) ([]gpc.OneTimeProductInfo, error)
 	deletePurchaseOptFn     func(packageName, productID, purchaseOptionID string, force bool) error
+	batchGetOffersFn        func(packageName, productID, purchaseOptionID string, offerIDs []string) (gpc.OneTimeProductOffersListInfo, error)
+	batchUpdateOffersFn     func(packageName, productID, purchaseOptionID string, requests []*androidpublisher.UpdateOneTimeProductOfferRequest) (gpc.OneTimeProductOffersListInfo, error)
+	batchDeleteOffersFn     func(packageName, productID, purchaseOptionID string, requests []*androidpublisher.DeleteOneTimeProductOfferRequest) error
 
 	capture *paginateCapture
 }
@@ -84,6 +92,24 @@ func (f fakeClient) ListOneTimeProductOffers(_ context.Context, _, _, _ string, 
 		f.capture.offersPaginate = paginate
 	}
 	return f.offers, f.offersErr
+}
+func (f fakeClient) BatchGetOneTimeProductOffers(_ context.Context, packageName, productID, purchaseOptionID string, offerIDs []string) (gpc.OneTimeProductOffersListInfo, error) {
+	if f.batchGetOffersFn != nil {
+		return f.batchGetOffersFn(packageName, productID, purchaseOptionID, offerIDs)
+	}
+	return f.offersBatchGet, f.offersBatchGetErr
+}
+func (f fakeClient) BatchUpdateOneTimeProductOffers(_ context.Context, packageName, productID, purchaseOptionID string, requests []*androidpublisher.UpdateOneTimeProductOfferRequest) (gpc.OneTimeProductOffersListInfo, error) {
+	if f.batchUpdateOffersFn != nil {
+		return f.batchUpdateOffersFn(packageName, productID, purchaseOptionID, requests)
+	}
+	return f.offersBatchUpdate, f.offersBatchUpdateErr
+}
+func (f fakeClient) BatchDeleteOneTimeProductOffers(_ context.Context, packageName, productID, purchaseOptionID string, requests []*androidpublisher.DeleteOneTimeProductOfferRequest) error {
+	if f.batchDeleteOffersFn != nil {
+		return f.batchDeleteOffersFn(packageName, productID, purchaseOptionID, requests)
+	}
+	return f.offersBatchDeleteErr
 }
 func (f fakeClient) ActivateOneTimeProductOffer(_ context.Context, _, _, _, _ string) (gpc.OneTimeProductOfferInfo, error) {
 	return f.offer, f.activateOfferErr
@@ -320,6 +346,162 @@ func TestProductsDelete_ReturnsAPIError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "failed to delete one-time product") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestProductsOffersBatchGet_RequiresOfferIDs(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runProducts(
+		t,
+		deps,
+		"offers", "batch-get",
+		"--package-name", "com.example.app",
+		"--product-id", "coins_100",
+		"--purchase-option-id", "buy",
+	)
+	if err == nil || !strings.Contains(err.Error(), "--offer-ids is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestProductsOffersBatchGet_ReturnsOffers(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				batchGetOffersFn: func(packageName, productID, purchaseOptionID string, offerIDs []string) (gpc.OneTimeProductOffersListInfo, error) {
+					if packageName != "com.example.app" || productID != "coins_100" || purchaseOptionID != "buy" {
+						t.Fatalf("unexpected args: package=%q product=%q purchaseOption=%q", packageName, productID, purchaseOptionID)
+					}
+					if len(offerIDs) != 2 || offerIDs[0] != "offer_intro" || offerIDs[1] != "offer_sale" {
+						t.Fatalf("unexpected offer IDs: %+v", offerIDs)
+					}
+					return gpc.OneTimeProductOffersListInfo{
+						Offers: []gpc.OneTimeProductOfferInfo{{OfferID: "offer_intro"}, {OfferID: "offer_sale"}},
+					}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runProducts(
+		t,
+		deps,
+		"offers", "batch-get",
+		"--package-name", "com.example.app",
+		"--product-id", "coins_100",
+		"--purchase-option-id", "buy",
+		"--offer-ids", "offer_intro,offer_sale",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"offerId":"offer_intro"`) || !strings.Contains(out, `"offerId":"offer_sale"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestProductsOffersBatchUpdate_ReturnsUpdated(t *testing.T) {
+	inputPath := writeJSON(t, `{"requests":[{"allowMissing":true,"updateMask":"offerTags","regionsVersion":{"version":"2022/02"},"oneTimeProductOffer":{"packageName":"com.example.app","productId":"coins_100","purchaseOptionId":"buy","offerId":"offer_intro"}}]}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				batchUpdateOffersFn: func(packageName, productID, purchaseOptionID string, requests []*androidpublisher.UpdateOneTimeProductOfferRequest) (gpc.OneTimeProductOffersListInfo, error) {
+					if packageName != "com.example.app" || productID != "coins_100" || purchaseOptionID != "buy" {
+						t.Fatalf("unexpected args: package=%q product=%q purchaseOption=%q", packageName, productID, purchaseOptionID)
+					}
+					if len(requests) != 1 || requests[0].OneTimeProductOffer == nil || requests[0].OneTimeProductOffer.OfferId != "offer_intro" {
+						t.Fatalf("unexpected requests: %+v", requests)
+					}
+					return gpc.OneTimeProductOffersListInfo{
+						Offers: []gpc.OneTimeProductOfferInfo{{OfferID: "offer_intro"}},
+					}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runProducts(
+		t,
+		deps,
+		"offers", "batch-update",
+		"--package-name", "com.example.app",
+		"--product-id", "coins_100",
+		"--purchase-option-id", "buy",
+		"--input", inputPath,
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"updated"`) || !strings.Contains(out, `"offerId":"offer_intro"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestProductsOffersBatchDelete_RequiresConfirm(t *testing.T) {
+	inputPath := writeJSON(t, `{"requests":[{"packageName":"com.example.app","productId":"coins_100","purchaseOptionId":"buy","offerId":"offer_intro"}]}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runProducts(
+		t,
+		deps,
+		"offers", "batch-delete",
+		"--package-name", "com.example.app",
+		"--product-id", "coins_100",
+		"--purchase-option-id", "buy",
+		"--input", inputPath,
+	)
+	if err == nil || !strings.Contains(err.Error(), "--confirm is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestProductsOffersBatchDelete_ReturnsDeleted(t *testing.T) {
+	inputPath := writeJSON(t, `{"requests":[{"packageName":"com.example.app","productId":"coins_100","purchaseOptionId":"buy","offerId":"offer_intro"},{"packageName":"com.example.app","productId":"coins_100","purchaseOptionId":"buy","offerId":"offer_sale"}]}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				batchDeleteOffersFn: func(packageName, productID, purchaseOptionID string, requests []*androidpublisher.DeleteOneTimeProductOfferRequest) error {
+					if packageName != "com.example.app" || productID != "coins_100" || purchaseOptionID != "buy" {
+						t.Fatalf("unexpected args: package=%q product=%q purchaseOption=%q", packageName, productID, purchaseOptionID)
+					}
+					if len(requests) != 2 || requests[0].OfferId != "offer_intro" || requests[1].OfferId != "offer_sale" {
+						t.Fatalf("unexpected requests: %+v", requests)
+					}
+					return nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runProducts(
+		t,
+		deps,
+		"offers", "batch-delete",
+		"--package-name", "com.example.app",
+		"--product-id", "coins_100",
+		"--purchase-option-id", "buy",
+		"--input", inputPath,
+		"--confirm",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"deleted"`) || !strings.Contains(out, `"deletedCount":2`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
 
