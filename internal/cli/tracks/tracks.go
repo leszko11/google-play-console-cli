@@ -136,7 +136,7 @@ func newGetCommand(deps Deps) *ffcli.Command {
 func newUpdateCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var packageName, editID, trackName, status, releaseName, versionCodesCSV string
+	var packageName, editID, trackName, status, releaseName, versionCodesCSV, releaseNotesFile string
 	var userFraction float64
 	var updatePriority int64
 	fs.StringVar(&packageName, "package-name", "", "Package name")
@@ -145,6 +145,7 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&status, "status", "", "Release status (draft, inProgress, halted, completed)")
 	fs.StringVar(&releaseName, "release-name", "", "Release name")
 	fs.StringVar(&versionCodesCSV, "version-codes", "", "Comma-separated version codes")
+	fs.StringVar(&releaseNotesFile, "release-notes-file", "", "Path to release notes JSON payload (object or array)")
 	fs.Float64Var(&userFraction, "user-fraction", -1, "Rollout user fraction (0-1)")
 	fs.Int64Var(&updatePriority, "update-priority", 0, "In-app update priority (0-5)")
 
@@ -179,6 +180,10 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 			if updatePriority < 0 || updatePriority > 5 {
 				return fmt.Errorf("--update-priority must be between 0 and 5")
 			}
+			releaseNotes, err := shared.ParseReleaseNotesFile(releaseNotesFile)
+			if err != nil {
+				return err
+			}
 
 			track, err := client.UpdateTrack(requestCtx, pkg, eid, trackName, gpc.TrackUpdate{
 				Status:         status,
@@ -186,6 +191,7 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 				UserFraction:   userFraction,
 				VersionCodes:   versionCodes,
 				UpdatePriority: updatePriority,
+				ReleaseNotes:   releaseNotes,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to update track: %w", err)
@@ -263,6 +269,7 @@ func newPromoteCommand(deps Deps) *ffcli.Command {
 				UserFraction:   sourceRelease.UserFraction,
 				VersionCodes:   sourceRelease.VersionCodes,
 				UpdatePriority: sourceRelease.UpdatePriority,
+				ReleaseNotes:   sourceRelease.ReleaseNotes,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to promote track: %w", err)

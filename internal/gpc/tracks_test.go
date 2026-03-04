@@ -44,6 +44,13 @@ func TestTrackMethods_ValidateArgs(t *testing.T) {
 	if _, err := c.UpdateTrack(context.Background(), "com.example.app", "edit-1", "production", TrackUpdate{Status: "completed"}); err == nil || !strings.Contains(err.Error(), "at least one version code is required") {
 		t.Fatalf("unexpected UpdateTrack error: %v", err)
 	}
+	if _, err := c.UpdateTrack(context.Background(), "com.example.app", "edit-1", "production", TrackUpdate{
+		Status:       "completed",
+		VersionCodes: []int64{1},
+		ReleaseNotes: []LocalizedText{{Language: "en-US", Text: "   "}},
+	}); err == nil || !strings.Contains(err.Error(), "release note text is required") {
+		t.Fatalf("unexpected UpdateTrack error: %v", err)
+	}
 }
 
 func TestTrackInfoFromTrack(t *testing.T) {
@@ -56,6 +63,10 @@ func TestTrackInfoFromTrack(t *testing.T) {
 				UserFraction:        0.5,
 				VersionCodes:        []int64{123, 456},
 				InAppUpdatePriority: 3,
+				ReleaseNotes: []*androidpublisher.LocalizedText{
+					{Language: "en-US", Text: "Release note"},
+					{Language: "pl-PL", Text: "Notatki wydania"},
+				},
 			},
 		},
 	})
@@ -71,5 +82,8 @@ func TestTrackInfoFromTrack(t *testing.T) {
 	}
 	if len(got.Releases[0].VersionCodes) != 2 || got.Releases[0].VersionCodes[0] != 123 {
 		t.Fatalf("unexpected version codes map: %+v", got.Releases[0])
+	}
+	if len(got.Releases[0].ReleaseNotes) != 2 || got.Releases[0].ReleaseNotes[0].Language != "en-US" {
+		t.Fatalf("unexpected release notes map: %+v", got.Releases[0])
 	}
 }
