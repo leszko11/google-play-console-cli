@@ -8,6 +8,11 @@ on:
         required: false
         default: false
         type: boolean
+      run_phase5:
+        description: "Run phase 5 monetization/purchases smoke"
+        required: false
+        default: false
+        type: boolean
       aab_path:
         description: "Path to test .aab artifact (required when run_phase3=true and apk_path is empty)"
         required: false
@@ -39,6 +44,10 @@ on:
         required: false
         default: false
         type: boolean
+      run_phase5:
+        required: false
+        default: false
+        type: boolean
       aab_path:
         required: false
         default: ""
@@ -62,6 +71,12 @@ on:
     secrets:
       GPC_SERVICE_ACCOUNT_JSON:
         required: true
+      GPC_TEST_SUBSCRIPTION_TOKEN:
+        required: false
+      GPC_TEST_SUBSCRIPTION_ETAG:
+        required: false
+      GPC_TEST_PRODUCT_TOKEN:
+        required: false
 
 jobs:
   smoke:
@@ -71,11 +86,19 @@ jobs:
       GPC_TEST_TRACK: internal
       GPC_RELEASE_STATUS: completed
       GPC_ENABLE_PHASE3: ${{ inputs.run_phase3 && '1' || '0' }}
+      GPC_ENABLE_PHASE5: ${{ inputs.run_phase5 && '1' || '0' }}
       GPC_TEST_AAB: ${{ inputs.aab_path }}
       GPC_TEST_APK: ${{ inputs.apk_path }}
       GPC_EXPECT_VERSION_CODE: ${{ inputs.expected_version_code }}
       GPC_MAPPING_FILE: ${{ inputs.mapping_file }}
       GPC_MAPPING_TYPE: ${{ inputs.mapping_type }}
+      GPC_PHASE5_PAGE_SIZE: ${{ vars.GPC_PHASE5_PAGE_SIZE }}
+      GPC_STRICT_PHASE5_PURCHASES: ${{ vars.GPC_STRICT_PHASE5_PURCHASES }}
+      GPC_TEST_SUBSCRIPTION_PRODUCT_ID: ${{ vars.GPC_TEST_SUBSCRIPTION_PRODUCT_ID }}
+      GPC_TEST_PRODUCT_ID: ${{ vars.GPC_TEST_PRODUCT_ID }}
+      GPC_TEST_SUBSCRIPTION_TOKEN: ${{ secrets.GPC_TEST_SUBSCRIPTION_TOKEN }}
+      GPC_TEST_SUBSCRIPTION_ETAG: ${{ secrets.GPC_TEST_SUBSCRIPTION_ETAG }}
+      GPC_TEST_PRODUCT_TOKEN: ${{ secrets.GPC_TEST_PRODUCT_TOKEN }}
 
     steps:
       - name: Checkout

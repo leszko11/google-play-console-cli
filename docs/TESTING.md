@@ -63,6 +63,13 @@ CI secret and variable contract:
 
 - Secret `GPC_SERVICE_ACCOUNT_JSON`: full JSON content (not path).
 - Variable `GPC_TEST_PACKAGE`: dedicated test package name.
+- Optional variable `GPC_PHASE5_PAGE_SIZE`: page size for Phase 5 list checks.
+- Optional variable `GPC_STRICT_PHASE5_PURCHASES`: set `1` to fail instead of skip on package/permission purchase errors.
+- Optional variable `GPC_TEST_SUBSCRIPTION_PRODUCT_ID`: enables `subscriptions get` assertion.
+- Optional variable `GPC_TEST_PRODUCT_ID`: enables `products get` and `purchases products get` assertions (with token).
+- Optional secret `GPC_TEST_SUBSCRIPTION_TOKEN`: enables `purchases subscriptions get`.
+- Optional secret `GPC_TEST_SUBSCRIPTION_ETAG`: enables `purchases subscriptions defer --validate-only`.
+- Optional secret `GPC_TEST_PRODUCT_TOKEN`: enables `purchases products get`.
 
 The workflow writes credentials to a temp file and exports:
 
@@ -73,6 +80,8 @@ export GPC_SERVICE_ACCOUNT="$RUNNER_TEMP/gpc-sa.json"
 ```
 
 Phase 3 can be enabled via workflow-dispatch input `run_phase3=true`, with `aab_path` or `apk_path`. Use `expected_version_code` when your test artifact is built with CI-derived monotonic version code.
+
+Phase 5 can be enabled via workflow-dispatch input `run_phase5=true`. If purchase token secrets are missing, token-based checks are skipped.
 
 ## CLI Smoke Commands
 
