@@ -110,6 +110,6 @@ func writeListOutput(deps Deps, output string, items []listItem) error {
 		}
 		return nil
 	default:
-		return fmt.Errorf("unsupported output format %q", output)
+		return shared.UsageErrorf("unsupported output format %q", output)
 	}
 }

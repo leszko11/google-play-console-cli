@@ -1,0 +1,2274 @@
+# Command Reference Guide
+
+This file is generated from live CLI help output.
+For authoritative command behavior, use:
+
+```bash
+gpc --help
+gpc <command> --help
+gpc <command> <subcommand> --help
+```
+
+To regenerate:
+
+```bash
+make generate-command-docs
+```
+
+## Command Paths
+
+- `gpc auth`
+- `gpc auth init`
+- `gpc auth status`
+- `gpc auth switch`
+- `gpc auth logout`
+- `gpc apps`
+- `gpc apps list`
+- `gpc apps get`
+- `gpc apps add-package`
+- `gpc apps remove-package`
+- `gpc edits`
+- `gpc edits create`
+- `gpc edits get`
+- `gpc edits validate`
+- `gpc edits commit`
+- `gpc edits delete`
+- `gpc edits details`
+- `gpc edits details get`
+- `gpc edits details update`
+- `gpc edits testers`
+- `gpc edits testers get`
+- `gpc edits testers update`
+- `gpc edits country-availability`
+- `gpc edits country-availability get`
+- `gpc edits listings`
+- `gpc edits listings list`
+- `gpc edits listings get`
+- `gpc edits listings update`
+- `gpc edits listings batch-update`
+- `gpc edits listings delete`
+- `gpc edits listings delete-all`
+- `gpc edits images`
+- `gpc edits images list`
+- `gpc edits images upload`
+- `gpc edits images delete`
+- `gpc edits images delete-all`
+- `gpc tracks`
+- `gpc tracks list`
+- `gpc tracks get`
+- `gpc tracks update`
+- `gpc tracks promote`
+- `gpc apks`
+- `gpc apks list`
+- `gpc apks upload`
+- `gpc bundles`
+- `gpc bundles list`
+- `gpc bundles upload`
+- `gpc deobfuscation`
+- `gpc deobfuscation upload`
+- `gpc deploy`
+- `gpc reviews`
+- `gpc reviews list`
+- `gpc reviews get`
+- `gpc reviews reply`
+- `gpc subscriptions`
+- `gpc subscriptions list`
+- `gpc subscriptions get`
+- `gpc subscriptions batch-get`
+- `gpc subscriptions create`
+- `gpc subscriptions batch-update`
+- `gpc subscriptions update`
+- `gpc subscriptions delete`
+- `gpc subscriptions archive`
+- `gpc subscriptions base-plans`
+- `gpc subscriptions base-plans activate`
+- `gpc subscriptions base-plans deactivate`
+- `gpc subscriptions base-plans delete`
+- `gpc subscriptions offers`
+- `gpc subscriptions offers list`
+- `gpc subscriptions offers get`
+- `gpc subscriptions offers batch-get`
+- `gpc subscriptions offers batch-update`
+- `gpc subscriptions offers activate`
+- `gpc subscriptions offers deactivate`
+- `gpc subscriptions offers create`
+- `gpc subscriptions offers update`
+- `gpc subscriptions offers delete`
+- `gpc products`
+- `gpc products list`
+- `gpc products get`
+- `gpc products batch-get`
+- `gpc products batch-update`
+- `gpc products batch-delete`
+- `gpc products create`
+- `gpc products update`
+- `gpc products delete`
+- `gpc products offers`
+- `gpc products offers list`
+- `gpc products offers batch-get`
+- `gpc products offers batch-update`
+- `gpc products offers batch-delete`
+- `gpc products offers activate`
+- `gpc products offers deactivate`
+- `gpc products offers cancel`
+- `gpc products purchase-options`
+- `gpc products purchase-options activate`
+- `gpc products purchase-options deactivate`
+- `gpc products purchase-options delete`
+- `gpc iap`
+- `gpc iap list`
+- `gpc iap get`
+- `gpc iap batch-get`
+- `gpc iap create`
+- `gpc iap update`
+- `gpc iap batch-update`
+- `gpc iap batch-delete`
+- `gpc iap delete`
+- `gpc purchases`
+- `gpc purchases products`
+- `gpc purchases products get`
+- `gpc purchases products acknowledge`
+- `gpc purchases products consume`
+- `gpc purchases subscriptions`
+- `gpc purchases subscriptions get`
+- `gpc purchases subscriptions cancel`
+- `gpc purchases subscriptions defer`
+- `gpc purchases subscriptions revoke`
+- `gpc purchases voided`
+- `gpc purchases voided list`
+- `gpc users`
+- `gpc users list`
+- `gpc users create`
+- `gpc users update`
+- `gpc users delete`
+- `gpc grants`
+- `gpc grants create`
+- `gpc grants update`
+- `gpc grants delete`
+- `gpc internal-sharing`
+- `gpc internal-sharing upload`
+- `gpc completion`
+- `gpc completion bash`
+- `gpc completion zsh`
+- `gpc completion fish`
+
+## `gpc --help`
+
+```text
+DESCRIPTION
+  Google Play Console CLI
+
+USAGE
+  gpc [flags] <command>
+
+SUBCOMMANDS
+  auth              Manage authentication profiles
+  apps              App visibility and metadata commands
+  edits             Manage Google Play edit transactions
+  tracks            Manage release tracks inside an edit
+  apks              Manage APK uploads in an edit
+  bundles           Manage Android App Bundles in an edit
+  deobfuscation     Manage deobfuscation files in an edit
+  deploy            Upload artifact and publish to a track in one flow
+  reviews           Read and reply to Play Store reviews
+  subscriptions     Manage monetization subscriptions
+  products          Manage monetization one-time products
+  iap               Manage legacy in-app products
+  purchases         Manage one-time and subscription purchases
+  users             Manage Play Console account users
+  grants            Manage per-app user grants
+  internal-sharing  Upload artifacts for internal app sharing
+  completion        Generate shell completion script
+
+FLAGS
+  -bootstrap-assist=false  Enable interactive bootstrap build assistance
+  -debug string            Enable debug logging
+  -output string           Output format override: json, table, markdown
+  -package-name string     App package name
+  -paginate=false          Fetch all paginated API responses
+  -pretty=false            Pretty print JSON output
+  -service-account string  Path to service account JSON
+  -timeout 0s              Request timeout
+  -upload-timeout 0s       Upload request timeout
+  -version=false           Show build version information
+```
+
+## `gpc auth --help`
+
+```text
+DESCRIPTION
+  Manage authentication profiles
+
+USAGE
+  auth
+
+SUBCOMMANDS
+  init    Initialize authentication profile
+  status  Show authentication status
+  switch  Switch active authentication profile
+  logout  Log out current profile
+```
+
+## `gpc auth init --help`
+
+```text
+DESCRIPTION
+  Initialize authentication profile
+
+USAGE
+  init
+
+FLAGS
+  -developer-id string        Optional developer account ID (numeric or developers/<id>)
+  -package-name string        Verify package access for this package
+  -profile default            Auth profile name
+  -prompt-developer-id=false  Prompt for developer ID when missing (interactive terminals only)
+  -service-account string     Path to service account JSON
+```
+
+## `gpc auth status --help`
+
+```text
+DESCRIPTION
+  Show authentication status
+
+USAGE
+  status
+
+FLAGS
+  -output string  Output format: json, table
+```
+
+## `gpc auth switch --help`
+
+```text
+DESCRIPTION
+  Switch active authentication profile
+
+USAGE
+  switch
+
+FLAGS
+  -profile string  Profile name to activate
+```
+
+## `gpc auth logout --help`
+
+```text
+DESCRIPTION
+  Log out current profile
+
+USAGE
+  logout
+```
+
+## `gpc apps --help`
+
+```text
+DESCRIPTION
+  App visibility and metadata commands
+
+USAGE
+  apps
+
+SUBCOMMANDS
+  list            List configured packages
+  get             Get app details for a package
+  add-package     Add package to local app list
+  remove-package  Remove package from local app list
+```
+
+## `gpc apps list --help`
+
+```text
+DESCRIPTION
+  List configured packages
+
+USAGE
+  list
+
+FLAGS
+  -output string  Output format: json, table, markdown
+  -verify=false   Verify API access for each configured package
+```
+
+## `gpc apps get --help`
+
+```text
+DESCRIPTION
+  Get app details for a package
+
+USAGE
+  get
+
+FLAGS
+  -output string        Output format: json, table, markdown
+  -package-name string  Package name
+```
+
+## `gpc apps add-package --help`
+
+```text
+DESCRIPTION
+  Add package to local app list
+
+USAGE
+  add-package
+
+FLAGS
+  -package-name string  Package name to store for list/verify flows
+```
+
+## `gpc apps remove-package --help`
+
+```text
+DESCRIPTION
+  Remove package from local app list
+
+USAGE
+  remove-package
+
+FLAGS
+  -package-name string  Package name to remove from local app list
+```
+
+## `gpc edits --help`
+
+```text
+DESCRIPTION
+  Manage Google Play edit transactions
+
+USAGE
+  edits
+
+SUBCOMMANDS
+  create                Create a new edit
+  get                   Get edit details
+  validate              Validate an edit
+  commit                Commit an edit
+  delete                Delete an edit
+  details               Manage app details inside an edit
+  testers               Manage testers for a track inside an edit
+  country-availability  Inspect track country availability inside an edit
+  listings              Manage listing changes inside an edit
+  images                Manage store listing images inside an edit
+```
+
+## `gpc edits create --help`
+
+```text
+DESCRIPTION
+  Create a new edit
+
+USAGE
+  create
+
+FLAGS
+  -package-name string  Package name
+```
+
+## `gpc edits get --help`
+
+```text
+DESCRIPTION
+  Get edit details
+
+USAGE
+  get
+
+FLAGS
+  -edit-id string       Edit ID
+  -package-name string  Package name
+```
+
+## `gpc edits validate --help`
+
+```text
+DESCRIPTION
+  Validate an edit
+
+USAGE
+  validate
+
+FLAGS
+  -edit-id string       Edit ID
+  -package-name string  Package name
+```
+
+## `gpc edits commit --help`
+
+```text
+DESCRIPTION
+  Commit an edit
+
+USAGE
+  commit
+
+FLAGS
+  -confirm=false        Confirm committing the edit (required)
+  -edit-id string       Edit ID
+  -package-name string  Package name
+```
+
+## `gpc edits delete --help`
+
+```text
+DESCRIPTION
+  Delete an edit
+
+USAGE
+  delete
+
+FLAGS
+  -confirm=false        Confirm deleting the edit (required)
+  -edit-id string       Edit ID
+  -package-name string  Package name
+```
+
+## `gpc edits details --help`
+
+```text
+DESCRIPTION
+  Manage app details inside an edit
+
+USAGE
+  details
+
+SUBCOMMANDS
+  get     Get app details in an edit
+  update  Update app details in an edit
+```
+
+## `gpc edits details get --help`
+
+```text
+DESCRIPTION
+  Get app details in an edit
+
+USAGE
+  get
+
+FLAGS
+  -edit-id string       Edit ID
+  -package-name string  Package name
+```
+
+## `gpc edits details update --help`
+
+```text
+DESCRIPTION
+  Update app details in an edit
+
+USAGE
+  update
+
+FLAGS
+  -contact-email string     Contact email address
+  -contact-phone string     Contact phone number
+  -contact-website string   Contact website URL
+  -default-language string  Default listing language (BCP-47, e.g. en-US)
+  -edit-id string           Edit ID
+  -package-name string      Package name
+```
+
+## `gpc edits testers --help`
+
+```text
+DESCRIPTION
+  Manage testers for a track inside an edit
+
+USAGE
+  testers
+
+SUBCOMMANDS
+  get     Get tester Google Groups for a track in an edit
+  update  Update tester Google Groups for a track in an edit
+```
+
+## `gpc edits testers get --help`
+
+```text
+DESCRIPTION
+  Get tester Google Groups for a track in an edit
+
+USAGE
+  get
+
+FLAGS
+  -edit-id string       Edit ID
+  -package-name string  Package name
+  -track string         Track name (e.g. internal, closed)
+```
+
+## `gpc edits testers update --help`
+
+```text
+DESCRIPTION
+  Update tester Google Groups for a track in an edit
+
+USAGE
+  update
+
+FLAGS
+  -edit-id string        Edit ID
+  -google-groups string  Comma-separated Google Group email addresses
+  -package-name string   Package name
+  -track string          Track name (e.g. internal, closed)
+```
+
+## `gpc edits country-availability --help`
+
+```text
+DESCRIPTION
+  Inspect track country availability inside an edit
+
+USAGE
+  country-availability
+
+SUBCOMMANDS
+  get  Get country availability for a track in an edit
+```
+
+## `gpc edits country-availability get --help`
+
+```text
+DESCRIPTION
+  Get country availability for a track in an edit
+
+USAGE
+  get
+
+FLAGS
+  -edit-id string       Edit ID
+  -package-name string  Package name
+  -track string         Track name (e.g. production)
+```
+
+## `gpc edits listings --help`
+
+```text
+DESCRIPTION
+  Manage listing changes inside an edit
+
+USAGE
+  listings
+
+SUBCOMMANDS
+  list          List localized listings in an edit
+  get           Get listing in an edit
+  update        Update listing fields in an edit
+  batch-update  Batch update listing fields from per-locale JSON files
+  delete        Delete one localized listing in an edit
+  delete-all    Delete all localized listings in an edit
+```
+
+## `gpc edits listings list --help`
+
+```text
+DESCRIPTION
+  List localized listings in an edit
+
+USAGE
+  list
+
+FLAGS
+  -edit-id string       Edit ID
+  -package-name string  Package name
+```
+
+## `gpc edits listings get --help`
+
+```text
+DESCRIPTION
+  Get listing in an edit
+
+USAGE
+  get
+
+FLAGS
+  -edit-id string       Edit ID
+  -locale string        Listing locale (BCP-47, e.g. en-US)
+  -package-name string  Package name
+```
+
+## `gpc edits listings update --help`
+
+```text
+DESCRIPTION
+  Update listing fields in an edit
+
+USAGE
+  update
+
+FLAGS
+  -edit-id string            Edit ID
+  -full-description string   Localized full description
+  -locale string             Listing locale (BCP-47, e.g. en-US)
+  -package-name string       Package name
+  -short-description string  Localized short description
+  -title string              Localized app title
+```
+
+## `gpc edits listings batch-update --help`
+
+```text
+DESCRIPTION
+  Batch update listing fields from per-locale JSON files
+
+USAGE
+  batch-update
+
+FLAGS
+  -continue-on-error=true  Continue processing locales after errors
+  -dry-run=false           Preview updates without calling the API
+  -edit-id string          Edit ID
+  -from-dir string         Directory containing per-locale JSON files (<locale>.json)
+  -locales string          Optional comma-separated locale filter
+  -package-name string     Package name
+```
+
+## `gpc edits listings delete --help`
+
+```text
+DESCRIPTION
+  Delete one localized listing in an edit
+
+USAGE
+  delete
+
+FLAGS
+  -edit-id string       Edit ID
+  -locale string        Listing locale (BCP-47, e.g. en-US)
+  -package-name string  Package name
+```
+
+## `gpc edits listings delete-all --help`
+
+```text
+DESCRIPTION
+  Delete all localized listings in an edit
+
+USAGE
+  delete-all
+
+FLAGS
+  -edit-id string       Edit ID
+  -package-name string  Package name
+```
+
+## `gpc edits images --help`
+
+```text
+DESCRIPTION
+  Manage store listing images inside an edit
+
+USAGE
+  images
+
+SUBCOMMANDS
+  list        List images for one locale/type inside an edit
+  upload      Upload one image inside an edit
+  delete      Delete one image inside an edit
+  delete-all  Delete all images for one locale/type inside an edit
+```
+
+## `gpc edits images list --help`
+
+```text
+DESCRIPTION
+  List images for one locale/type inside an edit
+
+USAGE
+  list
+
+FLAGS
+  -edit-id string       Edit ID
+  -image-type string    Image type (icon, featureGraphic, phoneScreenshots, ...)
+  -locale string        Listing locale (BCP-47, e.g. en-US)
+  -package-name string  Package name
+```
+
+## `gpc edits images upload --help`
+
+```text
+DESCRIPTION
+  Upload one image inside an edit
+
+USAGE
+  upload
+
+FLAGS
+  -edit-id string       Edit ID
+  -file string          Path to image file (PNG/JPEG)
+  -image-type string    Image type (icon, featureGraphic, phoneScreenshots, ...)
+  -locale string        Listing locale (BCP-47, e.g. en-US)
+  -package-name string  Package name
+```
+
+## `gpc edits images delete --help`
+
+```text
+DESCRIPTION
+  Delete one image inside an edit
+
+USAGE
+  delete
+
+FLAGS
+  -edit-id string       Edit ID
+  -image-id string      Image ID to delete
+  -image-type string    Image type (icon, featureGraphic, phoneScreenshots, ...)
+  -locale string        Listing locale (BCP-47, e.g. en-US)
+  -package-name string  Package name
+```
+
+## `gpc edits images delete-all --help`
+
+```text
+DESCRIPTION
+  Delete all images for one locale/type inside an edit
+
+USAGE
+  delete-all
+
+FLAGS
+  -edit-id string       Edit ID
+  -image-type string    Image type (icon, featureGraphic, phoneScreenshots, ...)
+  -locale string        Listing locale (BCP-47, e.g. en-US)
+  -package-name string  Package name
+```
+
+## `gpc tracks --help`
+
+```text
+DESCRIPTION
+  Manage release tracks inside an edit
+
+USAGE
+  tracks
+
+SUBCOMMANDS
+  list     List tracks in an edit
+  get      Get a single track in an edit
+  update   Update a track release in an edit
+  promote  Promote a release from one track to another in an edit
+```
+
+## `gpc tracks list --help`
+
+```text
+DESCRIPTION
+  List tracks in an edit
+
+USAGE
+  list
+
+FLAGS
+  -edit-id string       Edit ID
+  -package-name string  Package name
+```
+
+## `gpc tracks get --help`
+
+```text
+DESCRIPTION
+  Get a single track in an edit
+
+USAGE
+  get
+
+FLAGS
+  -edit-id string       Edit ID
+  -package-name string  Package name
+  -track string         Track name (e.g. production, internal)
+```
+
+## `gpc tracks update --help`
+
+```text
+DESCRIPTION
+  Update a track release in an edit
+
+USAGE
+  update
+
+FLAGS
+  -edit-id string        Edit ID
+  -package-name string   Package name
+  -release-name string   Release name
+  -status string         Release status (draft, inProgress, halted, completed)
+  -track string          Track name (e.g. production, internal)
+  -update-priority 0     In-app update priority (0-5)
+  -user-fraction -1      Rollout user fraction (0-1)
+  -version-codes string  Comma-separated version codes
+```
+
+## `gpc tracks promote --help`
+
+```text
+DESCRIPTION
+  Promote a release from one track to another in an edit
+
+USAGE
+  promote
+
+FLAGS
+  -edit-id string       Edit ID
+  -from-track string    Source track name
+  -package-name string  Package name
+  -release-name string  Override release name
+  -status string        Override release status
+  -to-track string      Target track name
+```
+
+## `gpc apks --help`
+
+```text
+DESCRIPTION
+  Manage APK uploads in an edit
+
+USAGE
+  apks
+
+SUBCOMMANDS
+  list    List APKs in an edit
+  upload  Upload an APK to an edit
+```
+
+## `gpc apks list --help`
+
+```text
+DESCRIPTION
+  List APKs in an edit
+
+USAGE
+  list
+
+FLAGS
+  -edit-id string       Edit ID
+  -package-name string  Package name
+```
+
+## `gpc apks upload --help`
+
+```text
+DESCRIPTION
+  Upload an APK to an edit
+
+USAGE
+  upload
+
+FLAGS
+  -edit-id string       Edit ID
+  -file string          Path to .apk file
+  -package-name string  Package name
+```
+
+## `gpc bundles --help`
+
+```text
+DESCRIPTION
+  Manage Android App Bundles in an edit
+
+USAGE
+  bundles
+
+SUBCOMMANDS
+  list    List bundles in an edit
+  upload  Upload an Android App Bundle to an edit
+```
+
+## `gpc bundles list --help`
+
+```text
+DESCRIPTION
+  List bundles in an edit
+
+USAGE
+  list
+
+FLAGS
+  -edit-id string       Edit ID
+  -package-name string  Package name
+```
+
+## `gpc bundles upload --help`
+
+```text
+DESCRIPTION
+  Upload an Android App Bundle to an edit
+
+USAGE
+  upload
+
+FLAGS
+  -edit-id string       Edit ID
+  -file string          Path to .aab file
+  -package-name string  Package name
+```
+
+## `gpc deobfuscation --help`
+
+```text
+DESCRIPTION
+  Manage deobfuscation files in an edit
+
+USAGE
+  deobfuscation
+
+SUBCOMMANDS
+  upload  Upload a deobfuscation file to an edit
+```
+
+## `gpc deobfuscation upload --help`
+
+```text
+DESCRIPTION
+  Upload a deobfuscation file to an edit
+
+USAGE
+  upload
+
+FLAGS
+  -edit-id string       Edit ID
+  -file string          Path to deobfuscation file
+  -package-name string  Package name
+  -type string          Deobfuscation file type: proguard or nativeCode
+  -version-code 0       Version code associated with the mapping file
+```
+
+## `gpc deploy --help`
+
+```text
+DESCRIPTION
+  Upload artifact and publish to a track in one flow
+
+USAGE
+  deploy
+
+FLAGS
+  -aab string               Path to .aab file
+  -allow-production=false   Allow deploys to production track
+  -apk string               Path to .apk file
+  -cleanup-on-failure=true  Delete edit if deploy fails
+  -confirm=false            Confirm committing the edit (required unless --dry-run)
+  -dry-run=false            Run deploy steps, then delete edit instead of committing
+  -mapping-file string      Path to deobfuscation mapping file
+  -mapping-type string      Mapping type: proguard or nativeCode (defaults to proguard)
+  -package-name string      Package name
+  -release-name string      Release name
+  -status string            Release status (draft, inProgress, halted, completed)
+  -track string             Track name (e.g. internal, production)
+  -user-fraction -1         Rollout user fraction (0-1)
+```
+
+## `gpc reviews --help`
+
+```text
+DESCRIPTION
+  Read and reply to Play Store reviews
+
+USAGE
+  reviews
+
+SUBCOMMANDS
+  list   List app reviews
+  get    Get one review by ID
+  reply  Reply to a review
+```
+
+## `gpc reviews list --help`
+
+```text
+DESCRIPTION
+  List app reviews
+
+USAGE
+  list
+
+FLAGS
+  -max-results 0                Maximum number of reviews per page
+  -package-name string          Package name
+  -start-index 0                Index of first review to return (non-token pagination)
+  -token string                 Pagination token
+  -translation-language string  Language localization code for translated responses
+```
+
+## `gpc reviews get --help`
+
+```text
+DESCRIPTION
+  Get one review by ID
+
+USAGE
+  get
+
+FLAGS
+  -package-name string  Package name
+  -review-id string     Review ID
+```
+
+## `gpc reviews reply --help`
+
+```text
+DESCRIPTION
+  Reply to a review
+
+USAGE
+  reply
+
+FLAGS
+  -package-name string  Package name
+  -reply-text string    Reply text
+  -review-id string     Review ID
+```
+
+## `gpc subscriptions --help`
+
+```text
+DESCRIPTION
+  Manage monetization subscriptions
+
+USAGE
+  subscriptions
+
+SUBCOMMANDS
+  list          List subscriptions
+  get           Get a subscription by product ID
+  batch-get     Batch-get subscriptions by product IDs
+  create        Create a subscription
+  batch-update  Batch create or update subscriptions
+  update        Update a subscription
+  delete        Delete a subscription
+  archive       Archive a subscription
+  base-plans    Manage subscription base plans
+  offers        Manage subscription offers under base plans
+```
+
+## `gpc subscriptions list --help`
+
+```text
+DESCRIPTION
+  List subscriptions
+
+USAGE
+  list
+
+FLAGS
+  -package-name string  Package name
+  -page-size 0          Maximum subscriptions per page
+  -page-token string    Page token for the next page
+```
+
+## `gpc subscriptions get --help`
+
+```text
+DESCRIPTION
+  Get a subscription by product ID
+
+USAGE
+  get
+
+FLAGS
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions batch-get --help`
+
+```text
+DESCRIPTION
+  Batch-get subscriptions by product IDs
+
+USAGE
+  batch-get
+
+FLAGS
+  -package-name string  Package name
+  -product-ids string   Comma-separated subscription product IDs
+```
+
+## `gpc subscriptions create --help`
+
+```text
+DESCRIPTION
+  Create a subscription
+
+USAGE
+  create
+
+FLAGS
+  -input string         Path to subscription JSON payload (use - for stdin)
+  -package-name string  Package name
+```
+
+## `gpc subscriptions batch-update --help`
+
+```text
+DESCRIPTION
+  Batch create or update subscriptions
+
+USAGE
+  batch-update
+
+FLAGS
+  -input string         Path to subscriptions batch update JSON payload (use - for stdin)
+  -package-name string  Package name
+```
+
+## `gpc subscriptions update --help`
+
+```text
+DESCRIPTION
+  Update a subscription
+
+USAGE
+  update
+
+FLAGS
+  -input string         Path to subscription JSON payload (use - for stdin)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions delete --help`
+
+```text
+DESCRIPTION
+  Delete a subscription
+
+USAGE
+  delete
+
+FLAGS
+  -confirm=false        Confirm deleting the subscription (required)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions archive --help`
+
+```text
+DESCRIPTION
+  Archive a subscription
+
+USAGE
+  archive
+
+FLAGS
+  -confirm=false        Confirm archiving the subscription (required)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions base-plans --help`
+
+```text
+DESCRIPTION
+  Manage subscription base plans
+
+USAGE
+  base-plans
+
+SUBCOMMANDS
+  activate    Activate a subscription base plan
+  deactivate  Deactivate a subscription base plan
+  delete      Delete a subscription base plan
+```
+
+## `gpc subscriptions base-plans activate --help`
+
+```text
+DESCRIPTION
+  Activate a subscription base plan
+
+USAGE
+  activate
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions base-plans deactivate --help`
+
+```text
+DESCRIPTION
+  Deactivate a subscription base plan
+
+USAGE
+  deactivate
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -confirm=false        Confirm deactivating the base plan (required)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions base-plans delete --help`
+
+```text
+DESCRIPTION
+  Delete a subscription base plan
+
+USAGE
+  delete
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -confirm=false        Confirm deleting the base plan (required)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions offers --help`
+
+```text
+DESCRIPTION
+  Manage subscription offers under base plans
+
+USAGE
+  offers
+
+SUBCOMMANDS
+  list          List offers under a subscription base plan
+  get           Get one subscription offer
+  batch-get     Batch-get subscription offers
+  batch-update  Batch create or update subscription offers
+  activate      Activate a subscription offer
+  deactivate    Deactivate a subscription offer
+  create        Create a subscription offer
+  update        Update a subscription offer
+  delete        Delete a subscription offer
+```
+
+## `gpc subscriptions offers list --help`
+
+```text
+DESCRIPTION
+  List offers under a subscription base plan
+
+USAGE
+  list
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -package-name string  Package name
+  -page-size 0          Maximum offers per page
+  -page-token string    Page token for the next page
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions offers get --help`
+
+```text
+DESCRIPTION
+  Get one subscription offer
+
+USAGE
+  get
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -offer-id string      Offer ID
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions offers batch-get --help`
+
+```text
+DESCRIPTION
+  Batch-get subscription offers
+
+USAGE
+  batch-get
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -offer-ids string     Comma-separated offer IDs
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions offers batch-update --help`
+
+```text
+DESCRIPTION
+  Batch create or update subscription offers
+
+USAGE
+  batch-update
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -input string         Path to subscription offers batch update JSON payload (use - for stdin)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions offers activate --help`
+
+```text
+DESCRIPTION
+  Activate a subscription offer
+
+USAGE
+  activate
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -offer-id string      Offer ID
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions offers deactivate --help`
+
+```text
+DESCRIPTION
+  Deactivate a subscription offer
+
+USAGE
+  deactivate
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -confirm=false        Confirm deactivating the offer (required)
+  -offer-id string      Offer ID
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions offers create --help`
+
+```text
+DESCRIPTION
+  Create a subscription offer
+
+USAGE
+  create
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -input string         Path to subscription offer JSON payload (use - for stdin)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions offers update --help`
+
+```text
+DESCRIPTION
+  Update a subscription offer
+
+USAGE
+  update
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -input string         Path to subscription offer JSON payload (use - for stdin)
+  -offer-id string      Offer ID
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+  -update-mask string   Comma-separated list of fields to update
+```
+
+## `gpc subscriptions offers delete --help`
+
+```text
+DESCRIPTION
+  Delete a subscription offer
+
+USAGE
+  delete
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -confirm=false        Confirm deleting the offer (required)
+  -offer-id string      Offer ID
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc products --help`
+
+```text
+DESCRIPTION
+  Manage monetization one-time products
+
+USAGE
+  products
+
+SUBCOMMANDS
+  list              List one-time products
+  get               Get a one-time product by product ID
+  batch-get         Batch-get one-time products by product IDs
+  batch-update      Batch create or update one-time products
+  batch-delete      Batch delete one-time products
+  create            Create a one-time product (patch with allowMissing=true)
+  update            Update a one-time product
+  delete            Delete a one-time product
+  offers            Manage one-time product offers under purchase options
+  purchase-options  Manage one-time product purchase options
+```
+
+## `gpc products list --help`
+
+```text
+DESCRIPTION
+  List one-time products
+
+USAGE
+  list
+
+FLAGS
+  -package-name string  Package name
+  -page-size 0          Maximum one-time products per page
+  -page-token string    Page token for the next page
+```
+
+## `gpc products get --help`
+
+```text
+DESCRIPTION
+  Get a one-time product by product ID
+
+USAGE
+  get
+
+FLAGS
+  -package-name string  Package name
+  -product-id string    One-time product ID
+```
+
+## `gpc products batch-get --help`
+
+```text
+DESCRIPTION
+  Batch-get one-time products by product IDs
+
+USAGE
+  batch-get
+
+FLAGS
+  -package-name string  Package name
+  -product-ids string   Comma-separated one-time product IDs
+```
+
+## `gpc products batch-update --help`
+
+```text
+DESCRIPTION
+  Batch create or update one-time products
+
+USAGE
+  batch-update
+
+FLAGS
+  -input string         Path to one-time products batch update JSON payload (use - for stdin)
+  -package-name string  Package name
+```
+
+## `gpc products batch-delete --help`
+
+```text
+DESCRIPTION
+  Batch delete one-time products
+
+USAGE
+  batch-delete
+
+FLAGS
+  -confirm=false        Confirm deleting the one-time products (required)
+  -input string         Path to one-time products batch delete JSON payload (use - for stdin)
+  -package-name string  Package name
+```
+
+## `gpc products create --help`
+
+```text
+DESCRIPTION
+  Create a one-time product (patch with allowMissing=true)
+
+USAGE
+  create
+
+FLAGS
+  -input string         Path to one-time product JSON payload (use - for stdin)
+  -package-name string  Package name
+```
+
+## `gpc products update --help`
+
+```text
+DESCRIPTION
+  Update a one-time product
+
+USAGE
+  update
+
+FLAGS
+  -input string         Path to one-time product JSON payload (use - for stdin)
+  -package-name string  Package name
+  -product-id string    One-time product ID
+  -update-mask string   Comma-separated list of fields to update
+```
+
+## `gpc products delete --help`
+
+```text
+DESCRIPTION
+  Delete a one-time product
+
+USAGE
+  delete
+
+FLAGS
+  -confirm=false        Confirm deleting the one-time product (required)
+  -package-name string  Package name
+  -product-id string    One-time product ID
+```
+
+## `gpc products offers --help`
+
+```text
+DESCRIPTION
+  Manage one-time product offers under purchase options
+
+USAGE
+  offers
+
+SUBCOMMANDS
+  list          List offers for a one-time product purchase option
+  batch-get     Batch-get one-time product offers
+  batch-update  Batch create or update one-time product offers
+  batch-delete  Batch delete one-time product offers
+  activate      Activate a one-time product offer
+  deactivate    Deactivate a one-time product offer
+  cancel        Cancel a one-time product pre-order offer
+```
+
+## `gpc products offers list --help`
+
+```text
+DESCRIPTION
+  List offers for a one-time product purchase option
+
+USAGE
+  list
+
+FLAGS
+  -package-name string        Package name
+  -page-size 0                Maximum offers per page
+  -page-token string          Page token for the next page
+  -product-id string          One-time product ID
+  -purchase-option-id string  Purchase option ID
+```
+
+## `gpc products offers batch-get --help`
+
+```text
+DESCRIPTION
+  Batch-get one-time product offers
+
+USAGE
+  batch-get
+
+FLAGS
+  -offer-ids string           Comma-separated offer IDs
+  -package-name string        Package name
+  -product-id string          One-time product ID
+  -purchase-option-id string  Purchase option ID
+```
+
+## `gpc products offers batch-update --help`
+
+```text
+DESCRIPTION
+  Batch create or update one-time product offers
+
+USAGE
+  batch-update
+
+FLAGS
+  -input string               Path to one-time product offers batch update JSON payload (use - for stdin)
+  -package-name string        Package name
+  -product-id string          One-time product ID
+  -purchase-option-id string  Purchase option ID
+```
+
+## `gpc products offers batch-delete --help`
+
+```text
+DESCRIPTION
+  Batch delete one-time product offers
+
+USAGE
+  batch-delete
+
+FLAGS
+  -confirm=false              Confirm deleting the offers (required)
+  -input string               Path to one-time product offers batch delete JSON payload (use - for stdin)
+  -package-name string        Package name
+  -product-id string          One-time product ID
+  -purchase-option-id string  Purchase option ID
+```
+
+## `gpc products offers activate --help`
+
+```text
+DESCRIPTION
+  Activate a one-time product offer
+
+USAGE
+  activate
+
+FLAGS
+  -offer-id string            Offer ID
+  -package-name string        Package name
+  -product-id string          One-time product ID
+  -purchase-option-id string  Purchase option ID
+```
+
+## `gpc products offers deactivate --help`
+
+```text
+DESCRIPTION
+  Deactivate a one-time product offer
+
+USAGE
+  deactivate
+
+FLAGS
+  -confirm=false              Confirm deactivating the offer (required)
+  -offer-id string            Offer ID
+  -package-name string        Package name
+  -product-id string          One-time product ID
+  -purchase-option-id string  Purchase option ID
+```
+
+## `gpc products offers cancel --help`
+
+```text
+DESCRIPTION
+  Cancel a one-time product pre-order offer
+
+USAGE
+  cancel
+
+FLAGS
+  -confirm=false              Confirm canceling the offer (required)
+  -offer-id string            Offer ID
+  -package-name string        Package name
+  -product-id string          One-time product ID
+  -purchase-option-id string  Purchase option ID
+```
+
+## `gpc products purchase-options --help`
+
+```text
+DESCRIPTION
+  Manage one-time product purchase options
+
+USAGE
+  purchase-options
+
+SUBCOMMANDS
+  activate    Activate a one-time product purchase option
+  deactivate  Deactivate a one-time product purchase option
+  delete      Delete a one-time product purchase option
+```
+
+## `gpc products purchase-options activate --help`
+
+```text
+DESCRIPTION
+  Activate a one-time product purchase option
+
+USAGE
+  activate
+
+FLAGS
+  -package-name string        Package name
+  -product-id string          One-time product ID
+  -purchase-option-id string  Purchase option ID
+```
+
+## `gpc products purchase-options deactivate --help`
+
+```text
+DESCRIPTION
+  Deactivate a one-time product purchase option
+
+USAGE
+  deactivate
+
+FLAGS
+  -confirm=false              Confirm deactivating the purchase option (required)
+  -package-name string        Package name
+  -product-id string          One-time product ID
+  -purchase-option-id string  Purchase option ID
+```
+
+## `gpc products purchase-options delete --help`
+
+```text
+DESCRIPTION
+  Delete a one-time product purchase option
+
+USAGE
+  delete
+
+FLAGS
+  -confirm=false              Confirm deleting the purchase option (required)
+  -force=false                Delete even when managed externally
+  -package-name string        Package name
+  -product-id string          One-time product ID
+  -purchase-option-id string  Purchase option ID
+```
+
+## `gpc iap --help`
+
+```text
+DESCRIPTION
+  Manage legacy in-app products
+
+USAGE
+  iap
+
+SUBCOMMANDS
+  list          List legacy in-app products
+  get           Get a legacy in-app product by SKU
+  batch-get     Get multiple legacy in-app products by SKU
+  create        Create a legacy in-app product
+  update        Update a legacy in-app product
+  batch-update  Create or update multiple legacy in-app products
+  batch-delete  Delete multiple legacy in-app products
+  delete        Delete a legacy in-app product
+```
+
+## `gpc iap list --help`
+
+```text
+DESCRIPTION
+  List legacy in-app products
+
+USAGE
+  list
+
+FLAGS
+  -max-results 0        Maximum in-app products per page
+  -package-name string  Package name
+  -page-token string    Page token for the next page
+```
+
+## `gpc iap get --help`
+
+```text
+DESCRIPTION
+  Get a legacy in-app product by SKU
+
+USAGE
+  get
+
+FLAGS
+  -package-name string  Package name
+  -sku string           In-app product SKU
+```
+
+## `gpc iap batch-get --help`
+
+```text
+DESCRIPTION
+  Get multiple legacy in-app products by SKU
+
+USAGE
+  batch-get
+
+FLAGS
+  -package-name string  Package name
+  -skus string          Comma-separated in-app product SKUs
+```
+
+## `gpc iap create --help`
+
+```text
+DESCRIPTION
+  Create a legacy in-app product
+
+USAGE
+  create
+
+FLAGS
+  -input string         Path to in-app product JSON payload (use - for stdin)
+  -package-name string  Package name
+```
+
+## `gpc iap update --help`
+
+```text
+DESCRIPTION
+  Update a legacy in-app product
+
+USAGE
+  update
+
+FLAGS
+  -input string         Path to in-app product JSON payload (use - for stdin)
+  -package-name string  Package name
+  -sku string           In-app product SKU
+```
+
+## `gpc iap batch-update --help`
+
+```text
+DESCRIPTION
+  Create or update multiple legacy in-app products
+
+USAGE
+  batch-update
+
+FLAGS
+  -input string         Path to in-app products batch update JSON payload (use - for stdin)
+  -package-name string  Package name
+```
+
+## `gpc iap batch-delete --help`
+
+```text
+DESCRIPTION
+  Delete multiple legacy in-app products
+
+USAGE
+  batch-delete
+
+FLAGS
+  -confirm=false        Confirm deleting the in-app products (required)
+  -input string         Path to in-app products batch delete JSON payload (use - for stdin)
+  -package-name string  Package name
+```
+
+## `gpc iap delete --help`
+
+```text
+DESCRIPTION
+  Delete a legacy in-app product
+
+USAGE
+  delete
+
+FLAGS
+  -confirm=false        Confirm deleting the in-app product (required)
+  -package-name string  Package name
+  -sku string           In-app product SKU
+```
+
+## `gpc purchases --help`
+
+```text
+DESCRIPTION
+  Manage one-time and subscription purchases
+
+USAGE
+  purchases
+
+SUBCOMMANDS
+  products       Inspect and mutate one-time product purchases
+  subscriptions  Inspect and mutate subscription purchases
+  voided         Inspect voided purchases
+```
+
+## `gpc purchases products --help`
+
+```text
+DESCRIPTION
+  Inspect and mutate one-time product purchases
+
+USAGE
+  products
+
+SUBCOMMANDS
+  get          Get one-time product purchase details
+  acknowledge  Acknowledge a one-time product purchase
+  consume      Consume a one-time product purchase
+```
+
+## `gpc purchases products get --help`
+
+```text
+DESCRIPTION
+  Get one-time product purchase details
+
+USAGE
+  get
+
+FLAGS
+  -package-name string  Package name
+  -product-id string    One-time product ID
+  -token string         Purchase token
+```
+
+## `gpc purchases products acknowledge --help`
+
+```text
+DESCRIPTION
+  Acknowledge a one-time product purchase
+
+USAGE
+  acknowledge
+
+FLAGS
+  -developer-payload string  Optional developer payload
+  -package-name string       Package name
+  -product-id string         One-time product ID
+  -token string              Purchase token
+```
+
+## `gpc purchases products consume --help`
+
+```text
+DESCRIPTION
+  Consume a one-time product purchase
+
+USAGE
+  consume
+
+FLAGS
+  -confirm=false        Confirm consuming the purchase (required)
+  -package-name string  Package name
+  -product-id string    One-time product ID
+  -token string         Purchase token
+```
+
+## `gpc purchases subscriptions --help`
+
+```text
+DESCRIPTION
+  Inspect and mutate subscription purchases
+
+USAGE
+  subscriptions
+
+SUBCOMMANDS
+  get     Get subscription purchase details
+  cancel  Cancel a subscription purchase
+  defer   Defer a subscription renewal
+  revoke  Revoke a subscription purchase
+```
+
+## `gpc purchases subscriptions get --help`
+
+```text
+DESCRIPTION
+  Get subscription purchase details
+
+USAGE
+  get
+
+FLAGS
+  -package-name string  Package name
+  -token string         Purchase token
+```
+
+## `gpc purchases subscriptions cancel --help`
+
+```text
+DESCRIPTION
+  Cancel a subscription purchase
+
+USAGE
+  cancel
+
+FLAGS
+  -cancellation-type USER_REQUESTED_STOP_RENEWALS  Cancellation type: USER_REQUESTED_STOP_RENEWALS or DEVELOPER_REQUESTED_STOP_PAYMENTS
+  -confirm=false                                   Confirm canceling the subscription purchase (required)
+  -package-name string                             Package name
+  -token string                                    Purchase token
+```
+
+## `gpc purchases subscriptions defer --help`
+
+```text
+DESCRIPTION
+  Defer a subscription renewal
+
+USAGE
+  defer
+
+FLAGS
+  -confirm=false          Confirm deferring the subscription purchase (required unless --validate-only)
+  -defer-duration string  Deferral duration (protobuf format, for example 604800s)
+  -etag string            Current subscription etag from purchases subscriptions get
+  -package-name string    Package name
+  -token string           Purchase token
+  -validate-only=false    Validate deferral request without applying changes
+```
+
+## `gpc purchases subscriptions revoke --help`
+
+```text
+DESCRIPTION
+  Revoke a subscription purchase
+
+USAGE
+  revoke
+
+FLAGS
+  -confirm=false        Confirm revoking the subscription purchase (required)
+  -package-name string  Package name
+  -refund-type full     Refund type: full or prorated
+  -token string         Purchase token
+```
+
+## `gpc purchases voided --help`
+
+```text
+DESCRIPTION
+  Inspect voided purchases
+
+USAGE
+  voided
+
+SUBCOMMANDS
+  list  List voided purchases
+```
+
+## `gpc purchases voided list --help`
+
+```text
+DESCRIPTION
+  List voided purchases
+
+USAGE
+  list
+
+FLAGS
+  -end-time 0                                   End time in milliseconds since epoch
+  -include-quantity-based-partial-refund=false  Include quantity-based partial refunds
+  -max-results 0                                Maximum number of results
+  -package-name string                          Package name
+  -start-index 0                                Index of first result (indexed pagination)
+  -start-time 0                                 Start time in milliseconds since epoch
+  -token string                                 Token from previous paginated response
+  -type 0                                       0 for one-time products, 1 for products and subscriptions
+```
+
+## `gpc users --help`
+
+```text
+DESCRIPTION
+  Manage Play Console account users
+
+USAGE
+  users
+
+SUBCOMMANDS
+  list    List account users
+  create  Create an account user
+  update  Update an account user
+  delete  Delete an account user
+```
+
+## `gpc users list --help`
+
+```text
+DESCRIPTION
+  List account users
+
+USAGE
+  list
+
+FLAGS
+  -developer-id string  Developer account ID (numeric or developers/<id>)
+  -page-size -1         Maximum users per page (-1 uses API default)
+  -page-token string    Page token for the next page
+```
+
+## `gpc users create --help`
+
+```text
+DESCRIPTION
+  Create an account user
+
+USAGE
+  create
+
+FLAGS
+  -developer-id string  Developer account ID (numeric or developers/<id>)
+  -input string         Path to user JSON payload (use - for stdin)
+```
+
+## `gpc users update --help`
+
+```text
+DESCRIPTION
+  Update an account user
+
+USAGE
+  update
+
+FLAGS
+  -developer-id string  Developer account ID (numeric or developers/<id>)
+  -input string         Path to user JSON payload (use - for stdin)
+  -name string          User resource name (developers/<developer-id>/users/<email>)
+  -update-mask string   Comma-separated list of fields to update
+  -user-email string    User email for resource name synthesis
+```
+
+## `gpc users delete --help`
+
+```text
+DESCRIPTION
+  Delete an account user
+
+USAGE
+  delete
+
+FLAGS
+  -confirm=false        Confirm deleting the user (required)
+  -developer-id string  Developer account ID (numeric or developers/<id>)
+  -name string          User resource name (developers/<developer-id>/users/<email>)
+  -user-email string    User email for resource name synthesis
+```
+
+## `gpc grants --help`
+
+```text
+DESCRIPTION
+  Manage per-app user grants
+
+USAGE
+  grants
+
+SUBCOMMANDS
+  create  Create a grant under a user
+  update  Update a grant
+  delete  Delete a grant
+```
+
+## `gpc grants create --help`
+
+```text
+DESCRIPTION
+  Create a grant under a user
+
+USAGE
+  create
+
+FLAGS
+  -developer-id string  Developer account ID (numeric or developers/<id>)
+  -input string         Path to grant JSON payload (use - for stdin)
+  -parent string        User resource name (developers/<developer-id>/users/<email>)
+  -user-email string    User email for parent name synthesis (requires --developer-id or stored auth developer ID)
+```
+
+## `gpc grants update --help`
+
+```text
+DESCRIPTION
+  Update a grant
+
+USAGE
+  update
+
+FLAGS
+  -developer-id string  Developer account ID (numeric or developers/<id>)
+  -input string         Path to grant JSON payload (use - for stdin)
+  -name string          Grant resource name (developers/<developer-id>/users/<email>/grants/<package-name>)
+  -package-name string  Package name for grant name synthesis
+  -update-mask string   Comma-separated list of fields to update
+  -user-email string    User email for grant name synthesis
+```
+
+## `gpc grants delete --help`
+
+```text
+DESCRIPTION
+  Delete a grant
+
+USAGE
+  delete
+
+FLAGS
+  -confirm=false        Confirm deleting the grant (required)
+  -developer-id string  Developer account ID (numeric or developers/<id>)
+  -name string          Grant resource name (developers/<developer-id>/users/<email>/grants/<package-name>)
+  -package-name string  Package name for grant name synthesis
+  -user-email string    User email for grant name synthesis
+```
+
+## `gpc internal-sharing --help`
+
+```text
+DESCRIPTION
+  Upload artifacts for internal app sharing
+
+USAGE
+  internal-sharing
+
+SUBCOMMANDS
+  upload  Upload one APK or AAB for internal app sharing
+```
+
+## `gpc internal-sharing upload --help`
+
+```text
+DESCRIPTION
+  Upload one APK or AAB for internal app sharing
+
+USAGE
+  upload
+
+FLAGS
+  -aab string           Path to .aab file
+  -apk string           Path to .apk file
+  -package-name string  Package name
+```
+
+## `gpc completion --help`
+
+```text
+DESCRIPTION
+  Generate shell completion script
+
+USAGE
+  completion
+
+SUBCOMMANDS
+  bash  Print bash completion script
+  zsh   Print zsh completion script
+  fish  Print fish completion script
+```
+
+## `gpc completion bash --help`
+
+```text
+DESCRIPTION
+  Print bash completion script
+
+USAGE
+  bash
+```
+
+## `gpc completion zsh --help`
+
+```text
+DESCRIPTION
+  Print zsh completion script
+
+USAGE
+  zsh
+```
+
+## `gpc completion fish --help`
+
+```text
+DESCRIPTION
+  Print fish completion script
+
+USAGE
+  fish
+```

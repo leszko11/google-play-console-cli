@@ -74,6 +74,6 @@ func writeGetOutput(deps Deps, output string, app gpc.AppInfo) error {
 		_, err := fmt.Fprintf(deps.Stdout, "| %s |\n", app.PackageName)
 		return err
 	default:
-		return fmt.Errorf("unsupported output format %q", output)
+		return shared.UsageErrorf("unsupported output format %q", output)
 	}
 }

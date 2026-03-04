@@ -28,12 +28,14 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 		profile            string
 		packageName        string
 		developerID        string
+		promptDeveloperID  bool
 	)
 
 	fs.StringVar(&serviceAccountPath, "service-account", "", "Path to service account JSON")
 	fs.StringVar(&profile, "profile", "default", "Auth profile name")
 	fs.StringVar(&packageName, "package-name", "", "Verify package access for this package")
 	fs.StringVar(&developerID, "developer-id", "", "Optional developer account ID (numeric or developers/<id>)")
+	fs.BoolVar(&promptDeveloperID, "prompt-developer-id", false, "Prompt for developer ID when missing (interactive terminals only)")
 
 	return &ffcli.Command{
 		Name:      "init",
@@ -48,7 +50,7 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 				serviceAccountPath = strings.TrimSpace(deps.LookupEnv(shared.EnvServiceAccountPath))
 			}
 			if strings.TrimSpace(serviceAccountPath) == "" {
-				return fmt.Errorf("--service-account is required or set %s", shared.EnvServiceAccountPath)
+				return shared.UsageErrorf("--service-account is required or set %s", shared.EnvServiceAccountPath)
 			}
 
 			cfg, err := deps.LoadConfig()
@@ -60,7 +62,7 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 			}
 			current := cfg.Profiles[profile]
 
-			resolvedDeveloperID, err := resolveDeveloperIDForProfile(deps, developerID, current.DeveloperID)
+			resolvedDeveloperID, err := resolveDeveloperIDForProfile(deps, developerID, current.DeveloperID, promptDeveloperID)
 			if err != nil {
 				return err
 			}
@@ -101,7 +103,7 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 	}
 }
 
-func resolveDeveloperIDForProfile(deps Deps, provided, existing string) (string, error) {
+func resolveDeveloperIDForProfile(deps Deps, provided, existing string, prompt bool) (string, error) {
 	if normalized, err := shared.NormalizeDeveloperID(provided); err != nil {
 		return "", err
 	} else if normalized != "" {
@@ -111,6 +113,9 @@ func resolveDeveloperIDForProfile(deps Deps, provided, existing string) (string,
 		return "", err
 	} else if normalized != "" {
 		return normalized, nil
+	}
+	if !prompt {
+		return "", nil
 	}
 
 	prompted, err := deps.PromptID(deps.Stdin, deps.Stderr)

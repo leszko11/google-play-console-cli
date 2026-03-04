@@ -5,8 +5,9 @@ A fast, lightweight, AI-agent-friendly CLI for Google Play Console. Built in Go 
 ## Core Principles
 
 - Explicit flags: prefer `--package-name` over short aliases.
-- JSON-first output: machine-readable by default.
-- No interactive prompts for core flows.
+- TTY-aware output defaults: `table` for interactive terminals and `json` for non-interactive output.
+- JSON-first safety for automation (`--output json` and `GPC_DEFAULT_OUTPUT` for explicit control).
+- No interactive prompts for core flows (opt-in only via explicit flags).
 - Keep stdout for data and stderr for errors/help.
 
 ## Command Discovery
@@ -39,4 +40,3 @@ make format
 
 - Never commit service account credentials.
 - Keep credentials in local config/keychain and CI secrets only.
-

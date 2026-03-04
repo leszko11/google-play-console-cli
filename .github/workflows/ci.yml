@@ -31,6 +31,9 @@ jobs:
       - name: Lint
         run: go vet ./...
 
+      - name: Command docs sync
+        run: make check-command-docs
+
       - name: Run tests
         run: go test ./...
 

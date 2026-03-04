@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 )
 
 func handleError(err error) int {
@@ -13,6 +15,11 @@ func handleError(err error) int {
 	}
 
 	fmt.Fprintln(os.Stderr, err)
-	maybeOfferBootstrapBuild(err)
+	if shared.ActiveGlobalFlags().BootstrapAssist {
+		maybeOfferBootstrapBuild(err)
+	}
+	if shared.IsLikelyUsageError(err) {
+		return ExitCodeUsage
+	}
 	return ExitCodeError
 }

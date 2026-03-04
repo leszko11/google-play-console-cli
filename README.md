@@ -58,8 +58,13 @@ gpc auth init --service-account /path/to/service-account.json
 # Optional: save your developer account ID once for developer-level commands
 gpc auth init --service-account /path/to/service-account.json --developer-id 9023817352750250026
 
+# Optional: interactive developer ID prompt (TTY only, opt-in)
+gpc auth init --service-account /path/to/service-account.json --prompt-developer-id
+
 # Show current auth profile
 gpc auth status
+gpc auth status --output table
+gpc auth status --output json
 
 # Global flags are available from root and apply to all commands
 gpc --package-name com.example.app --service-account /path/to/service-account.json --timeout 90s --pretty apps get
@@ -99,6 +104,12 @@ gpc edits listings update \
 gpc edits listings list --package-name com.example.app --edit-id <edit-id>
 gpc edits listings delete --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings delete-all --package-name com.example.app --edit-id <edit-id>
+
+# Batch update localized listings from JSON files (<locale>.json)
+gpc edits listings batch-update --package-name com.example.app --edit-id <edit-id> --from-dir /path/to/listings
+gpc edits listings batch-update --package-name com.example.app --edit-id <edit-id> --from-dir /path/to/listings --locales en-US,pl-PL --dry-run
+# Example file: /path/to/listings/en-US.json
+# {"title":"My App","shortDescription":"Short text","fullDescription":"Long text"}
 
 # Manage store images in an edit
 gpc edits images list --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
@@ -272,10 +283,16 @@ gpc deploy \
 
 Google Play API can only manage packages that were initialized with at least one artifact uploaded in Play Console UI.
 
-When `gpc` hits a `package not found` error in an interactive terminal and detects an Android Gradle project (`./gradlew` or `./android/gradlew`), it offers a guided build flow:
+When `gpc` hits a `package not found` error and `--bootstrap-assist` is enabled in an interactive terminal, it can offer a guided build flow if it detects an Android Gradle project (`./gradlew` or `./android/gradlew`):
 - asks for `aab`/`apk`, module, and variant
 - runs the Gradle task
 - prints the built artifact path you can upload manually in Play Console for one-time bootstrap
+
+Example:
+
+```bash
+gpc --bootstrap-assist apps get --package-name com.example.newapp
+```
 
 ## Finding Developer ID
 
@@ -298,11 +315,15 @@ When CLI output includes `access denied` or `missing Play Console permissions`:
 
 - `--package-name`: default package for commands that support package-level operations.
 - `--service-account`: credential path override (`flag > env > config`).
-- `--output`: default output format for commands that support output variants.
+- `--output`: output format override for commands that support output variants.
 - `--pretty`: pretty-print JSON output.
 - `--timeout`: timeout for standard API requests.
 - `--upload-timeout`: timeout for upload API requests.
 - `--paginate`: fetch all pages on paginated endpoints (enabled per-command where supported).
+- `--bootstrap-assist`: opt in to interactive bootstrap artifact help on package-not-found errors.
+
+When `--output` is not provided, output precedence is:
+`command --output` > global `--output` > `GPC_DEFAULT_OUTPUT` > TTY default (`table`) > non-TTY default (`json`).
 
 ## Command Discovery
 
@@ -325,3 +346,9 @@ gpc users --help
 gpc grants --help
 gpc internal-sharing --help
 ```
+
+Generated command reference (live help snapshot):
+
+- `docs/COMMANDS.md`
+- `make generate-command-docs`
+- `make check-command-docs`

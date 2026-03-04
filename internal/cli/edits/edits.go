@@ -2,12 +2,14 @@ package edits
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"image"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
@@ -140,7 +142,7 @@ func newGetCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			edit, err := client.GetEdit(requestCtx, pkg, editID)
 			if err != nil {
@@ -174,7 +176,7 @@ func newValidateCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			if err := client.ValidateEdit(requestCtx, pkg, editID); err != nil {
 				return fmt.Errorf("failed to validate edit: %w", err)
@@ -210,10 +212,10 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			if !confirm {
-				return fmt.Errorf("--confirm is required to commit edit %q", editID)
+				return shared.UsageErrorf("--confirm is required to commit edit %q", editID)
 			}
 			edit, err := client.CommitEdit(requestCtx, pkg, editID)
 			if err != nil {
@@ -250,10 +252,10 @@ func newDeleteCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			if !confirm {
-				return fmt.Errorf("--confirm is required to delete edit %q", editID)
+				return shared.UsageErrorf("--confirm is required to delete edit %q", editID)
 			}
 			if err := client.DeleteEdit(requestCtx, pkg, editID); err != nil {
 				return fmt.Errorf("failed to delete edit: %w", err)
@@ -276,6 +278,7 @@ func newListingsCommand(deps Deps) *ffcli.Command {
 			newListingsListCommand(deps),
 			newListingsGetCommand(deps),
 			newListingsUpdateCommand(deps),
+			newListingsBatchUpdateCommand(deps),
 			newListingsDeleteCommand(deps),
 			newListingsDeleteAllCommand(deps),
 		},
@@ -316,11 +319,11 @@ func newImagesListCommand(deps Deps) *ffcli.Command {
 
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			locale = strings.TrimSpace(locale)
 			if locale == "" {
-				return fmt.Errorf("--locale is required")
+				return shared.UsageErrorf("--locale is required")
 			}
 			imageType, err = validateImageType(imageType)
 			if err != nil {
@@ -363,11 +366,11 @@ func newImagesUploadCommand(deps Deps) *ffcli.Command {
 
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			locale = strings.TrimSpace(locale)
 			if locale == "" {
-				return fmt.Errorf("--locale is required")
+				return shared.UsageErrorf("--locale is required")
 			}
 			imageType, err = validateImageType(imageType)
 			if err != nil {
@@ -375,7 +378,7 @@ func newImagesUploadCommand(deps Deps) *ffcli.Command {
 			}
 			imagePath = strings.TrimSpace(imagePath)
 			if imagePath == "" {
-				return fmt.Errorf("--file is required")
+				return shared.UsageErrorf("--file is required")
 			}
 			if err := validateImageUploadFile(imageType, imagePath); err != nil {
 				return err
@@ -418,11 +421,11 @@ func newImagesDeleteCommand(deps Deps) *ffcli.Command {
 
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			locale = strings.TrimSpace(locale)
 			if locale == "" {
-				return fmt.Errorf("--locale is required")
+				return shared.UsageErrorf("--locale is required")
 			}
 			imageType, err = validateImageType(imageType)
 			if err != nil {
@@ -430,7 +433,7 @@ func newImagesDeleteCommand(deps Deps) *ffcli.Command {
 			}
 			imageID = strings.TrimSpace(imageID)
 			if imageID == "" {
-				return fmt.Errorf("--image-id is required")
+				return shared.UsageErrorf("--image-id is required")
 			}
 
 			if err := client.DeleteImage(requestCtx, pkg, editID, locale, imageType, imageID); err != nil {
@@ -468,11 +471,11 @@ func newImagesDeleteAllCommand(deps Deps) *ffcli.Command {
 
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			locale = strings.TrimSpace(locale)
 			if locale == "" {
-				return fmt.Errorf("--locale is required")
+				return shared.UsageErrorf("--locale is required")
 			}
 			imageType, err = validateImageType(imageType)
 			if err != nil {
@@ -534,7 +537,7 @@ func newDetailsGetCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			details, err := client.GetAppDetails(requestCtx, pkg, editID)
 			if err != nil {
@@ -574,7 +577,7 @@ func newDetailsUpdateCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			details, err := client.UpdateAppDetails(requestCtx, pkg, editID, gpc.AppDetailsUpdate{
 				DefaultLanguage: defaultLanguage,
@@ -628,11 +631,11 @@ func newTestersGetCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			track = strings.TrimSpace(track)
 			if track == "" {
-				return fmt.Errorf("--track is required")
+				return shared.UsageErrorf("--track is required")
 			}
 			testers, err := client.GetTesters(requestCtx, pkg, editID, track)
 			if err != nil {
@@ -669,15 +672,15 @@ func newTestersUpdateCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			track = strings.TrimSpace(track)
 			if track == "" {
-				return fmt.Errorf("--track is required")
+				return shared.UsageErrorf("--track is required")
 			}
 			googleGroups := parseCommaSeparated(groupsCSV)
 			if len(googleGroups) == 0 {
-				return fmt.Errorf("--google-groups is required")
+				return shared.UsageErrorf("--google-groups is required")
 			}
 			testers, err := client.UpdateTesters(requestCtx, pkg, editID, track, googleGroups)
 			if err != nil {
@@ -725,11 +728,11 @@ func newCountryAvailabilityGetCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			track = strings.TrimSpace(track)
 			if track == "" {
-				return fmt.Errorf("--track is required")
+				return shared.UsageErrorf("--track is required")
 			}
 			availability, err := client.GetCountryAvailability(requestCtx, pkg, editID, track)
 			if err != nil {
@@ -764,7 +767,7 @@ func newListingsListCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			listings, err := client.ListListings(requestCtx, pkg, editID)
 			if err != nil {
@@ -809,10 +812,10 @@ const validImageTypesHelp = "featureGraphic, icon, phoneScreenshots, promoGraphi
 func validateImageType(raw string) (string, error) {
 	imageType := strings.TrimSpace(raw)
 	if imageType == "" {
-		return "", fmt.Errorf("--image-type is required")
+		return "", shared.UsageErrorf("--image-type is required")
 	}
 	if _, ok := validImageTypes[imageType]; !ok {
-		return "", fmt.Errorf("--image-type must be one of: %s", validImageTypesHelp)
+		return "", shared.UsageErrorf("--image-type must be one of: %s", validImageTypesHelp)
 	}
 	return imageType, nil
 }
@@ -822,7 +825,7 @@ func validateImageUploadFile(imageType, imagePath string) error {
 	switch ext {
 	case ".png", ".jpg", ".jpeg":
 	default:
-		return fmt.Errorf("--file must use one of: .png, .jpg, .jpeg")
+		return shared.UsageErrorf("--file must use one of: .png, .jpg, .jpeg")
 	}
 
 	stat, err := os.Stat(imagePath)
@@ -830,7 +833,7 @@ func validateImageUploadFile(imageType, imagePath string) error {
 		return fmt.Errorf("stat --file: %w", err)
 	}
 	if stat.IsDir() {
-		return fmt.Errorf("--file must point to an image file, got directory")
+		return shared.UsageErrorf("--file must point to an image file, got directory")
 	}
 
 	file, err := os.Open(imagePath)
@@ -841,32 +844,32 @@ func validateImageUploadFile(imageType, imagePath string) error {
 
 	cfg, format, err := image.DecodeConfig(file)
 	if err != nil {
-		return fmt.Errorf("--file must be a valid PNG or JPEG image: %w", err)
+		return shared.UsageErrorf("--file must be a valid PNG or JPEG image: %v", err)
 	}
 	format = strings.ToLower(strings.TrimSpace(format))
 	if format != "png" && format != "jpeg" {
-		return fmt.Errorf("--file must be PNG or JPEG, got %q", format)
+		return shared.UsageErrorf("--file must be PNG or JPEG, got %q", format)
 	}
 	if cfg.Width <= 0 || cfg.Height <= 0 {
-		return fmt.Errorf("--file has invalid dimensions %dx%d", cfg.Width, cfg.Height)
+		return shared.UsageErrorf("--file has invalid dimensions %dx%d", cfg.Width, cfg.Height)
 	}
 
 	if imageType == "icon" {
 		if format != "png" {
-			return fmt.Errorf("--image-type icon requires a PNG file")
+			return shared.UsageErrorf("--image-type icon requires a PNG file")
 		}
 		if cfg.Width != 512 || cfg.Height != 512 {
-			return fmt.Errorf("--image-type icon requires dimensions 512x512, got %dx%d", cfg.Width, cfg.Height)
+			return shared.UsageErrorf("--image-type icon requires dimensions 512x512, got %dx%d", cfg.Width, cfg.Height)
 		}
 	}
 	if imageType == "featureGraphic" && (cfg.Width != 1024 || cfg.Height != 500) {
-		return fmt.Errorf("--image-type featureGraphic requires dimensions 1024x500, got %dx%d", cfg.Width, cfg.Height)
+		return shared.UsageErrorf("--image-type featureGraphic requires dimensions 1024x500, got %dx%d", cfg.Width, cfg.Height)
 	}
 	if imageType == "tvBanner" && (cfg.Width != 1280 || cfg.Height != 720) {
-		return fmt.Errorf("--image-type tvBanner requires dimensions 1280x720, got %dx%d", cfg.Width, cfg.Height)
+		return shared.UsageErrorf("--image-type tvBanner requires dimensions 1280x720, got %dx%d", cfg.Width, cfg.Height)
 	}
 	if isScreenshotImageType(imageType) && (cfg.Width < 320 || cfg.Width > 3840 || cfg.Height < 320 || cfg.Height > 3840) {
-		return fmt.Errorf("--image-type %s requires width/height in range 320-3840, got %dx%d", imageType, cfg.Width, cfg.Height)
+		return shared.UsageErrorf("--image-type %s requires width/height in range 320-3840, got %dx%d", imageType, cfg.Width, cfg.Height)
 	}
 
 	return nil
@@ -902,11 +905,11 @@ func newListingsGetCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			locale = strings.TrimSpace(locale)
 			if locale == "" {
-				return fmt.Errorf("--locale is required")
+				return shared.UsageErrorf("--locale is required")
 			}
 			listing, err := client.GetListing(requestCtx, pkg, editID, locale)
 			if err != nil {
@@ -945,11 +948,11 @@ func newListingsUpdateCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			locale = strings.TrimSpace(locale)
 			if locale == "" {
-				return fmt.Errorf("--locale is required")
+				return shared.UsageErrorf("--locale is required")
 			}
 			listing, err := client.UpdateListing(requestCtx, pkg, editID, locale, gpc.ListingUpdate{
 				Title:            title,
@@ -967,6 +970,219 @@ func newListingsUpdateCommand(deps Deps) *ffcli.Command {
 			})
 		},
 	}
+}
+
+type listingBatchInput struct {
+	Title            string `json:"title,omitempty"`
+	ShortDescription string `json:"shortDescription,omitempty"`
+	FullDescription  string `json:"fullDescription,omitempty"`
+}
+
+type listingBatchItem struct {
+	Locale string
+	Input  listingBatchInput
+}
+
+type listingBatchResult struct {
+	Locale  string            `json:"locale"`
+	Status  string            `json:"status"`
+	Input   listingBatchInput `json:"input,omitempty"`
+	Listing *gpc.ListingInfo  `json:"listing,omitempty"`
+	Error   string            `json:"error,omitempty"`
+}
+
+func newListingsBatchUpdateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-update", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, fromDir, localesCSV string
+	var dryRun, continueOnError bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&fromDir, "from-dir", "", "Directory containing per-locale JSON files (<locale>.json)")
+	fs.StringVar(&localesCSV, "locales", "", "Optional comma-separated locale filter")
+	fs.BoolVar(&dryRun, "dry-run", false, "Preview updates without calling the API")
+	fs.BoolVar(&continueOnError, "continue-on-error", true, "Continue processing locales after errors")
+
+	return &ffcli.Command{
+		Name:      "batch-update",
+		ShortHelp: "Batch update listing fields from per-locale JSON files",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			pkg, err := shared.ResolvePackageName(packageName)
+			if err != nil {
+				return err
+			}
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return shared.UsageErrorf("--edit-id is required")
+			}
+			fromDir = strings.TrimSpace(fromDir)
+			if fromDir == "" {
+				return shared.UsageErrorf("--from-dir is required")
+			}
+
+			filter := parseCommaSeparated(localesCSV)
+			items, err := loadListingBatchItems(fromDir, filter)
+			if err != nil {
+				return err
+			}
+			if len(items) == 0 {
+				return shared.UsageErrorf("no locale JSON payloads found in %s", fromDir)
+			}
+
+			var (
+				client     Client
+				requestCtx context.Context
+				cancel     context.CancelFunc
+			)
+			if !dryRun {
+				client, _, requestCtx, cancel, err = buildClient(ctx, deps, packageName, false)
+				if err != nil {
+					return err
+				}
+				defer cancel()
+			}
+
+			results := make([]listingBatchResult, 0, len(items))
+			failed := 0
+
+			for _, item := range items {
+				result := listingBatchResult{
+					Locale: item.Locale,
+					Input:  item.Input,
+				}
+
+				update := gpc.ListingUpdate{
+					Title:            item.Input.Title,
+					ShortDescription: item.Input.ShortDescription,
+					FullDescription:  item.Input.FullDescription,
+				}
+
+				if update.Title == "" && update.ShortDescription == "" && update.FullDescription == "" {
+					result.Status = "error"
+					result.Error = "at least one listing field must be provided"
+					failed++
+					results = append(results, result)
+					if !continueOnError {
+						break
+					}
+					continue
+				}
+
+				if dryRun {
+					result.Status = "planned"
+					results = append(results, result)
+					continue
+				}
+
+				listing, updateErr := client.UpdateListing(requestCtx, pkg, editID, item.Locale, update)
+				if updateErr != nil {
+					result.Status = "error"
+					result.Error = updateErr.Error()
+					failed++
+					results = append(results, result)
+					if !continueOnError {
+						break
+					}
+					continue
+				}
+
+				result.Status = "updated"
+				result.Listing = &listing
+				results = append(results, result)
+			}
+
+			payload := map[string]any{
+				"packageName":       pkg,
+				"editId":            editID,
+				"fromDir":           fromDir,
+				"dryRun":            dryRun,
+				"continueOnError":   continueOnError,
+				"results":           results,
+				"failedLocaleCount": failed,
+			}
+			if err := shared.WriteJSON(deps.Stdout, payload); err != nil {
+				return err
+			}
+			if failed > 0 {
+				return fmt.Errorf("%d listing locale updates failed", failed)
+			}
+			return nil
+		},
+	}
+}
+
+func loadListingBatchItems(fromDir string, filter []string) ([]listingBatchItem, error) {
+	entries, err := os.ReadDir(fromDir)
+	if err != nil {
+		return nil, shared.UsageErrorf("failed to read --from-dir %q: %v", fromDir, err)
+	}
+
+	filterSet := make(map[string]struct{}, len(filter))
+	for _, locale := range filter {
+		filterSet[locale] = struct{}{}
+	}
+
+	items := make([]listingBatchItem, 0, len(entries))
+	foundByLocale := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if strings.ToLower(filepath.Ext(entry.Name())) != ".json" {
+			continue
+		}
+
+		locale := strings.TrimSpace(strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name())))
+		if locale == "" {
+			continue
+		}
+		if len(filterSet) > 0 {
+			if _, ok := filterSet[locale]; !ok {
+				continue
+			}
+		}
+
+		path := filepath.Join(fromDir, entry.Name())
+		raw, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return nil, shared.UsageErrorf("failed to read %s: %v", path, readErr)
+		}
+
+		var input listingBatchInput
+		if err := json.Unmarshal(raw, &input); err != nil {
+			return nil, shared.UsageErrorf("invalid JSON in %s: %v", path, err)
+		}
+		input.Title = strings.TrimSpace(input.Title)
+		input.ShortDescription = strings.TrimSpace(input.ShortDescription)
+		input.FullDescription = strings.TrimSpace(input.FullDescription)
+
+		items = append(items, listingBatchItem{
+			Locale: locale,
+			Input:  input,
+		})
+		foundByLocale[locale] = struct{}{}
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Locale < items[j].Locale
+	})
+
+	if len(filterSet) > 0 {
+		missing := make([]string, 0)
+		for locale := range filterSet {
+			if _, ok := foundByLocale[locale]; !ok {
+				missing = append(missing, locale)
+			}
+		}
+		sort.Strings(missing)
+		if len(missing) > 0 {
+			return nil, shared.UsageErrorf("requested locales not found in --from-dir: %s", strings.Join(missing, ","))
+		}
+	}
+
+	return items, nil
 }
 
 func newListingsDeleteCommand(deps Deps) *ffcli.Command {
@@ -990,11 +1206,11 @@ func newListingsDeleteCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			locale = strings.TrimSpace(locale)
 			if locale == "" {
-				return fmt.Errorf("--locale is required")
+				return shared.UsageErrorf("--locale is required")
 			}
 			if err := client.DeleteListing(requestCtx, pkg, editID, locale); err != nil {
 				return fmt.Errorf("failed to delete listing: %w", err)
@@ -1029,7 +1245,7 @@ func newListingsDeleteAllCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 			editID = strings.TrimSpace(editID)
 			if editID == "" {
-				return fmt.Errorf("--edit-id is required")
+				return shared.UsageErrorf("--edit-id is required")
 			}
 			if err := client.DeleteAllListings(requestCtx, pkg, editID); err != nil {
 				return fmt.Errorf("failed to delete all listings: %w", err)
