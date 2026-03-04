@@ -142,6 +142,8 @@ gpc subscriptions archive --package-name com.example.app --product-id premium_mo
 gpc subscriptions base-plans activate --package-name com.example.app --product-id premium_monthly --base-plan-id monthly
 gpc subscriptions base-plans deactivate --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --confirm
 gpc subscriptions base-plans delete --package-name com.example.app --product-id premium_monthly --base-plan-id legacy --confirm
+gpc subscriptions base-plans migrate-prices --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --input /path/to/base-plan-migrate-prices.json --confirm
+gpc subscriptions base-plans batch-migrate-prices --package-name com.example.app --product-id premium_monthly --input /path/to/base-plans-batch-migrate-prices.json --confirm
 gpc subscriptions offers list --package-name com.example.app --product-id premium_monthly --base-plan-id monthly
 gpc subscriptions offers get --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro
 gpc subscriptions offers batch-get --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-ids intro,loyalty
@@ -256,6 +258,8 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc subscriptions base-plans activate ...` should return `status: activated`.
   - `gpc subscriptions base-plans deactivate ... --confirm` should return `status: deactivated`.
   - `gpc subscriptions base-plans delete ... --confirm` should return `status: deleted`.
+  - `gpc subscriptions base-plans migrate-prices ... --confirm` should return `status: migrated`.
+  - `gpc subscriptions base-plans batch-migrate-prices ... --confirm` should return `status: migrated`.
   - `gpc subscriptions offers list ...` should return offers and optional `nextPageToken`.
   - `gpc subscriptions offers get ...` should return one offer.
   - `gpc subscriptions offers batch-get ...` should return the requested offers in one call.

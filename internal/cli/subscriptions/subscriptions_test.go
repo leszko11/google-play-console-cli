@@ -17,44 +17,49 @@ import (
 )
 
 type fakeClient struct {
-	list                 gpc.SubscriptionsListInfo
-	listErr              error
-	get                  gpc.SubscriptionInfo
-	getErr               error
-	batchGet             gpc.SubscriptionsListInfo
-	batchGetErr          error
-	create               gpc.SubscriptionInfo
-	createErr            error
-	batchUpdate          gpc.SubscriptionsListInfo
-	batchUpdateErr       error
-	update               gpc.SubscriptionInfo
-	updateErr            error
-	deleteErr            error
-	archiveErr           error
-	offersList           gpc.SubscriptionOffersListInfo
-	offersListErr        error
-	offersBatchGet       gpc.SubscriptionOffersListInfo
-	offersBatchGetErr    error
-	offersBatchUpdate    gpc.SubscriptionOffersListInfo
-	offersBatchUpdateErr error
-	offerGet             gpc.SubscriptionOfferInfo
-	offerGetErr          error
-	offerCreate          gpc.SubscriptionOfferInfo
-	offerCreateErr       error
-	offerActivate        gpc.SubscriptionOfferInfo
-	offerActivateErr     error
-	offerDeactivate      gpc.SubscriptionOfferInfo
-	offerDeactivateErr   error
-	offerUpdate          gpc.SubscriptionOfferInfo
-	offerUpdateErr       error
-	offerDeleteErr       error
-	basePlanUpdates      []gpc.SubscriptionInfo
-	basePlanActErr       error
-	basePlanDeactErr     error
-	basePlanDeleteErr    error
-	capturedInput        *androidpublisher.Subscription
-	capturedOfferInput   *androidpublisher.SubscriptionOffer
-	captured             struct {
+	list                      gpc.SubscriptionsListInfo
+	listErr                   error
+	get                       gpc.SubscriptionInfo
+	getErr                    error
+	batchGet                  gpc.SubscriptionsListInfo
+	batchGetErr               error
+	create                    gpc.SubscriptionInfo
+	createErr                 error
+	batchUpdate               gpc.SubscriptionsListInfo
+	batchUpdateErr            error
+	update                    gpc.SubscriptionInfo
+	updateErr                 error
+	deleteErr                 error
+	archiveErr                error
+	offersList                gpc.SubscriptionOffersListInfo
+	offersListErr             error
+	offersBatchGet            gpc.SubscriptionOffersListInfo
+	offersBatchGetErr         error
+	offersBatchUpdate         gpc.SubscriptionOffersListInfo
+	offersBatchUpdateErr      error
+	offerGet                  gpc.SubscriptionOfferInfo
+	offerGetErr               error
+	offerCreate               gpc.SubscriptionOfferInfo
+	offerCreateErr            error
+	offerActivate             gpc.SubscriptionOfferInfo
+	offerActivateErr          error
+	offerDeactivate           gpc.SubscriptionOfferInfo
+	offerDeactivateErr        error
+	offerUpdate               gpc.SubscriptionOfferInfo
+	offerUpdateErr            error
+	offerDeleteErr            error
+	basePlanUpdates           []gpc.SubscriptionInfo
+	basePlanActErr            error
+	basePlanDeactErr          error
+	basePlanDeleteErr         error
+	basePlanMigrateErr        error
+	basePlanBatchMigrateErr   error
+	basePlanMigrateInput      *androidpublisher.MigrateBasePlanPricesRequest
+	basePlanBatchMigrateInput []*androidpublisher.MigrateBasePlanPricesRequest
+	basePlanBatchMigrateCount int
+	capturedInput             *androidpublisher.Subscription
+	capturedOfferInput        *androidpublisher.SubscriptionOffer
+	captured                  struct {
 		pageSize int64
 		pageTok  string
 		paginate bool
@@ -128,6 +133,19 @@ func (f *fakeClient) DeleteSubscriptionBasePlan(_ context.Context, _ string, pro
 	f.productID = productID
 	f.basePlanID = basePlanID
 	return f.basePlanDeleteErr
+}
+
+func (f *fakeClient) MigrateSubscriptionBasePlanPrices(_ context.Context, _ string, productID, basePlanID string, request *androidpublisher.MigrateBasePlanPricesRequest) error {
+	f.productID = productID
+	f.basePlanID = basePlanID
+	f.basePlanMigrateInput = request
+	return f.basePlanMigrateErr
+}
+
+func (f *fakeClient) BatchMigrateSubscriptionBasePlanPrices(_ context.Context, _ string, productID string, requests []*androidpublisher.MigrateBasePlanPricesRequest) (int, error) {
+	f.productID = productID
+	f.basePlanBatchMigrateInput = append([]*androidpublisher.MigrateBasePlanPricesRequest(nil), requests...)
+	return f.basePlanBatchMigrateCount, f.basePlanBatchMigrateErr
 }
 
 func (f *fakeClient) ListSubscriptionOffers(_ context.Context, _ string, productID, basePlanID string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionOffersListInfo, error) {
@@ -258,6 +276,26 @@ func writeOfferBatchUpdatePayload(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "offer-batch-update.json")
 	payload := `{"requests":[{"allowMissing":true,"updateMask":"offerTags","subscriptionOffer":{"packageName":"com.example.app","productId":"premium_monthly","basePlanId":"monthly","offerId":"intro","offerTags":[{"tag":"cli-test"}]}}]}`
+	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	return path
+}
+
+func writeBasePlanMigratePayload(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "base-plan-migrate.json")
+	payload := `{"regionalPriceMigrations":[{"regionCode":"US","oldestAllowedPriceVersionTime":"2025-01-01T00:00:00Z"}]}`
+	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	return path
+}
+
+func writeBasePlanBatchMigratePayload(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "base-plan-batch-migrate.json")
+	payload := `{"requests":[{"basePlanId":"monthly","regionalPriceMigrations":[{"regionCode":"US","oldestAllowedPriceVersionTime":"2025-01-01T00:00:00Z"}]},{"basePlanId":"yearly","regionalPriceMigrations":[{"regionCode":"PL","oldestAllowedPriceVersionTime":"2025-01-01T00:00:00Z"}]}]}`
 	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
 		t.Fatalf("write payload: %v", err)
 	}
@@ -544,6 +582,118 @@ func TestSubscriptionsArchive_ReturnsStatusArchived(t *testing.T) {
 	}
 	if fc.productID != "premium_monthly" {
 		t.Fatalf("unexpected product id passed to client: %s", fc.productID)
+	}
+}
+
+func TestSubscriptionsBasePlansMigratePrices_RequiresConfirm(t *testing.T) {
+	payloadPath := writeBasePlanMigratePayload(t)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runSubscriptions(
+		t,
+		deps,
+		"base-plans", "migrate-prices",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--base-plan-id", "monthly",
+		"--input", payloadPath,
+	)
+	if err == nil || !strings.Contains(err.Error(), "--confirm is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSubscriptionsBasePlansMigratePrices_ReturnsStatusMigrated(t *testing.T) {
+	payloadPath := writeBasePlanMigratePayload(t)
+	fc := &fakeClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(
+		t,
+		deps,
+		"base-plans", "migrate-prices",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--base-plan-id", "monthly",
+		"--input", payloadPath,
+		"--confirm",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"migrated"`) || !strings.Contains(out, `"basePlanId":"monthly"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.productID != "premium_monthly" || fc.basePlanID != "monthly" {
+		t.Fatalf("unexpected captured IDs: product=%s basePlan=%s", fc.productID, fc.basePlanID)
+	}
+	if fc.basePlanMigrateInput == nil || len(fc.basePlanMigrateInput.RegionalPriceMigrations) != 1 {
+		t.Fatalf("unexpected parsed migration payload: %+v", fc.basePlanMigrateInput)
+	}
+}
+
+func TestSubscriptionsBasePlansBatchMigratePrices_RequiresConfirm(t *testing.T) {
+	payloadPath := writeBasePlanBatchMigratePayload(t)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runSubscriptions(
+		t,
+		deps,
+		"base-plans", "batch-migrate-prices",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--input", payloadPath,
+	)
+	if err == nil || !strings.Contains(err.Error(), "--confirm is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSubscriptionsBasePlansBatchMigratePrices_ReturnsStatusMigrated(t *testing.T) {
+	payloadPath := writeBasePlanBatchMigratePayload(t)
+	fc := &fakeClient{basePlanBatchMigrateCount: 2}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(
+		t,
+		deps,
+		"base-plans", "batch-migrate-prices",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--input", payloadPath,
+		"--confirm",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"migrated"`) || !strings.Contains(out, `"migratedCount":2`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.productID != "premium_monthly" {
+		t.Fatalf("unexpected product id: %s", fc.productID)
+	}
+	if len(fc.basePlanBatchMigrateInput) != 2 {
+		t.Fatalf("unexpected request count captured: %d", len(fc.basePlanBatchMigrateInput))
 	}
 }
 
