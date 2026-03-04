@@ -36,11 +36,81 @@ func TestResolvePackageName_Required(t *testing.T) {
 
 func TestResolveOutput_GlobalFallback(t *testing.T) {
 	prev := boundGlobalFlags
-	defer func() { boundGlobalFlags = prev }()
+	prevEnv := resolveOutputLookupEnv
+	prevTTY := resolveOutputDetectTTY
+	defer func() {
+		boundGlobalFlags = prev
+		resolveOutputLookupEnv = prevEnv
+		resolveOutputDetectTTY = prevTTY
+	}()
 
 	boundGlobalFlags = &GlobalFlags{Output: "markdown"}
+	resolveOutputLookupEnv = func(string) string { return "" }
+	resolveOutputDetectTTY = func() bool { return false }
 	if got := ResolveOutput(""); got != "markdown" {
 		t.Fatalf("expected markdown, got %q", got)
+	}
+}
+
+func TestResolveOutput_EnvFallback(t *testing.T) {
+	prev := boundGlobalFlags
+	prevEnv := resolveOutputLookupEnv
+	prevTTY := resolveOutputDetectTTY
+	defer func() {
+		boundGlobalFlags = prev
+		resolveOutputLookupEnv = prevEnv
+		resolveOutputDetectTTY = prevTTY
+	}()
+
+	boundGlobalFlags = &GlobalFlags{}
+	resolveOutputLookupEnv = func(name string) string {
+		if name == EnvDefaultOutput {
+			return "table"
+		}
+		return ""
+	}
+	resolveOutputDetectTTY = func() bool { return false }
+
+	if got := ResolveOutput(""); got != "table" {
+		t.Fatalf("expected table from env, got %q", got)
+	}
+}
+
+func TestResolveOutput_TTYFallback(t *testing.T) {
+	prev := boundGlobalFlags
+	prevEnv := resolveOutputLookupEnv
+	prevTTY := resolveOutputDetectTTY
+	defer func() {
+		boundGlobalFlags = prev
+		resolveOutputLookupEnv = prevEnv
+		resolveOutputDetectTTY = prevTTY
+	}()
+
+	boundGlobalFlags = &GlobalFlags{}
+	resolveOutputLookupEnv = func(string) string { return "" }
+	resolveOutputDetectTTY = func() bool { return true }
+
+	if got := ResolveOutput(""); got != "table" {
+		t.Fatalf("expected table from tty fallback, got %q", got)
+	}
+}
+
+func TestResolveOutput_NonTTYFallback(t *testing.T) {
+	prev := boundGlobalFlags
+	prevEnv := resolveOutputLookupEnv
+	prevTTY := resolveOutputDetectTTY
+	defer func() {
+		boundGlobalFlags = prev
+		resolveOutputLookupEnv = prevEnv
+		resolveOutputDetectTTY = prevTTY
+	}()
+
+	boundGlobalFlags = &GlobalFlags{}
+	resolveOutputLookupEnv = func(string) string { return "" }
+	resolveOutputDetectTTY = func() bool { return false }
+
+	if got := ResolveOutput(""); got != "json" {
+		t.Fatalf("expected json fallback, got %q", got)
 	}
 }
 

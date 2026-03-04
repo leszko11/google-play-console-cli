@@ -90,7 +90,10 @@ gpc --version
 gpc --help
 gpc auth init --service-account /path/to/service-account.json
 gpc auth init --service-account /path/to/service-account.json --developer-id <developer-id>
+gpc auth init --service-account /path/to/service-account.json --prompt-developer-id
 gpc auth status
+gpc auth status --output table
+gpc auth status --output json
 gpc --package-name com.example.app --service-account /path/to/service-account.json --pretty apps get
 gpc apps add-package --package-name com.example.app
 gpc apps list --output json
@@ -107,6 +110,8 @@ gpc edits country-availability get --package-name com.example.app --edit-id <edi
 gpc edits listings list --package-name com.example.app --edit-id <edit-id>
 gpc edits listings get --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings update --package-name com.example.app --edit-id <edit-id> --locale en-US --title "My App Test"
+gpc edits listings batch-update --package-name com.example.app --edit-id <edit-id> --from-dir /path/to/listings
+gpc edits listings batch-update --package-name com.example.app --edit-id <edit-id> --from-dir /path/to/listings --locales en-US,pl-PL --dry-run
 gpc edits listings delete --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings delete-all --package-name com.example.app --edit-id <edit-id>
 gpc edits images list --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
@@ -119,6 +124,7 @@ gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
 gpc tracks get --package-name com.example.app --edit-id <edit-id> --track production
 gpc tracks update --package-name com.example.app --edit-id <edit-id> --track internal --status completed --version-codes 123456
+gpc tracks update --package-name com.example.app --edit-id <edit-id> --track internal --status completed --version-codes 123456 --release-notes-file /path/to/release-notes.json
 gpc tracks promote --package-name com.example.app --edit-id <edit-id> --from-track internal --to-track production
 gpc bundles list --package-name com.example.app --edit-id <edit-id>
 gpc bundles upload --package-name com.example.app --edit-id <edit-id> --file /path/to/app.aab
@@ -126,6 +132,7 @@ gpc apks list --package-name com.example.app --edit-id <edit-id>
 gpc apks upload --package-name com.example.app --edit-id <edit-id> --file /path/to/app.apk
 gpc deobfuscation upload --package-name com.example.app --edit-id <edit-id> --version-code <version-code> --type proguard --file /path/to/mapping.txt
 gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --confirm
+gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --release-notes-file /path/to/release-notes.json --confirm
 gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --dry-run
 gpc release verify --package-name com.example.app --project-dir /path/to/android-project --build-task :app:bundleStagingRelease --notes-mode git
 gpc release alpha --package-name com.example.app --project-dir /path/to/android-project --track alpha --status completed --notes-mode git --confirm
@@ -223,6 +230,8 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - when output contains `access denied` / `missing Play Console permissions`, grant the service account in Play Console (`Users and permissions`) and ensure `Google Play Android Developer API` is enabled in the same GCP project.
 - Valid credentials:
   - `gpc auth init --service-account <valid-file>` should succeed.
+  - `gpc auth status --output table` should print a tabular status.
+  - `gpc auth status --output json` should print JSON status.
   - `gpc apps get --package-name <valid-package>` should return app JSON with `packageName`.
   - `gpc edits create --package-name <valid-package>` should return a JSON edit object with `id`.
   - `gpc edits details get ...` should return app details for the edit.
@@ -232,6 +241,8 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc edits country-availability get ...` should return country targeting for the track.
   - `gpc edits listings list ...` should return localized listings for the edit.
   - `gpc edits listings update ...` should return `status: updated` inside an edit.
+  - `gpc edits listings batch-update ...` should process per-locale JSON payload files in deterministic locale order.
+  - `gpc edits listings batch-update ... --dry-run` should return `status: planned` per locale and skip API writes.
   - `gpc edits listings delete ...` should return `status: deleted`.
   - `gpc edits listings delete-all ...` should return `status: deleted_all`.
   - `gpc edits images list ...` should return image metadata for locale + image type.
@@ -240,11 +251,13 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc edits images delete-all ...` should return `status: deleted_all`.
   - `gpc edits commit ... --confirm` should be required for publishing changes.
   - `gpc tracks list ...` should return track JSON for the given edit.
+  - `gpc tracks update ... --release-notes-file ...` should apply all locale notes from the payload in one request.
   - `gpc tracks promote ...` should copy release metadata from source track to target track within the edit.
   - `gpc bundles list ...` and `gpc apks list ...` should return version code arrays for the edit.
   - `gpc bundles upload ...` and `gpc apks upload ...` should return `status: uploaded` when upload succeeds.
   - `gpc deobfuscation upload ...` should return `status: uploaded` with the uploaded mapping `symbolType`.
   - `gpc deploy ... --confirm` should return `status: committed` and include deterministic `steps`.
+  - `gpc deploy ... --release-notes-file ...` should publish all locale notes without additional patch scripts.
   - `gpc deploy ... --dry-run` should return `status: dry-run` and delete the temporary edit.
   - `gpc deploy --track production` should fail unless `--allow-production` is set.
   - `gpc release verify ...` should return `status: ok` only when Java/Gradle/credentials/package checks pass.

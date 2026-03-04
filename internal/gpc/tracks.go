@@ -77,11 +77,41 @@ func (c *Client) UpdateTrack(ctx context.Context, packageName, editID, trackName
 	if len(update.VersionCodes) == 0 {
 		return TrackInfo{}, fmt.Errorf("at least one version code is required")
 	}
+
+	releaseNotes := make([]*androidpublisher.LocalizedText, 0, len(update.ReleaseNotes))
+	for _, note := range update.ReleaseNotes {
+		language := strings.TrimSpace(note.Language)
+		if language == "" {
+			return TrackInfo{}, fmt.Errorf("release note language is required")
+		}
+		text := strings.TrimSpace(note.Text)
+		if text == "" {
+			return TrackInfo{}, fmt.Errorf("release note text is required for locale %q", language)
+		}
+		releaseNotes = append(releaseNotes, &androidpublisher.LocalizedText{
+			Language: language,
+			Text:     text,
+		})
+	}
+
 	if c == nil || c.service == nil {
 		return TrackInfo{}, ErrInvalidCredentials
 	}
 
-	release := trackReleaseRequestFromUpdate(update)
+	release := &androidpublisher.TrackRelease{
+		Status:       update.Status,
+		Name:         strings.TrimSpace(update.ReleaseName),
+		VersionCodes: update.VersionCodes,
+	}
+	if update.UserFraction >= 0 {
+		release.UserFraction = update.UserFraction
+	}
+	if update.UpdatePriority > 0 {
+		release.InAppUpdatePriority = update.UpdatePriority
+	}
+	if len(releaseNotes) > 0 {
+		release.ReleaseNotes = releaseNotes
+	}
 
 	req := &androidpublisher.Track{
 		Track:    trackName,
@@ -115,12 +145,12 @@ func trackReleaseInfoFromRelease(release *androidpublisher.TrackRelease) TrackRe
 	if release == nil {
 		return TrackReleaseInfo{}
 	}
-	releaseNotes := make([]LocalizedReleaseNote, 0, len(release.ReleaseNotes))
+	releaseNotes := make([]LocalizedText, 0, len(release.ReleaseNotes))
 	for _, note := range release.ReleaseNotes {
 		if note == nil {
 			continue
 		}
-		releaseNotes = append(releaseNotes, LocalizedReleaseNote{
+		releaseNotes = append(releaseNotes, LocalizedText{
 			Language: note.Language,
 			Text:     note.Text,
 		})
@@ -134,33 +164,4 @@ func trackReleaseInfoFromRelease(release *androidpublisher.TrackRelease) TrackRe
 		UpdatePriority: release.InAppUpdatePriority,
 		ReleaseNotes:   releaseNotes,
 	}
-}
-
-func trackReleaseRequestFromUpdate(update TrackUpdate) *androidpublisher.TrackRelease {
-	release := &androidpublisher.TrackRelease{
-		Status:       update.Status,
-		Name:         strings.TrimSpace(update.ReleaseName),
-		VersionCodes: update.VersionCodes,
-	}
-	if update.UserFraction >= 0 {
-		release.UserFraction = update.UserFraction
-	}
-	if update.UpdatePriority > 0 {
-		release.InAppUpdatePriority = update.UpdatePriority
-	}
-	if len(update.ReleaseNotes) > 0 {
-		release.ReleaseNotes = make([]*androidpublisher.LocalizedText, 0, len(update.ReleaseNotes))
-		for _, note := range update.ReleaseNotes {
-			language := strings.TrimSpace(note.Language)
-			text := strings.TrimSpace(note.Text)
-			if language == "" || text == "" {
-				continue
-			}
-			release.ReleaseNotes = append(release.ReleaseNotes, &androidpublisher.LocalizedText{
-				Language: language,
-				Text:     text,
-			})
-		}
-	}
-	return release
 }

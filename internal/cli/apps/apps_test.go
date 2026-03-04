@@ -53,7 +53,7 @@ func TestAppsList_DefaultJSON(t *testing.T) {
 		},
 	}
 
-	out, err := runApps(t, deps, "list")
+	out, err := runApps(t, deps, "list", "--output", "json")
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestAppsListVerify_IncludesStatus(t *testing.T) {
 		},
 	}
 
-	out, err := runApps(t, deps, "list", "--verify")
+	out, err := runApps(t, deps, "list", "--verify", "--output", "json")
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}

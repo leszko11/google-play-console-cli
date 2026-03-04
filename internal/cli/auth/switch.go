@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"flag"
-	"fmt"
 	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
@@ -27,7 +26,7 @@ func NewSwitchCommand(deps Deps) *ffcli.Command {
 		Exec: func(context.Context, []string) error {
 			profile = strings.TrimSpace(profile)
 			if profile == "" {
-				return fmt.Errorf("--profile is required")
+				return shared.UsageErrorf("--profile is required")
 			}
 
 			cfg, err := deps.LoadConfig()
@@ -36,10 +35,10 @@ func NewSwitchCommand(deps Deps) *ffcli.Command {
 			}
 
 			if cfg.Profiles == nil {
-				return fmt.Errorf("profile %q not found", profile)
+				return shared.UsageErrorf("profile %q not found", profile)
 			}
 			if _, ok := cfg.Profiles[profile]; !ok {
-				return fmt.Errorf("profile %q not found", profile)
+				return shared.UsageErrorf("profile %q not found", profile)
 			}
 
 			cfg.ActiveProfile = profile

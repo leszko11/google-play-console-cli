@@ -11,7 +11,6 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
-	notesgen "github.com/leszko11/google-play-console-cli/internal/release/notes"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
@@ -99,7 +98,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 	fs.Int64Var(&updatePriority, "update-priority", 0, "In-app update priority (0-5)")
 	fs.StringVar(&mappingFile, "mapping-file", "", "Path to deobfuscation mapping file")
 	fs.StringVar(&mappingType, "mapping-type", "", "Mapping type: proguard or nativeCode (defaults to proguard)")
-	fs.StringVar(&releaseNotesFile, "release-notes-file", "", "Path to release notes text file")
+	fs.StringVar(&releaseNotesFile, "release-notes-file", "", "Path to release notes file (JSON object/array, tagged blocks, or plain text)")
 	fs.StringVar(&releaseNotesLocale, "release-notes-locale", defaultNotesLocale, "Release notes locale (BCP-47)")
 	fs.StringVar(&releaseNotesText, "release-notes-text", "", "Release notes text")
 	fs.BoolVar(&confirm, "confirm", false, "Confirm committing the edit (required unless --dry-run)")
@@ -162,7 +161,7 @@ type deployParams struct {
 	UpdatePriority   int64
 	MappingFile      string
 	MappingType      string
-	ReleaseNotes     []gpc.LocalizedReleaseNote
+	ReleaseNotes     []gpc.LocalizedText
 	Confirm          bool
 	CleanupOnFailure bool
 	DryRun           bool
@@ -249,26 +248,14 @@ func validateFlags(
 		}
 	}
 
-	releaseNotesFile = strings.TrimSpace(releaseNotesFile)
-	releaseNotesText = strings.TrimSpace(releaseNotesText)
-	releaseNotesLocale = strings.TrimSpace(releaseNotesLocale)
-	if releaseNotesLocale == "" {
-		releaseNotesLocale = defaultNotesLocale
-	}
-	if releaseNotesFile != "" && releaseNotesText != "" {
-		return deployParams{}, fmt.Errorf("only one of --release-notes-file or --release-notes-text can be set")
-	}
-
-	parsedNotes, err := notesgen.ParseLocalizedInput(releaseNotesFile, releaseNotesText, releaseNotesLocale, os.ReadFile)
+	releaseNotes, err := shared.ParseReleaseNotesInput(
+		releaseNotesFile,
+		releaseNotesText,
+		releaseNotesLocale,
+		os.ReadFile,
+	)
 	if err != nil {
 		return deployParams{}, err
-	}
-	releaseNotes := make([]gpc.LocalizedReleaseNote, 0, len(parsedNotes))
-	for _, note := range parsedNotes {
-		releaseNotes = append(releaseNotes, gpc.LocalizedReleaseNote{
-			Language: note.Locale,
-			Text:     note.Text,
-		})
 	}
 
 	return deployParams{

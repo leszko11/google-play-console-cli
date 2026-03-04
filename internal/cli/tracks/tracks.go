@@ -149,7 +149,7 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&versionCodesCSV, "version-codes", "", "Comma-separated version codes")
 	fs.Float64Var(&userFraction, "user-fraction", -1, "Rollout user fraction (0-1)")
 	fs.Int64Var(&updatePriority, "update-priority", 0, "In-app update priority (0-5)")
-	fs.StringVar(&releaseNotesFile, "release-notes-file", "", "Path to release notes text file")
+	fs.StringVar(&releaseNotesFile, "release-notes-file", "", "Path to release notes file (JSON object/array, tagged blocks, or plain text)")
 	fs.StringVar(&releaseNotesLocale, "release-notes-locale", notesgen.DefaultLocale, "Release notes locale (BCP-47)")
 	fs.StringVar(&releaseNotesText, "release-notes-text", "", "Release notes text")
 
@@ -184,11 +184,7 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 			if updatePriority < 0 || updatePriority > 5 {
 				return fmt.Errorf("--update-priority must be between 0 and 5")
 			}
-			if strings.TrimSpace(releaseNotesFile) != "" && strings.TrimSpace(releaseNotesText) != "" {
-				return fmt.Errorf("only one of --release-notes-file or --release-notes-text can be set")
-			}
-
-			parsedNotes, err := notesgen.ParseLocalizedInput(
+			releaseNotes, err := shared.ParseReleaseNotesInput(
 				releaseNotesFile,
 				releaseNotesText,
 				releaseNotesLocale,
@@ -196,13 +192,6 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 			)
 			if err != nil {
 				return err
-			}
-			releaseNotes := make([]gpc.LocalizedReleaseNote, 0, len(parsedNotes))
-			for _, note := range parsedNotes {
-				releaseNotes = append(releaseNotes, gpc.LocalizedReleaseNote{
-					Language: note.Locale,
-					Text:     note.Text,
-				})
 			}
 
 			track, err := client.UpdateTrack(requestCtx, pkg, eid, trackName, gpc.TrackUpdate{

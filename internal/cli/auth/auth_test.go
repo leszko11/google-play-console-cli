@@ -21,16 +21,22 @@ func (f fakeClient) VerifyPackageAccess(_ context.Context, _ string) error {
 
 func runAuth(t *testing.T, deps Deps, args ...string) string {
 	t.Helper()
+	out, err := runAuthWithErr(t, deps, args...)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	return out
+}
+
+func runAuthWithErr(t *testing.T, deps Deps, args ...string) (string, error) {
+	t.Helper()
 
 	var out bytes.Buffer
 	deps.Stdout = &out
 	deps.Stderr = &bytes.Buffer{}
 	cmd := NewCommand(deps)
-	if err := cmd.ParseAndRun(context.Background(), args); err != nil {
-		t.Fatalf("command failed: %v", err)
-	}
-
-	return out.String()
+	err := cmd.ParseAndRun(context.Background(), args)
+	return out.String(), err
 }
 
 func TestAuthInitStoresProfileMetadata(t *testing.T) {
@@ -104,10 +110,38 @@ func TestAuthInitPromptsForDeveloperID(t *testing.T) {
 		Now: func() time.Time { return time.Date(2026, 2, 6, 1, 2, 3, 0, time.UTC) },
 	}
 
-	runAuth(t, deps, "init", "--service-account", "/tmp/sa.json")
+	runAuth(t, deps, "init", "--service-account", "/tmp/sa.json", "--prompt-developer-id")
 
 	if stored.Profiles["default"].DeveloperID != "1234567890123456789" {
 		t.Fatalf("unexpected developer id: %+v", stored.Profiles["default"])
+	}
+}
+
+func TestAuthInitDoesNotPromptByDefault(t *testing.T) {
+	var stored config.Config
+	promptCalled := false
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return stored, nil },
+		SaveConfig: func(cfg config.Config) error {
+			stored = cfg
+			return nil
+		},
+		NewClient: func(context.Context, gpc.CredentialInput) (PackageVerifier, error) {
+			return fakeClient{}, nil
+		},
+		PromptID: func(_ io.Reader, _ io.Writer) (string, error) {
+			promptCalled = true
+			return "9023817352750250026", nil
+		},
+		Now: func() time.Time { return time.Date(2026, 2, 6, 1, 2, 3, 0, time.UTC) },
+	}
+
+	runAuth(t, deps, "init", "--service-account", "/tmp/sa.json")
+	if promptCalled {
+		t.Fatal("did not expect developer-id prompt by default")
+	}
+	if stored.Profiles["default"].DeveloperID != "" {
+		t.Fatalf("expected empty developer id, got %+v", stored.Profiles["default"])
 	}
 }
 
@@ -123,12 +157,49 @@ func TestAuthStatusPrintsActiveProfileJSON(t *testing.T) {
 		},
 	}
 
-	out := runAuth(t, deps, "status")
+	out := runAuth(t, deps, "status", "--output", "json")
 	if !bytes.Contains([]byte(out), []byte(`"activeProfile":"default"`)) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 	if !bytes.Contains([]byte(out), []byte(`"developerId":"1234567890123456789"`)) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestAuthStatus_TableOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{
+				ActiveProfile: "default",
+				Profiles: map[string]config.Profile{
+					"default": {ServiceAccountPath: "/tmp/sa.json"},
+				},
+			}, nil
+		},
+	}
+
+	out := runAuth(t, deps, "status", "--output", "table")
+	if !bytes.Contains([]byte(out), []byte("FIELD\tVALUE")) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if !bytes.Contains([]byte(out), []byte("authenticated\ttrue")) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestAuthStatus_InvalidOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{}, nil
+		},
+	}
+
+	_, err := runAuthWithErr(t, deps, "status", "--output", "xml")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("unsupported output format")) {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
