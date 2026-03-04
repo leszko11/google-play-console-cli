@@ -17,6 +17,7 @@ import (
 
 type Client interface {
 	GetProductPurchase(ctx context.Context, packageName, productID, token string) (gpc.ProductPurchaseInfo, error)
+	GetProductPurchaseV2(ctx context.Context, packageName, token string) (gpc.ProductPurchaseV2Info, error)
 	AcknowledgeProductPurchase(ctx context.Context, packageName, productID, token, developerPayload string) error
 	ConsumeProductPurchase(ctx context.Context, packageName, productID, token string) error
 
@@ -44,6 +45,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
 			newProductsCommand(deps),
+			newProductsV2Command(deps),
 			newSubscriptionsCommand(deps),
 			newVoidedCommand(deps),
 		},
@@ -84,6 +86,54 @@ func newProductsCommand(deps Deps) *ffcli.Command {
 	}
 }
 
+func newProductsV2Command(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "products-v2",
+		ShortHelp: "Inspect one-time product purchases via Purchases.Productsv2",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newProductsV2GetCommand(deps),
+		},
+	}
+}
+
+func newProductsV2GetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, token string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&token, "token", "", "Purchase token")
+
+	return &ffcli.Command{
+		Name:      "get",
+		ShortHelp: "Get one-time product purchase details (v2)",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			token = strings.TrimSpace(token)
+			if token == "" {
+				return fmt.Errorf("--token is required")
+			}
+
+			purchase, err := client.GetProductPurchaseV2(requestCtx, pkg, token)
+			if err != nil {
+				return wrapPurchaseEndpointError("failed to get product purchase (v2)", err)
+			}
+
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"purchase":    purchase,
+			})
+		},
+	}
+}
+
 func newProductsGetCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
@@ -115,7 +165,7 @@ func newProductsGetCommand(deps Deps) *ffcli.Command {
 
 			purchase, err := client.GetProductPurchase(requestCtx, pkg, productID, token)
 			if err != nil {
-				return fmt.Errorf("failed to get product purchase: %w", err)
+				return wrapPurchaseEndpointError("failed to get product purchase", err)
 			}
 
 			return shared.WriteJSON(deps.Stdout, map[string]any{
@@ -157,7 +207,7 @@ func newProductsAcknowledgeCommand(deps Deps) *ffcli.Command {
 			}
 
 			if err := client.AcknowledgeProductPurchase(requestCtx, pkg, productID, token, developerPayload); err != nil {
-				return fmt.Errorf("failed to acknowledge product purchase: %w", err)
+				return wrapPurchaseEndpointError("failed to acknowledge product purchase", err)
 			}
 
 			return shared.WriteJSON(deps.Stdout, map[string]any{
@@ -205,7 +255,7 @@ func newProductsConsumeCommand(deps Deps) *ffcli.Command {
 			}
 
 			if err := client.ConsumeProductPurchase(requestCtx, pkg, productID, token); err != nil {
-				return fmt.Errorf("failed to consume product purchase: %w", err)
+				return wrapPurchaseEndpointError("failed to consume product purchase", err)
 			}
 
 			return shared.WriteJSON(deps.Stdout, map[string]any{
@@ -258,7 +308,7 @@ func newSubscriptionsGetCommand(deps Deps) *ffcli.Command {
 
 			purchase, err := client.GetSubscriptionPurchase(requestCtx, pkg, token)
 			if err != nil {
-				return fmt.Errorf("failed to get subscription purchase: %w", err)
+				return wrapPurchaseEndpointError("failed to get subscription purchase", err)
 			}
 
 			return shared.WriteJSON(deps.Stdout, map[string]any{
@@ -300,7 +350,7 @@ func newSubscriptionsCancelCommand(deps Deps) *ffcli.Command {
 			}
 
 			if err := client.CancelSubscriptionPurchase(requestCtx, pkg, token, cancellationType); err != nil {
-				return fmt.Errorf("failed to cancel subscription purchase: %w", err)
+				return wrapPurchaseEndpointError("failed to cancel subscription purchase", err)
 			}
 
 			return shared.WriteJSON(deps.Stdout, map[string]any{
@@ -344,7 +394,7 @@ func newSubscriptionsRevokeCommand(deps Deps) *ffcli.Command {
 			}
 
 			if err := client.RevokeSubscriptionPurchase(requestCtx, pkg, token, refundType); err != nil {
-				return fmt.Errorf("failed to revoke subscription purchase: %w", err)
+				return wrapPurchaseEndpointError("failed to revoke subscription purchase", err)
 			}
 
 			return shared.WriteJSON(deps.Stdout, map[string]any{
@@ -399,7 +449,7 @@ func newSubscriptionsDeferCommand(deps Deps) *ffcli.Command {
 
 			result, err := client.DeferSubscriptionPurchase(requestCtx, pkg, token, etag, deferDuration, validateOnly)
 			if err != nil {
-				return fmt.Errorf("failed to defer subscription purchase: %w", err)
+				return wrapPurchaseEndpointError("failed to defer subscription purchase", err)
 			}
 
 			status := "deferred"
@@ -468,10 +518,7 @@ func newVoidedListCommand(deps Deps) *ffcli.Command {
 				Paginate:                          shared.ActiveGlobalFlags().Paginate,
 			})
 			if err != nil {
-				if errors.Is(err, gpc.ErrPackageNotFound) {
-					return fmt.Errorf("failed to list voided purchases: %w\nhint: this endpoint can return package-not-found when the package has no supported billing history for this API view. Verify package name and financial permissions, then retry later after billing activity", err)
-				}
-				return fmt.Errorf("failed to list voided purchases: %w", err)
+				return wrapPurchaseEndpointError("failed to list voided purchases", err)
 			}
 
 			return shared.WriteJSON(deps.Stdout, map[string]any{
@@ -481,6 +528,16 @@ func newVoidedListCommand(deps Deps) *ffcli.Command {
 			})
 		},
 	}
+}
+
+func wrapPurchaseEndpointError(prefix string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, gpc.ErrPackageNotFound) {
+		return fmt.Errorf("%s: %w\nhint: purchases endpoints can return package-not-found when billing access or purchase history is unavailable for this package. Verify package name, financial permissions, and purchase token source", prefix, err)
+	}
+	return fmt.Errorf("%s: %w", prefix, err)
 }
 
 func buildClient(ctx context.Context, deps Deps, packageName string) (Client, string, context.Context, context.CancelFunc, error) {

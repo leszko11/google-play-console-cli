@@ -192,6 +192,7 @@ gpc iap delete --package-name com.example.app --sku coins_100 --confirm
 
 # Purchase management
 gpc purchases products get --package-name com.example.app --product-id premium --token <purchase-token>
+gpc purchases products-v2 get --package-name com.example.app --token <purchase-token>
 gpc purchases products acknowledge --package-name com.example.app --product-id premium --token <purchase-token>
 gpc purchases products consume --package-name com.example.app --product-id premium --token <purchase-token> --confirm
 gpc purchases subscriptions get --package-name com.example.app --token <subscription-token>

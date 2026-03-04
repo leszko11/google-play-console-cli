@@ -43,6 +43,26 @@ func (c *Client) GetProductPurchase(ctx context.Context, packageName, productID,
 	return productPurchaseInfoFromProductPurchase(purchase), nil
 }
 
+func (c *Client) GetProductPurchaseV2(ctx context.Context, packageName, token string) (ProductPurchaseV2Info, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return ProductPurchaseV2Info{}, fmt.Errorf("package name is required")
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return ProductPurchaseV2Info{}, fmt.Errorf("purchase token is required")
+	}
+	if c == nil || c.service == nil {
+		return ProductPurchaseV2Info{}, ErrInvalidCredentials
+	}
+
+	purchase, err := c.service.Purchases.Productsv2.Getproductpurchasev2(packageName, token).Context(ctx).Do()
+	if err != nil {
+		return ProductPurchaseV2Info{}, mapGoogleAPIError(err)
+	}
+	return productPurchaseV2InfoFromProductPurchaseV2(purchase), nil
+}
+
 func (c *Client) AcknowledgeProductPurchase(ctx context.Context, packageName, productID, token, developerPayload string) error {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -310,6 +330,25 @@ func productPurchaseInfoFromProductPurchase(purchase *androidpublisher.ProductPu
 		ConsumptionState:     purchase.ConsumptionState,
 		PurchaseTimeMillis:   purchase.PurchaseTimeMillis,
 		RegionCode:           purchase.RegionCode,
+	}
+}
+
+func productPurchaseV2InfoFromProductPurchaseV2(purchase *androidpublisher.ProductPurchaseV2) ProductPurchaseV2Info {
+	if purchase == nil {
+		return ProductPurchaseV2Info{}
+	}
+	state := ""
+	if purchase.PurchaseStateContext != nil {
+		state = purchase.PurchaseStateContext.PurchaseState
+	}
+	return ProductPurchaseV2Info{
+		Kind:                   purchase.Kind,
+		OrderID:                purchase.OrderId,
+		AcknowledgementState:   purchase.AcknowledgementState,
+		PurchaseState:          state,
+		RegionCode:             purchase.RegionCode,
+		PurchaseCompletionTime: purchase.PurchaseCompletionTime,
+		LineItemCount:          len(purchase.ProductLineItem),
 	}
 }
 

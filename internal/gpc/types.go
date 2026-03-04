@@ -183,6 +183,16 @@ type ProductPurchaseInfo struct {
 	RegionCode           string `json:"regionCode,omitempty"`
 }
 
+type ProductPurchaseV2Info struct {
+	Kind                   string `json:"kind,omitempty"`
+	OrderID                string `json:"orderId,omitempty"`
+	AcknowledgementState   string `json:"acknowledgementState,omitempty"`
+	PurchaseState          string `json:"purchaseState,omitempty"`
+	RegionCode             string `json:"regionCode,omitempty"`
+	PurchaseCompletionTime string `json:"purchaseCompletionTime,omitempty"`
+	LineItemCount          int    `json:"lineItemCount,omitempty"`
+}
+
 type SubscriptionPurchaseInfo struct {
 	Kind                 string `json:"kind,omitempty"`
 	LatestOrderID        string `json:"latestOrderId,omitempty"`
