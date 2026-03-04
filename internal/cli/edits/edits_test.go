@@ -39,6 +39,7 @@ type fakeClient struct {
 	listings         []gpc.ListingInfo
 	listErr          error
 	updateErr        error
+	updateListingFn  func(packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
 	delListErr       error
 	delAllErr        error
 	images           []gpc.ImageInfo
@@ -88,7 +89,10 @@ func (f fakeClient) GetListing(_ context.Context, _, _, _ string) (gpc.ListingIn
 func (f fakeClient) ListListings(_ context.Context, _, _ string) ([]gpc.ListingInfo, error) {
 	return f.listings, f.listErr
 }
-func (f fakeClient) UpdateListing(_ context.Context, _, _, _ string, _ gpc.ListingUpdate) (gpc.ListingInfo, error) {
+func (f fakeClient) UpdateListing(_ context.Context, packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error) {
+	if f.updateListingFn != nil {
+		return f.updateListingFn(packageName, editID, language, update)
+	}
 	return f.listing, f.updateErr
 }
 func (f fakeClient) DeleteListing(_ context.Context, _, _, _ string) error  { return f.delListErr }
@@ -489,6 +493,156 @@ func TestEditsListingsUpdate_ReturnsStatusUpdated(t *testing.T) {
 	}
 }
 
+func TestEditsListingsBatchUpdate_DryRun(t *testing.T) {
+	dir := t.TempDir()
+	writeListingLocaleFile(t, dir, "en-US", `{"title":"Title EN","shortDescription":"Short EN"}`)
+	writeListingLocaleFile(t, dir, "pl-PL", `{"title":"Title PL","fullDescription":"Full PL"}`)
+
+	updateCalls := 0
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				updateListingFn: func(_, _, _ string, _ gpc.ListingUpdate) (gpc.ListingInfo, error) {
+					updateCalls++
+					return gpc.ListingInfo{}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"listings",
+		"batch-update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--from-dir", dir,
+		"--dry-run",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if updateCalls != 0 {
+		t.Fatalf("expected no API calls in dry-run, got %d", updateCalls)
+	}
+	if !strings.Contains(out, `"status":"planned"`) || !strings.Contains(out, `"locale":"en-US"`) || !strings.Contains(out, `"locale":"pl-PL"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsListingsBatchUpdate_PartialFailureReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	writeListingLocaleFile(t, dir, "en-US", `{"title":"Title EN"}`)
+	writeListingLocaleFile(t, dir, "pl-PL", `{"title":"Title PL"}`)
+
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				updateListingFn: func(_, _, locale string, update gpc.ListingUpdate) (gpc.ListingInfo, error) {
+					if locale == "pl-PL" {
+						return gpc.ListingInfo{}, errors.New("boom")
+					}
+					return gpc.ListingInfo{Language: locale, Title: update.Title}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"listings",
+		"batch-update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--from-dir", dir,
+	)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "listing locale updates failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, `"locale":"en-US"`) || !strings.Contains(out, `"status":"updated"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if !strings.Contains(out, `"locale":"pl-PL"`) || !strings.Contains(out, `"status":"error"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsListingsBatchUpdate_LocalesFilterDeterministic(t *testing.T) {
+	dir := t.TempDir()
+	writeListingLocaleFile(t, dir, "fr-FR", `{"title":"FR"}`)
+	writeListingLocaleFile(t, dir, "en-US", `{"title":"EN"}`)
+	writeListingLocaleFile(t, dir, "pl-PL", `{"title":"PL"}`)
+
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"listings",
+		"batch-update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--from-dir", dir,
+		"--locales", "pl-PL,en-US",
+		"--dry-run",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if strings.Contains(out, `"locale":"fr-FR"`) {
+		t.Fatalf("did not expect filtered-out locale in output: %s", out)
+	}
+	enIdx := strings.Index(out, `"locale":"en-US"`)
+	plIdx := strings.Index(out, `"locale":"pl-PL"`)
+	if enIdx == -1 || plIdx == -1 {
+		t.Fatalf("expected locales missing from output: %s", out)
+	}
+	if enIdx > plIdx {
+		t.Fatalf("expected deterministic sorted output, got: %s", out)
+	}
+}
+
+func TestEditsListingsBatchUpdate_MalformedJSON(t *testing.T) {
+	dir := t.TempDir()
+	writeListingLocaleFile(t, dir, "en-US", `{"title":`)
+
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(
+		t,
+		deps,
+		"listings",
+		"batch-update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--from-dir", dir,
+		"--dry-run",
+	)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "invalid JSON") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestEditsListingsDelete_ReturnsStatusDeleted(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
@@ -712,6 +866,14 @@ func TestEditsImagesList_RequiresImageType(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--image-type is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func writeListingLocaleFile(t *testing.T, dir, locale, content string) {
+	t.Helper()
+	path := filepath.Join(dir, locale+".json")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write listing file: %v", err)
 	}
 }
 

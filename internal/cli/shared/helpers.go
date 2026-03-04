@@ -3,7 +3,6 @@ package shared
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -13,6 +12,9 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
 
+var resolveOutputLookupEnv = os.Getenv
+var resolveOutputDetectTTY = detectStdoutTTY
+
 func ResolvePackageName(localValue string) (string, error) {
 	if pkg := strings.TrimSpace(localValue); pkg != "" {
 		return pkg, nil
@@ -20,7 +22,7 @@ func ResolvePackageName(localValue string) (string, error) {
 	if pkg := strings.TrimSpace(ActiveGlobalFlags().PackageName); pkg != "" {
 		return pkg, nil
 	}
-	return "", fmt.Errorf("--package-name is required")
+	return "", UsageErrorf("--package-name is required")
 }
 
 func NormalizeDeveloperID(value string) (string, error) {
@@ -32,11 +34,11 @@ func NormalizeDeveloperID(value string) (string, error) {
 	normalized := strings.TrimPrefix(trimmed, "developers/")
 	normalized = strings.TrimSpace(normalized)
 	if normalized == "" {
-		return "", fmt.Errorf("developer id must not be empty")
+		return "", UsageErrorf("developer id must not be empty")
 	}
 	for _, r := range normalized {
 		if r < '0' || r > '9' {
-			return "", fmt.Errorf("developer id must be numeric or developers/<id>")
+			return "", UsageErrorf("developer id must be numeric or developers/<id>")
 		}
 	}
 	return normalized, nil
@@ -53,7 +55,7 @@ func ResolveDeveloperID(localValue string, cfg config.Config) (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("--developer-id is required (or run `gpc auth init --developer-id <id>` once)")
+	return "", UsageErrorf("--developer-id is required (or run `gpc auth init --developer-id <id>` once)")
 }
 
 func ResolveOutput(localValue string) string {
@@ -62,6 +64,12 @@ func ResolveOutput(localValue string) string {
 	}
 	if out := strings.TrimSpace(ActiveGlobalFlags().Output); out != "" {
 		return strings.ToLower(out)
+	}
+	if out := strings.TrimSpace(resolveOutputLookupEnv(EnvDefaultOutput)); out != "" {
+		return strings.ToLower(out)
+	}
+	if resolveOutputDetectTTY() {
+		return "table"
 	}
 	return "json"
 }
@@ -85,7 +93,7 @@ func ResolveServiceAccountPath(cfg config.Config, lookupEnv func(string) string)
 	})
 	if err != nil {
 		if errors.Is(err, authresolver.ErrNoCredentialSources) {
-			return "", fmt.Errorf("no service account configured")
+			return "", UsageErrorf("no service account configured")
 		}
 		return "", err
 	}
@@ -139,4 +147,12 @@ func BuildClient[T any](ctx context.Context, deps BuildClientDeps[T]) (T, contex
 	}
 
 	return client, requestCtx, cancel, nil
+}
+
+func detectStdoutTTY() bool {
+	info, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }

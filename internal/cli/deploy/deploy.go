@@ -147,7 +147,7 @@ func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseN
 	aabPath = strings.TrimSpace(aabPath)
 	apkPath = strings.TrimSpace(apkPath)
 	if (aabPath == "" && apkPath == "") || (aabPath != "" && apkPath != "") {
-		return deployParams{}, fmt.Errorf("exactly one of --aab or --apk is required")
+		return deployParams{}, shared.UsageErrorf("exactly one of --aab or --apk is required")
 	}
 
 	artifactType := artifactTypeAAB
@@ -162,29 +162,29 @@ func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseN
 
 	track = strings.TrimSpace(track)
 	if track == "" {
-		return deployParams{}, fmt.Errorf("--track is required")
+		return deployParams{}, shared.UsageErrorf("--track is required")
 	}
 	if track == "production" && !allowProduction {
-		return deployParams{}, fmt.Errorf("--allow-production is required when --track=production")
+		return deployParams{}, shared.UsageErrorf("--allow-production is required when --track=production")
 	}
 
 	releaseStatus = strings.TrimSpace(releaseStatus)
 	if releaseStatus == "" {
-		return deployParams{}, fmt.Errorf("--status is required")
+		return deployParams{}, shared.UsageErrorf("--status is required")
 	}
 
 	if !dryRun && !confirm {
-		return deployParams{}, fmt.Errorf("--confirm is required unless --dry-run is set")
+		return deployParams{}, shared.UsageErrorf("--confirm is required unless --dry-run is set")
 	}
 
 	if userFraction > 1 || (userFraction >= 0 && userFraction <= 0) {
-		return deployParams{}, fmt.Errorf("--user-fraction must be within (0,1] when set")
+		return deployParams{}, shared.UsageErrorf("--user-fraction must be within (0,1] when set")
 	}
 
 	mappingFile = strings.TrimSpace(mappingFile)
 	mappingType = strings.TrimSpace(mappingType)
 	if mappingFile == "" && mappingType != "" {
-		return deployParams{}, fmt.Errorf("--mapping-type requires --mapping-file")
+		return deployParams{}, shared.UsageErrorf("--mapping-type requires --mapping-file")
 	}
 	if mappingFile != "" {
 		if err := validateReadableFile(mappingFile, "mapping file"); err != nil {
@@ -194,7 +194,7 @@ func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseN
 			mappingType = mappingTypeProguard
 		}
 		if mappingType != mappingTypeProguard && mappingType != mappingTypeNativeCode {
-			return deployParams{}, fmt.Errorf("--mapping-type must be one of: %s, %s", mappingTypeProguard, mappingTypeNativeCode)
+			return deployParams{}, shared.UsageErrorf("--mapping-type must be one of: %s, %s", mappingTypeProguard, mappingTypeNativeCode)
 		}
 	}
 
@@ -332,17 +332,17 @@ func validateReadableFile(path, label string) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("%s does not exist: %s", label, path)
+			return shared.UsageErrorf("%s does not exist: %s", label, path)
 		}
-		return fmt.Errorf("failed to stat %s: %w", label, err)
+		return shared.UsageErrorf("failed to stat %s: %v", label, err)
 	}
 	if info.IsDir() {
-		return fmt.Errorf("%s must be a file, got directory: %s", label, path)
+		return shared.UsageErrorf("%s must be a file, got directory: %s", label, path)
 	}
 
 	f, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("%s is not readable: %w", label, err)
+		return shared.UsageErrorf("%s is not readable: %v", label, err)
 	}
 	return f.Close()
 }

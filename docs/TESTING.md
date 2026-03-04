@@ -90,7 +90,10 @@ gpc --version
 gpc --help
 gpc auth init --service-account /path/to/service-account.json
 gpc auth init --service-account /path/to/service-account.json --developer-id <developer-id>
+gpc auth init --service-account /path/to/service-account.json --prompt-developer-id
 gpc auth status
+gpc auth status --output table
+gpc auth status --output json
 gpc --package-name com.example.app --service-account /path/to/service-account.json --pretty apps get
 gpc apps add-package --package-name com.example.app
 gpc apps list --output json
@@ -107,6 +110,8 @@ gpc edits country-availability get --package-name com.example.app --edit-id <edi
 gpc edits listings list --package-name com.example.app --edit-id <edit-id>
 gpc edits listings get --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings update --package-name com.example.app --edit-id <edit-id> --locale en-US --title "My App Test"
+gpc edits listings batch-update --package-name com.example.app --edit-id <edit-id> --from-dir /path/to/listings
+gpc edits listings batch-update --package-name com.example.app --edit-id <edit-id> --from-dir /path/to/listings --locales en-US,pl-PL --dry-run
 gpc edits listings delete --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings delete-all --package-name com.example.app --edit-id <edit-id>
 gpc edits images list --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
@@ -221,6 +226,8 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - when output contains `access denied` / `missing Play Console permissions`, grant the service account in Play Console (`Users and permissions`) and ensure `Google Play Android Developer API` is enabled in the same GCP project.
 - Valid credentials:
   - `gpc auth init --service-account <valid-file>` should succeed.
+  - `gpc auth status --output table` should print a tabular status.
+  - `gpc auth status --output json` should print JSON status.
   - `gpc apps get --package-name <valid-package>` should return app JSON with `packageName`.
   - `gpc edits create --package-name <valid-package>` should return a JSON edit object with `id`.
   - `gpc edits details get ...` should return app details for the edit.
@@ -230,6 +237,8 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc edits country-availability get ...` should return country targeting for the track.
   - `gpc edits listings list ...` should return localized listings for the edit.
   - `gpc edits listings update ...` should return `status: updated` inside an edit.
+  - `gpc edits listings batch-update ...` should process per-locale JSON payload files in deterministic locale order.
+  - `gpc edits listings batch-update ... --dry-run` should return `status: planned` per locale and skip API writes.
   - `gpc edits listings delete ...` should return `status: deleted`.
   - `gpc edits listings delete-all ...` should return `status: deleted_all`.
   - `gpc edits images list ...` should return image metadata for locale + image type.
