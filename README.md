@@ -44,6 +44,7 @@ make dev
 Detailed smoke tests: `docs/TESTING.md`.
 
 GitHub smoke workflow: `.github/workflows/smoke-tests.yml`.
+Use workflow-dispatch inputs `run_phase3` / `run_phase5` to enable optional deploy/monetization smoke phases.
 
 ## Quickstart
 
