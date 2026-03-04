@@ -32,6 +32,8 @@ jobs:
         run: go vet ./...
 
       - name: Command docs sync
+        env:
+          GPC_BIN: ""
         run: make check-command-docs
 
       - name: Run tests

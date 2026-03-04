@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import difflib
+import os
 import subprocess
 import sys
 import tempfile
@@ -18,7 +19,17 @@ GEN_SCRIPT = ROOT / "scripts" / "generate-command-docs.py"
 def main() -> int:
     with tempfile.NamedTemporaryFile(suffix=".md") as tmp:
         cmd = [sys.executable, str(GEN_SCRIPT), "--output", tmp.name]
-        proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, check=False)
+        env = os.environ.copy()
+        # Keep the docs check deterministic by always generating from source tree help output.
+        env.pop("GPC_BIN", None)
+        proc = subprocess.run(
+            cmd,
+            cwd=ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
         if proc.returncode != 0:
             sys.stderr.write(proc.stdout)
             sys.stderr.write(proc.stderr)
@@ -51,4 +62,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
