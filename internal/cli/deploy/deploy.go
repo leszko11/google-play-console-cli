@@ -22,6 +22,7 @@ const (
 	deployStatusFailed    = "failed"
 	mappingTypeProguard   = "proguard"
 	mappingTypeNativeCode = "nativeCode"
+	defaultNotesLocale    = "en-US"
 )
 
 type Client interface {
@@ -68,20 +69,23 @@ func NewCommand(deps Deps) *ffcli.Command {
 	fs.SetOutput(deps.Stderr)
 
 	var (
-		packageName      string
-		aabPath          string
-		apkPath          string
-		track            string
-		releaseStatus    string
-		releaseName      string
-		releaseNotesFile string
-		userFraction     float64
-		mappingFile      string
-		mappingType      string
-		confirm          bool
-		allowProduction  bool
-		cleanupOnFailure bool
-		dryRun           bool
+		packageName        string
+		aabPath            string
+		apkPath            string
+		track              string
+		releaseStatus      string
+		releaseName        string
+		userFraction       float64
+		updatePriority     int64
+		mappingFile        string
+		mappingType        string
+		releaseNotesFile   string
+		releaseNotesLocale string
+		releaseNotesText   string
+		confirm            bool
+		allowProduction    bool
+		cleanupOnFailure   bool
+		dryRun             bool
 	)
 
 	fs.StringVar(&packageName, "package-name", "", "Package name")
@@ -90,10 +94,13 @@ func NewCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&track, "track", "", "Track name (e.g. internal, production)")
 	fs.StringVar(&releaseStatus, "status", "", "Release status (draft, inProgress, halted, completed)")
 	fs.StringVar(&releaseName, "release-name", "", "Release name")
-	fs.StringVar(&releaseNotesFile, "release-notes-file", "", "Path to release notes JSON payload (object or array)")
 	fs.Float64Var(&userFraction, "user-fraction", -1, "Rollout user fraction (0-1)")
+	fs.Int64Var(&updatePriority, "update-priority", 0, "In-app update priority (0-5)")
 	fs.StringVar(&mappingFile, "mapping-file", "", "Path to deobfuscation mapping file")
 	fs.StringVar(&mappingType, "mapping-type", "", "Mapping type: proguard or nativeCode (defaults to proguard)")
+	fs.StringVar(&releaseNotesFile, "release-notes-file", "", "Path to release notes file (JSON object/array, tagged blocks, or plain text)")
+	fs.StringVar(&releaseNotesLocale, "release-notes-locale", defaultNotesLocale, "Release notes locale (BCP-47)")
+	fs.StringVar(&releaseNotesText, "release-notes-text", "", "Release notes text")
 	fs.BoolVar(&confirm, "confirm", false, "Confirm committing the edit (required unless --dry-run)")
 	fs.BoolVar(&allowProduction, "allow-production", false, "Allow deploys to production track")
 	fs.BoolVar(&cleanupOnFailure, "cleanup-on-failure", true, "Delete edit if deploy fails")
@@ -105,7 +112,25 @@ func NewCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			params, err := validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseName, releaseNotesFile, userFraction, mappingFile, mappingType, confirm, allowProduction, cleanupOnFailure, dryRun)
+			params, err := validateFlags(
+				packageName,
+				aabPath,
+				apkPath,
+				track,
+				releaseStatus,
+				releaseName,
+				userFraction,
+				updatePriority,
+				mappingFile,
+				mappingType,
+				releaseNotesFile,
+				releaseNotesLocale,
+				releaseNotesText,
+				confirm,
+				allowProduction,
+				cleanupOnFailure,
+				dryRun,
+			)
 			if err != nil {
 				return err
 			}
@@ -132,16 +157,35 @@ type deployParams struct {
 	Track            string
 	ReleaseStatus    string
 	ReleaseName      string
-	ReleaseNotes     []gpc.LocalizedText
 	UserFraction     float64
+	UpdatePriority   int64
 	MappingFile      string
 	MappingType      string
+	ReleaseNotes     []gpc.LocalizedText
 	Confirm          bool
 	CleanupOnFailure bool
 	DryRun           bool
 }
 
-func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseName, releaseNotesFile string, userFraction float64, mappingFile, mappingType string, confirm, allowProduction, cleanupOnFailure, dryRun bool) (deployParams, error) {
+func validateFlags(
+	packageName,
+	aabPath,
+	apkPath,
+	track,
+	releaseStatus,
+	releaseName string,
+	userFraction float64,
+	updatePriority int64,
+	mappingFile,
+	mappingType,
+	releaseNotesFile,
+	releaseNotesLocale,
+	releaseNotesText string,
+	confirm,
+	allowProduction,
+	cleanupOnFailure,
+	dryRun bool,
+) (deployParams, error) {
 	pkg, err := shared.ResolvePackageName(packageName)
 	if err != nil {
 		return deployParams{}, err
@@ -150,7 +194,7 @@ func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseN
 	aabPath = strings.TrimSpace(aabPath)
 	apkPath = strings.TrimSpace(apkPath)
 	if (aabPath == "" && apkPath == "") || (aabPath != "" && apkPath != "") {
-		return deployParams{}, shared.UsageErrorf("exactly one of --aab or --apk is required")
+		return deployParams{}, fmt.Errorf("exactly one of --aab or --apk is required")
 	}
 
 	artifactType := artifactTypeAAB
@@ -165,29 +209,32 @@ func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseN
 
 	track = strings.TrimSpace(track)
 	if track == "" {
-		return deployParams{}, shared.UsageErrorf("--track is required")
+		return deployParams{}, fmt.Errorf("--track is required")
 	}
 	if track == "production" && !allowProduction {
-		return deployParams{}, shared.UsageErrorf("--allow-production is required when --track=production")
+		return deployParams{}, fmt.Errorf("--allow-production is required when --track=production")
 	}
 
 	releaseStatus = strings.TrimSpace(releaseStatus)
 	if releaseStatus == "" {
-		return deployParams{}, shared.UsageErrorf("--status is required")
+		return deployParams{}, fmt.Errorf("--status is required")
 	}
 
 	if !dryRun && !confirm {
-		return deployParams{}, shared.UsageErrorf("--confirm is required unless --dry-run is set")
+		return deployParams{}, fmt.Errorf("--confirm is required unless --dry-run is set")
 	}
 
 	if userFraction > 1 || (userFraction >= 0 && userFraction <= 0) {
-		return deployParams{}, shared.UsageErrorf("--user-fraction must be within (0,1] when set")
+		return deployParams{}, fmt.Errorf("--user-fraction must be within (0,1] when set")
+	}
+	if updatePriority < 0 || updatePriority > 5 {
+		return deployParams{}, fmt.Errorf("--update-priority must be between 0 and 5")
 	}
 
 	mappingFile = strings.TrimSpace(mappingFile)
 	mappingType = strings.TrimSpace(mappingType)
 	if mappingFile == "" && mappingType != "" {
-		return deployParams{}, shared.UsageErrorf("--mapping-type requires --mapping-file")
+		return deployParams{}, fmt.Errorf("--mapping-type requires --mapping-file")
 	}
 	if mappingFile != "" {
 		if err := validateReadableFile(mappingFile, "mapping file"); err != nil {
@@ -197,10 +244,16 @@ func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseN
 			mappingType = mappingTypeProguard
 		}
 		if mappingType != mappingTypeProguard && mappingType != mappingTypeNativeCode {
-			return deployParams{}, shared.UsageErrorf("--mapping-type must be one of: %s, %s", mappingTypeProguard, mappingTypeNativeCode)
+			return deployParams{}, fmt.Errorf("--mapping-type must be one of: %s, %s", mappingTypeProguard, mappingTypeNativeCode)
 		}
 	}
-	releaseNotes, err := shared.ParseReleaseNotesFile(releaseNotesFile)
+
+	releaseNotes, err := shared.ParseReleaseNotesInput(
+		releaseNotesFile,
+		releaseNotesText,
+		releaseNotesLocale,
+		os.ReadFile,
+	)
 	if err != nil {
 		return deployParams{}, err
 	}
@@ -212,10 +265,11 @@ func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseN
 		Track:            track,
 		ReleaseStatus:    releaseStatus,
 		ReleaseName:      strings.TrimSpace(releaseName),
-		ReleaseNotes:     releaseNotes,
 		UserFraction:     userFraction,
+		UpdatePriority:   updatePriority,
 		MappingFile:      mappingFile,
 		MappingType:      mappingType,
+		ReleaseNotes:     releaseNotes,
 		Confirm:          confirm,
 		CleanupOnFailure: cleanupOnFailure,
 		DryRun:           dryRun,
@@ -277,11 +331,12 @@ func executeDeploy(parentCtx, requestCtx context.Context, client Client, out io.
 	}
 
 	_, err = client.UpdateTrack(requestCtx, p.PackageName, result.EditID, p.Track, gpc.TrackUpdate{
-		Status:       p.ReleaseStatus,
-		ReleaseName:  p.ReleaseName,
-		ReleaseNotes: p.ReleaseNotes,
-		UserFraction: p.UserFraction,
-		VersionCodes: []int64{versionCode},
+		Status:         p.ReleaseStatus,
+		ReleaseName:    p.ReleaseName,
+		UserFraction:   p.UserFraction,
+		VersionCodes:   []int64{versionCode},
+		UpdatePriority: p.UpdatePriority,
+		ReleaseNotes:   p.ReleaseNotes,
 	})
 	if err != nil {
 		return fail("update_track", fmt.Errorf("failed to update track: %w", err))
@@ -341,17 +396,17 @@ func validateReadableFile(path, label string) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return shared.UsageErrorf("%s does not exist: %s", label, path)
+			return fmt.Errorf("%s does not exist: %s", label, path)
 		}
-		return shared.UsageErrorf("failed to stat %s: %v", label, err)
+		return fmt.Errorf("failed to stat %s: %w", label, err)
 	}
 	if info.IsDir() {
-		return shared.UsageErrorf("%s must be a file, got directory: %s", label, path)
+		return fmt.Errorf("%s must be a file, got directory: %s", label, path)
 	}
 
 	f, err := os.Open(path)
 	if err != nil {
-		return shared.UsageErrorf("%s is not readable: %v", label, err)
+		return fmt.Errorf("%s is not readable: %w", label, err)
 	}
 	return f.Close()
 }

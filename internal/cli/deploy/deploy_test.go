@@ -122,9 +122,13 @@ func defaultConfig() config.Config {
 }
 
 func writeTempFile(t *testing.T, name string) string {
+	return writeTempFileWithContents(t, name, "x")
+}
+
+func writeTempFileWithContents(t *testing.T, name, contents string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), name)
-	if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatalf("write temp file: %v", err)
 	}
 	return path
@@ -339,6 +343,107 @@ func TestDeployMappingDefaultsToProguard(t *testing.T) {
 	}
 	if client.lastMappingType != "proguard" {
 		t.Fatalf("expected default mapping type proguard, got %q", client.lastMappingType)
+	}
+}
+
+func TestDeployPropagatesUpdatePriorityAndReleaseNotes(t *testing.T) {
+	client := &fakeClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	_, err := runDeploy(
+		t,
+		deps,
+		"--package-name", "com.example.app",
+		"--aab", writeTempFile(t, "app.aab"),
+		"--track", "internal",
+		"--status", "completed",
+		"--update-priority", "5",
+		"--release-notes-locale", "pl-PL",
+		"--release-notes-text", "Poprawki bledow",
+		"--confirm",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if client.lastTrack.UpdatePriority != 5 {
+		t.Fatalf("expected update priority 5, got %d", client.lastTrack.UpdatePriority)
+	}
+	if len(client.lastTrack.ReleaseNotes) != 1 {
+		t.Fatalf("expected one release note, got %+v", client.lastTrack.ReleaseNotes)
+	}
+	if client.lastTrack.ReleaseNotes[0].Language != "pl-PL" || client.lastTrack.ReleaseNotes[0].Text != "Poprawki bledow" {
+		t.Fatalf("unexpected release note payload: %+v", client.lastTrack.ReleaseNotes[0])
+	}
+}
+
+func TestDeployRejectsInvalidUpdatePriority(t *testing.T) {
+	_, err := runDeploy(
+		t,
+		Deps{},
+		"--package-name", "com.example.app",
+		"--aab", writeTempFile(t, "app.aab"),
+		"--track", "internal",
+		"--status", "completed",
+		"--update-priority", "7",
+		"--confirm",
+	)
+	if err == nil || !strings.Contains(err.Error(), "--update-priority must be between 0 and 5") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeployRejectsBothReleaseNotesSources(t *testing.T) {
+	_, err := runDeploy(
+		t,
+		Deps{},
+		"--package-name", "com.example.app",
+		"--aab", writeTempFile(t, "app.aab"),
+		"--track", "internal",
+		"--status", "completed",
+		"--release-notes-file", writeTempFile(t, "notes.txt"),
+		"--release-notes-text", "Hello",
+		"--confirm",
+	)
+	if err == nil || !strings.Contains(err.Error(), "only one of --release-notes-file or --release-notes-text can be set") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeployParsesMultipleReleaseNotesFromTaggedFile(t *testing.T) {
+	client := &fakeClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	notesPath := writeTempFileWithContents(t, "notes.txt", `<pl-PL>
+Poprawki bledow i ulepszenia stabilnosci.
+</pl-PL>
+<en-US>
+Bug fixes and stability improvements.
+</en-US>`)
+
+	_, err := runDeploy(
+		t,
+		deps,
+		"--package-name", "com.example.app",
+		"--aab", writeTempFile(t, "app.aab"),
+		"--track", "internal",
+		"--status", "completed",
+		"--release-notes-file", notesPath,
+		"--confirm",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if len(client.lastTrack.ReleaseNotes) != 2 {
+		t.Fatalf("expected 2 release notes, got %+v", client.lastTrack.ReleaseNotes)
+	}
+	if client.lastTrack.ReleaseNotes[0].Language != "pl-PL" || client.lastTrack.ReleaseNotes[1].Language != "en-US" {
+		t.Fatalf("unexpected release notes locales: %+v", client.lastTrack.ReleaseNotes)
 	}
 }
 

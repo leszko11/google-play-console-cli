@@ -105,14 +105,14 @@ func TestAuthInitPromptsForDeveloperID(t *testing.T) {
 			return fakeClient{}, nil
 		},
 		PromptID: func(_ io.Reader, _ io.Writer) (string, error) {
-			return "9023817352750250026", nil
+			return "1234567890123456789", nil
 		},
 		Now: func() time.Time { return time.Date(2026, 2, 6, 1, 2, 3, 0, time.UTC) },
 	}
 
 	runAuth(t, deps, "init", "--service-account", "/tmp/sa.json", "--prompt-developer-id")
 
-	if stored.Profiles["default"].DeveloperID != "9023817352750250026" {
+	if stored.Profiles["default"].DeveloperID != "1234567890123456789" {
 		t.Fatalf("unexpected developer id: %+v", stored.Profiles["default"])
 	}
 }
@@ -151,7 +151,7 @@ func TestAuthStatusPrintsActiveProfileJSON(t *testing.T) {
 			return config.Config{
 				ActiveProfile: "default",
 				Profiles: map[string]config.Profile{
-					"default": {ServiceAccountPath: "/tmp/sa.json", DeveloperID: "9023817352750250026"},
+					"default": {ServiceAccountPath: "/tmp/sa.json", DeveloperID: "1234567890123456789"},
 				},
 			}, nil
 		},
@@ -161,7 +161,7 @@ func TestAuthStatusPrintsActiveProfileJSON(t *testing.T) {
 	if !bytes.Contains([]byte(out), []byte(`"activeProfile":"default"`)) {
 		t.Fatalf("unexpected output: %s", out)
 	}
-	if !bytes.Contains([]byte(out), []byte(`"developerId":"9023817352750250026"`)) {
+	if !bytes.Contains([]byte(out), []byte(`"developerId":"1234567890123456789"`)) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }

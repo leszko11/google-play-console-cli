@@ -28,7 +28,7 @@ Required environment variables:
 Developer account ID (for `users`/`grants` commands):
 
 - Copy numeric ID from Play Console URL segment `developers/<id>`.
-- Example: `https://play.google.com/console/u/1/developers/9023817352750250026/app-list`.
+- Example: `https://play.google.com/console/u/1/developers/<developer-id>/app-list`.
 
 Optional environment variables:
 
@@ -134,6 +134,8 @@ gpc deobfuscation upload --package-name com.example.app --edit-id <edit-id> --ve
 gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --confirm
 gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --release-notes-file /path/to/release-notes.json --confirm
 gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --dry-run
+gpc release verify --package-name com.example.app --project-dir /path/to/android-project --build-task :app:bundleStagingRelease --notes-mode git
+gpc release alpha --package-name com.example.app --project-dir /path/to/android-project --track alpha --status completed --notes-mode git --confirm
 gpc reviews list --package-name com.example.app --max-results 50
 gpc reviews get --package-name com.example.app --review-id <review-id>
 gpc reviews reply --package-name com.example.app --review-id <review-id> --reply-text "Thanks for your feedback!"
@@ -258,6 +260,9 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc deploy ... --release-notes-file ...` should publish all locale notes without additional patch scripts.
   - `gpc deploy ... --dry-run` should return `status: dry-run` and delete the temporary edit.
   - `gpc deploy --track production` should fail unless `--allow-production` is set.
+  - `gpc release verify ...` should return `status: ok` only when Java/Gradle/credentials/package checks pass.
+  - `gpc release alpha ... --confirm` should return `status: committed` and include `uploadedVersionCode`.
+  - `gpc release alpha ... --dry-run` should return `status: dry-run` and skip commit.
   - `gpc reviews list ...` should return a review array and optional `nextToken`.
   - `gpc reviews get ...` should return a single review.
   - `gpc reviews reply ...` should return `status: replied`.

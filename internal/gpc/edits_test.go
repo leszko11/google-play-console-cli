@@ -154,11 +154,11 @@ func TestListingMethods_ValidateArgs(t *testing.T) {
 func TestListingInfoFromListing(t *testing.T) {
 	got := listingInfoFromListing(&androidpublisher.Listing{
 		Language:         "en-US",
-		Title:            "PeakMe",
+		Title:            "Example App",
 		ShortDescription: "Short",
 		FullDescription:  "Full",
 	})
-	if got.Language != "en-US" || got.Title != "PeakMe" {
+	if got.Language != "en-US" || got.Title != "Example App" {
 		t.Fatalf("unexpected listing map: %+v", got)
 	}
 }

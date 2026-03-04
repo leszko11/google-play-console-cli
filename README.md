@@ -15,6 +15,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Binary uploads in edits (`apks list/upload`, `bundles list/upload`)
 - Deobfuscation mapping upload (`deobfuscation upload`)
 - End-to-end deploy orchestration (`deploy`)
+- Staging release workflows (`release verify`, `release alpha`)
 - Reviews management (`reviews list/get/reply`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Monetization one-time product commands (`products ...`)
@@ -56,15 +57,10 @@ gpc --version
 gpc auth init --service-account /path/to/service-account.json
 
 # Optional: save your developer account ID once for developer-level commands
-gpc auth init --service-account /path/to/service-account.json --developer-id 9023817352750250026
-
-# Optional: interactive developer ID prompt (TTY only, opt-in)
-gpc auth init --service-account /path/to/service-account.json --prompt-developer-id
+gpc auth init --service-account /path/to/service-account.json --developer-id <developer-id>
 
 # Show current auth profile
 gpc auth status
-gpc auth status --output table
-gpc auth status --output json
 
 # Global flags are available from root and apply to all commands
 gpc --package-name com.example.app --service-account /path/to/service-account.json --timeout 90s --pretty apps get
@@ -104,12 +100,6 @@ gpc edits listings update \
 gpc edits listings list --package-name com.example.app --edit-id <edit-id>
 gpc edits listings delete --package-name com.example.app --edit-id <edit-id> --locale en-US
 gpc edits listings delete-all --package-name com.example.app --edit-id <edit-id>
-
-# Batch update localized listings from JSON files (<locale>.json)
-gpc edits listings batch-update --package-name com.example.app --edit-id <edit-id> --from-dir /path/to/listings
-gpc edits listings batch-update --package-name com.example.app --edit-id <edit-id> --from-dir /path/to/listings --locales en-US,pl-PL --dry-run
-# Example file: /path/to/listings/en-US.json
-# {"title":"My App","shortDescription":"Short text","fullDescription":"Long text"}
 
 # Manage store images in an edit
 gpc edits images list --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
@@ -246,17 +236,8 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
 # Inspect tracks inside an edit
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
 gpc tracks get --package-name com.example.app --edit-id <edit-id> --track production
-gpc tracks update --package-name com.example.app --edit-id <edit-id> --track internal --status completed --version-codes 123456
 gpc tracks promote --package-name com.example.app --edit-id <edit-id> --from-track internal --to-track production
-
-# Multi-locale release notes payload for track update/deploy
-cat >/tmp/release-notes.json <<'JSON'
-{
-  "en-US": "Bug fixes and performance improvements.",
-  "pl-PL": "Poprawki błędów i wydajności."
-}
-JSON
-gpc tracks update --package-name com.example.app --edit-id <edit-id> --track internal --status completed --version-codes 123456 --release-notes-file /tmp/release-notes.json
+gpc tracks update --package-name com.example.app --edit-id <edit-id> --track alpha --status draft --version-codes 123456789 --release-notes-file /path/to/release-notes.txt
 
 # List/upload binaries in an edit
 gpc bundles list --package-name com.example.app --edit-id <edit-id>
@@ -278,8 +259,39 @@ gpc deploy \
   --aab /path/to/app.aab \
   --track internal \
   --status completed \
-  --release-notes-file /tmp/release-notes.json \
+  --update-priority 3 \
+  --release-notes-locale en-US \
+  --release-notes-file /path/to/whats-new.txt \
   --confirm
+
+# Multi-locale release notes format (works with --release-notes-file, --notes-file)
+# If file content is plain text, locale defaults to --release-notes-locale / --notes-locale.
+cat <<'EOF' >/path/to/release-notes.txt
+<pl-PL>
+Poprawki bledow i ulepszenia stabilnosci.
+</pl-PL>
+<cs-CZ>
+Opravy chyb a vylepseni stability.
+</cs-CZ>
+<de-DE>
+Fehlerbehebungen und Stabilitaetsverbesserungen.
+</de-DE>
+<en-GB>
+Bug fixes and stability improvements.
+</en-GB>
+<en-US>
+Bug fixes and stability improvements.
+</en-US>
+<fr-FR>
+Corrections de bugs et ameliorations de la stabilite.
+</fr-FR>
+<it-IT>
+Correzioni di bug e miglioramenti della stabilita.
+</it-IT>
+<sk>
+Opravy chyb a zlepsenia stability.
+</sk>
+EOF
 
 # Dry-run deploy (deletes edit instead of commit)
 gpc deploy \
@@ -288,27 +300,37 @@ gpc deploy \
   --track internal \
   --status completed \
   --dry-run
+
+# Preflight release checks for staging -> alpha
+gpc release verify \
+  --package-name com.example.app.staging \
+  --project-dir /path/to/android-project \
+  --build-task :app:bundleStagingRelease \
+  --notes-mode git
+
+# One-command staging alpha release flow
+gpc release alpha \
+  --package-name com.example.app.staging \
+  --project-dir /path/to/android-project \
+  --track alpha \
+  --status completed \
+  --notes-mode git \
+  --confirm
 ```
 
 ## Bootstrap New Apps
 
 Google Play API can only manage packages that were initialized with at least one artifact uploaded in Play Console UI.
 
-When `gpc` hits a `package not found` error and `--bootstrap-assist` is enabled in an interactive terminal, it can offer a guided build flow if it detects an Android Gradle project (`./gradlew` or `./android/gradlew`):
+When `gpc` hits a `package not found` error in an interactive terminal and detects an Android Gradle project (`./gradlew` or `./android/gradlew`), it offers a guided build flow:
 - asks for `aab`/`apk`, module, and variant
 - runs the Gradle task
 - prints the built artifact path you can upload manually in Play Console for one-time bootstrap
 
-Example:
-
-```bash
-gpc --bootstrap-assist apps get --package-name com.example.newapp
-```
-
 ## Finding Developer ID
 
 - In Play Console, open any URL under your account and copy the number in `developers/<id>`.
-- Example: `https://play.google.com/console/u/1/developers/9023817352750250026/app-list` → developer ID is `9023817352750250026`.
+- Example: `https://play.google.com/console/u/1/developers/<developer-id>/app-list` → developer ID is `<developer-id>`.
 - You can store it once with `gpc auth init --developer-id <id>` so `gpc users list/create` can use it by default.
 
 ## Permission Errors
@@ -326,15 +348,11 @@ When CLI output includes `access denied` or `missing Play Console permissions`:
 
 - `--package-name`: default package for commands that support package-level operations.
 - `--service-account`: credential path override (`flag > env > config`).
-- `--output`: output format override for commands that support output variants.
+- `--output`: default output format for commands that support output variants.
 - `--pretty`: pretty-print JSON output.
 - `--timeout`: timeout for standard API requests.
 - `--upload-timeout`: timeout for upload API requests.
 - `--paginate`: fetch all pages on paginated endpoints (enabled per-command where supported).
-- `--bootstrap-assist`: opt in to interactive bootstrap artifact help on package-not-found errors.
-
-When `--output` is not provided, output precedence is:
-`command --output` > global `--output` > `GPC_DEFAULT_OUTPUT` > TTY default (`table`) > non-TTY default (`json`).
 
 ## Command Discovery
 
@@ -348,6 +366,7 @@ gpc bundles --help
 gpc apks --help
 gpc deobfuscation --help
 gpc deploy --help
+gpc release --help
 gpc reviews --help
 gpc subscriptions --help
 gpc products --help
@@ -357,9 +376,3 @@ gpc users --help
 gpc grants --help
 gpc internal-sharing --help
 ```
-
-Generated command reference (live help snapshot):
-
-- `docs/COMMANDS.md`
-- `make generate-command-docs`
-- `make check-command-docs`

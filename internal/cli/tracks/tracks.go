@@ -12,6 +12,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
+	notesgen "github.com/leszko11/google-play-console-cli/internal/release/notes"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
@@ -136,18 +137,21 @@ func newGetCommand(deps Deps) *ffcli.Command {
 func newUpdateCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var packageName, editID, trackName, status, releaseName, versionCodesCSV, releaseNotesFile string
+	var packageName, editID, trackName, status, releaseName, versionCodesCSV string
 	var userFraction float64
 	var updatePriority int64
+	var releaseNotesFile, releaseNotesLocale, releaseNotesText string
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
 	fs.StringVar(&trackName, "track", "", "Track name (e.g. production, internal)")
 	fs.StringVar(&status, "status", "", "Release status (draft, inProgress, halted, completed)")
 	fs.StringVar(&releaseName, "release-name", "", "Release name")
 	fs.StringVar(&versionCodesCSV, "version-codes", "", "Comma-separated version codes")
-	fs.StringVar(&releaseNotesFile, "release-notes-file", "", "Path to release notes JSON payload (object or array)")
 	fs.Float64Var(&userFraction, "user-fraction", -1, "Rollout user fraction (0-1)")
 	fs.Int64Var(&updatePriority, "update-priority", 0, "In-app update priority (0-5)")
+	fs.StringVar(&releaseNotesFile, "release-notes-file", "", "Path to release notes file (JSON object/array, tagged blocks, or plain text)")
+	fs.StringVar(&releaseNotesLocale, "release-notes-locale", notesgen.DefaultLocale, "Release notes locale (BCP-47)")
+	fs.StringVar(&releaseNotesText, "release-notes-text", "", "Release notes text")
 
 	return &ffcli.Command{
 		Name:      "update",
@@ -180,7 +184,12 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 			if updatePriority < 0 || updatePriority > 5 {
 				return fmt.Errorf("--update-priority must be between 0 and 5")
 			}
-			releaseNotes, err := shared.ParseReleaseNotesFile(releaseNotesFile)
+			releaseNotes, err := shared.ParseReleaseNotesInput(
+				releaseNotesFile,
+				releaseNotesText,
+				releaseNotesLocale,
+				os.ReadFile,
+			)
 			if err != nil {
 				return err
 			}
@@ -269,7 +278,6 @@ func newPromoteCommand(deps Deps) *ffcli.Command {
 				UserFraction:   sourceRelease.UserFraction,
 				VersionCodes:   sourceRelease.VersionCodes,
 				UpdatePriority: sourceRelease.UpdatePriority,
-				ReleaseNotes:   sourceRelease.ReleaseNotes,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to promote track: %w", err)

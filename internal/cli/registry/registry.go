@@ -14,6 +14,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/internalsharing"
 	"github.com/leszko11/google-play-console-cli/internal/cli/products"
 	"github.com/leszko11/google-play-console-cli/internal/cli/purchases"
+	"github.com/leszko11/google-play-console-cli/internal/cli/release"
 	"github.com/leszko11/google-play-console-cli/internal/cli/reviews"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/cli/subscriptions"
@@ -38,6 +39,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		bundles.NewCommand(bundles.Deps{}),
 		deobfuscation.NewCommand(deobfuscation.Deps{}),
 		deploy.NewCommand(deploy.Deps{}),
+		release.NewCommand(release.Deps{}),
 		reviews.NewCommand(reviews.Deps{}),
 		subscriptions.NewCommand(subscriptions.Deps{}),
 		products.NewCommand(products.Deps{}),

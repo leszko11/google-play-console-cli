@@ -157,8 +157,8 @@ func TestNormalizeDeveloperID(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{name: "numeric", input: "9023817352750250026", want: "9023817352750250026"},
-		{name: "prefixed", input: "developers/9023817352750250026", want: "9023817352750250026"},
+		{name: "numeric", input: "1234567890123456789", want: "1234567890123456789"},
+		{name: "prefixed", input: "developers/1234567890123456789", want: "1234567890123456789"},
 		{name: "empty", input: "", want: ""},
 		{name: "invalid", input: "developers/not-a-number", wantErr: true},
 	}
@@ -186,7 +186,7 @@ func TestResolveDeveloperID(t *testing.T) {
 	cfg := config.Config{
 		ActiveProfile: "default",
 		Profiles: map[string]config.Profile{
-			"default": {DeveloperID: "9023817352750250026"},
+			"default": {DeveloperID: "1234567890123456789"},
 		},
 	}
 
@@ -194,7 +194,7 @@ func TestResolveDeveloperID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got != "9023817352750250026" {
+	if got != "1234567890123456789" {
 		t.Fatalf("expected configured developer id, got %q", got)
 	}
 }

@@ -123,11 +123,11 @@ func TestGrantsCreate_InvalidJSON(t *testing.T) {
 func TestGrantsCreate_UsesStoredDeveloperID(t *testing.T) {
 	inputPath := writeJSON(t, `{"packageName":"com.example.app","appLevelPermissions":["CAN_VIEW_NON_FINANCIAL_DATA"]}`)
 	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("1234567890123456789"), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return fakeClient{
 				createFn: func(parent string, _ *androidpublisher.Grant) (gpc.GrantInfo, error) {
-					if parent != "developers/9023817352750250026/users/dev@example.com" {
+					if parent != "developers/1234567890123456789/users/dev@example.com" {
 						t.Fatalf("unexpected parent: %q", parent)
 					}
 					return gpc.GrantInfo{Name: parent + "/grants/com.example.app", PackageName: "com.example.app"}, nil
@@ -140,7 +140,7 @@ func TestGrantsCreate_UsesStoredDeveloperID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
-	if !strings.Contains(out, `"parent":"developers/9023817352750250026/users/dev@example.com"`) {
+	if !strings.Contains(out, `"parent":"developers/1234567890123456789/users/dev@example.com"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
@@ -205,11 +205,11 @@ func TestGrantsUpdate_RequiresName(t *testing.T) {
 func TestGrantsUpdate_UsesStoredDeveloperIDAndPackage(t *testing.T) {
 	inputPath := writeJSON(t, `{"appLevelPermissions":["CAN_REPLY_TO_REVIEWS"]}`)
 	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("1234567890123456789"), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return fakeClient{
 				updateFn: func(name string, _ *androidpublisher.Grant, _ string) (gpc.GrantInfo, error) {
-					if name != "developers/9023817352750250026/users/dev@example.com/grants/com.example.app" {
+					if name != "developers/1234567890123456789/users/dev@example.com/grants/com.example.app" {
 						t.Fatalf("unexpected name: %q", name)
 					}
 					return gpc.GrantInfo{Name: name}, nil
@@ -230,7 +230,7 @@ func TestGrantsUpdate_UsesStoredDeveloperIDAndPackage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
-	if !strings.Contains(out, `"name":"developers/9023817352750250026/users/dev@example.com/grants/com.example.app"`) {
+	if !strings.Contains(out, `"name":"developers/1234567890123456789/users/dev@example.com/grants/com.example.app"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
@@ -271,7 +271,7 @@ func TestGrantsDelete_ReturnsDeleted(t *testing.T) {
 
 func TestGrantsDelete_UsesStoredDeveloperIDAndPackage(t *testing.T) {
 	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("1234567890123456789"), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return fakeClient{}, nil
 		},
@@ -288,7 +288,7 @@ func TestGrantsDelete_UsesStoredDeveloperIDAndPackage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
-	if !strings.Contains(out, `"name":"developers/9023817352750250026/users/dev@example.com/grants/com.example.app"`) {
+	if !strings.Contains(out, `"name":"developers/1234567890123456789/users/dev@example.com/grants/com.example.app"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }

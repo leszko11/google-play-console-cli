@@ -221,7 +221,7 @@ func TestEditsListingsGet(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
-			return fakeClient{listing: gpc.ListingInfo{Language: "en-US", Title: "PeakMe"}}, nil
+			return fakeClient{listing: gpc.ListingInfo{Language: "en-US", Title: "Example App"}}, nil
 		},
 	}
 
@@ -229,7 +229,7 @@ func TestEditsListingsGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
-	if !strings.Contains(out, `"title":"PeakMe"`) {
+	if !strings.Contains(out, `"title":"Example App"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
@@ -463,7 +463,7 @@ func TestEditsListingsList(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
-			return fakeClient{listings: []gpc.ListingInfo{{Language: "en-US", Title: "PeakMe"}, {Language: "pl-PL", Title: "PeakMe PL"}}}, nil
+			return fakeClient{listings: []gpc.ListingInfo{{Language: "en-US", Title: "Example App"}, {Language: "pl-PL", Title: "Example App PL"}}}, nil
 		},
 	}
 
@@ -480,11 +480,11 @@ func TestEditsListingsUpdate_ReturnsStatusUpdated(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
-			return fakeClient{listing: gpc.ListingInfo{Language: "en-US", Title: "PeakMe Test"}}, nil
+			return fakeClient{listing: gpc.ListingInfo{Language: "en-US", Title: "Example App Test"}}, nil
 		},
 	}
 
-	out, err := runEdits(t, deps, "listings", "update", "--package-name", "com.example.app", "--edit-id", "edit-1", "--locale", "en-US", "--title", "PeakMe Test")
+	out, err := runEdits(t, deps, "listings", "update", "--package-name", "com.example.app", "--edit-id", "edit-1", "--locale", "en-US", "--title", "Example App Test")
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
+	notes "github.com/leszko11/google-play-console-cli/internal/release/notes"
 )
 
 func ParseReleaseNotesFile(path string) ([]gpc.LocalizedText, error) {
@@ -20,6 +21,57 @@ func ParseReleaseNotesFile(path string) ([]gpc.LocalizedText, error) {
 		return nil, UsageErrorf("failed to read --release-notes-file: %v", err)
 	}
 
+	return parseJSONReleaseNotesRaw(raw)
+}
+
+func ParseReleaseNotesInput(filePath, inlineText, defaultLocale string, readFile func(string) ([]byte, error)) ([]gpc.LocalizedText, error) {
+	filePath = strings.TrimSpace(filePath)
+	inlineText = strings.TrimSpace(inlineText)
+	defaultLocale = strings.TrimSpace(defaultLocale)
+	if defaultLocale == "" {
+		defaultLocale = notes.DefaultLocale
+	}
+	if filePath != "" && inlineText != "" {
+		return nil, UsageErrorf("only one of --release-notes-file or --release-notes-text can be set")
+	}
+	if filePath == "" && inlineText == "" {
+		return nil, nil
+	}
+
+	if readFile == nil {
+		readFile = os.ReadFile
+	}
+
+	if filePath != "" {
+		raw, err := readFile(filePath)
+		if err != nil {
+			return nil, UsageErrorf("failed to read --release-notes-file: %v", err)
+		}
+
+		trimmed := strings.TrimSpace(string(raw))
+		if trimmed == "" {
+			return nil, UsageErrorf("notes file is empty: %s", filePath)
+		}
+
+		if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+			return parseJSONReleaseNotesRaw([]byte(trimmed))
+		}
+
+		parsedNotes, err := notes.ParseLocalizedText(trimmed, defaultLocale)
+		if err != nil {
+			return nil, UsageErrorf("%s", err)
+		}
+		return toLocalizedText(parsedNotes), nil
+	}
+
+	parsedNotes, err := notes.ParseLocalizedText(inlineText, defaultLocale)
+	if err != nil {
+		return nil, UsageErrorf("%s", err)
+	}
+	return toLocalizedText(parsedNotes), nil
+}
+
+func parseJSONReleaseNotesRaw(raw []byte) ([]gpc.LocalizedText, error) {
 	var mapPayload map[string]string
 	if err := json.Unmarshal(raw, &mapPayload); err == nil && mapPayload != nil {
 		if len(mapPayload) == 0 {
@@ -41,6 +93,21 @@ func ParseReleaseNotesFile(path string) ([]gpc.LocalizedText, error) {
 	}
 
 	return nil, UsageErrorf("--release-notes-file must be either a JSON object or array")
+}
+
+func toLocalizedText(parsed []notes.LocalizedNote) []gpc.LocalizedText {
+	if len(parsed) == 0 {
+		return nil
+	}
+
+	notesOut := make([]gpc.LocalizedText, 0, len(parsed))
+	for _, note := range parsed {
+		notesOut = append(notesOut, gpc.LocalizedText{
+			Language: note.Locale,
+			Text:     note.Text,
+		})
+	}
+	return notesOut
 }
 
 func normalizeReleaseNotes(notes []gpc.LocalizedText) ([]gpc.LocalizedText, error) {

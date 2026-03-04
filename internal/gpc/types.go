@@ -266,6 +266,9 @@ type LocalizedText struct {
 	Text     string `json:"text,omitempty"`
 }
 
+// LocalizedReleaseNote is kept as an alias for compatibility with release workflow code.
+type LocalizedReleaseNote = LocalizedText
+
 type BundleInfo struct {
 	VersionCode int64  `json:"versionCode,omitempty"`
 	SHA1        string `json:"sha1,omitempty"`
