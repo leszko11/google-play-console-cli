@@ -28,6 +28,8 @@ type Client interface {
 	ActivateSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) ([]gpc.SubscriptionInfo, error)
 	DeactivateSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) ([]gpc.SubscriptionInfo, error)
 	DeleteSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) error
+	MigrateSubscriptionBasePlanPrices(ctx context.Context, packageName, productID, basePlanID string, request *androidpublisher.MigrateBasePlanPricesRequest) error
+	BatchMigrateSubscriptionBasePlanPrices(ctx context.Context, packageName, productID string, requests []*androidpublisher.MigrateBasePlanPricesRequest) (int, error)
 
 	ListSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionOffersListInfo, error)
 	GetSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error)
@@ -394,6 +396,8 @@ func newBasePlansCommand(deps Deps) *ffcli.Command {
 			newBasePlansActivateCommand(deps),
 			newBasePlansDeactivateCommand(deps),
 			newBasePlansDeleteCommand(deps),
+			newBasePlansMigratePricesCommand(deps),
+			newBasePlansBatchMigratePricesCommand(deps),
 		},
 	}
 }
@@ -530,6 +534,106 @@ func newBasePlansDeleteCommand(deps Deps) *ffcli.Command {
 				"productId":   productID,
 				"basePlanId":  basePlanID,
 				"status":      "deleted",
+			})
+		},
+	}
+}
+
+func newBasePlansMigratePricesCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("migrate-prices", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, basePlanID, inputPath string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
+	fs.StringVar(&inputPath, "input", "", "Path to base plan migrate-prices JSON payload (use - for stdin)")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm migrating base plan prices (required)")
+
+	return &ffcli.Command{
+		Name:      "migrate-prices",
+		ShortHelp: "Migrate legacy cohorts to current prices for one base plan",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			basePlanID = strings.TrimSpace(basePlanID)
+			if basePlanID == "" {
+				return fmt.Errorf("--base-plan-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to migrate prices for base plan %q", basePlanID)
+			}
+			payload, err := readBasePlanMigratePricesPayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			if err := client.MigrateSubscriptionBasePlanPrices(requestCtx, pkg, productID, basePlanID, payload); err != nil {
+				return fmt.Errorf("failed to migrate subscription base plan prices: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":                 pkg,
+				"productId":                   productID,
+				"basePlanId":                  basePlanID,
+				"regionalPriceMigrationCount": len(payload.RegionalPriceMigrations),
+				"status":                      "migrated",
+			})
+		},
+	}
+}
+
+func newBasePlansBatchMigratePricesCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-migrate-prices", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, inputPath string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&inputPath, "input", "", "Path to batch migrate-prices JSON payload (use - for stdin)")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm migrating base plan prices in batch (required)")
+
+	return &ffcli.Command{
+		Name:      "batch-migrate-prices",
+		ShortHelp: "Batch migrate legacy cohorts to current prices across base plans",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to batch-migrate base plan prices")
+			}
+			payload, err := readBasePlanBatchMigratePricesPayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			migratedCount, err := client.BatchMigrateSubscriptionBasePlanPrices(requestCtx, pkg, productID, payload.Requests)
+			if err != nil {
+				return fmt.Errorf("failed to batch-migrate subscription base plan prices: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":   pkg,
+				"productId":     productID,
+				"requestCount":  len(payload.Requests),
+				"migratedCount": migratedCount,
+				"status":        "migrated",
 			})
 		},
 	}
@@ -1126,6 +1230,66 @@ func readSubscriptionBatchUpdatePayload(inputPath string, stdin io.Reader) (*and
 	var payload androidpublisher.BatchUpdateSubscriptionsRequest
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return nil, fmt.Errorf("invalid subscriptions batch update JSON payload: %w", err)
+	}
+	return &payload, nil
+}
+
+func readBasePlanMigratePricesPayload(inputPath string, stdin io.Reader) (*androidpublisher.MigrateBasePlanPricesRequest, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var raw []byte
+	var err error
+	if inputPath == "-" {
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		raw, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input: %w", err)
+		}
+	}
+
+	var payload androidpublisher.MigrateBasePlanPricesRequest
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("invalid base plan migrate-prices JSON payload: %w", err)
+	}
+	return &payload, nil
+}
+
+func readBasePlanBatchMigratePricesPayload(inputPath string, stdin io.Reader) (*androidpublisher.BatchMigrateBasePlanPricesRequest, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var raw []byte
+	var err error
+	if inputPath == "-" {
+		if stdin == nil {
+			stdin = os.Stdin
+		}
+		raw, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input from stdin: %w", err)
+		}
+	} else {
+		raw, err = os.ReadFile(inputPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read --input: %w", err)
+		}
+	}
+
+	var payload androidpublisher.BatchMigrateBasePlanPricesRequest
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("invalid base plan batch-migrate-prices JSON payload: %w", err)
 	}
 	return &payload, nil
 }

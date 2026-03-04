@@ -45,6 +45,21 @@ func TestSubscriptionMethods_RejectMissingClient(t *testing.T) {
 	if err := c.DeleteSubscriptionBasePlan(context.Background(), "com.example.app", "premium_monthly", "monthly"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from DeleteSubscriptionBasePlan, got %v", err)
 	}
+	if err := c.MigrateSubscriptionBasePlanPrices(context.Background(), "com.example.app", "premium_monthly", "monthly", &androidpublisher.MigrateBasePlanPricesRequest{
+		RegionalPriceMigrations: []*androidpublisher.RegionalPriceMigrationConfig{{RegionCode: "US", OldestAllowedPriceVersionTime: "2025-01-01T00:00:00Z"}},
+	}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from MigrateSubscriptionBasePlanPrices, got %v", err)
+	}
+	if _, err := c.BatchMigrateSubscriptionBasePlanPrices(context.Background(), "com.example.app", "premium_monthly", []*androidpublisher.MigrateBasePlanPricesRequest{
+		{
+			BasePlanId: "monthly",
+			RegionalPriceMigrations: []*androidpublisher.RegionalPriceMigrationConfig{
+				{RegionCode: "US", OldestAllowedPriceVersionTime: "2025-01-01T00:00:00Z"},
+			},
+		},
+	}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchMigrateSubscriptionBasePlanPrices, got %v", err)
+	}
 	if _, err := c.ListSubscriptionOffers(context.Background(), "com.example.app", "premium_monthly", "monthly", 50, "", false); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from ListSubscriptionOffers, got %v", err)
 	}
@@ -129,6 +144,46 @@ func TestSubscriptionMethods_ValidateArgs(t *testing.T) {
 	}
 	if err := c.DeleteSubscriptionBasePlan(context.Background(), "com.example.app", "premium_monthly", ""); err == nil || !strings.Contains(err.Error(), "base plan id is required") {
 		t.Fatalf("unexpected DeleteSubscriptionBasePlan base plan id error: %v", err)
+	}
+	if err := c.MigrateSubscriptionBasePlanPrices(context.Background(), "com.example.app", "premium_monthly", "", &androidpublisher.MigrateBasePlanPricesRequest{}); err == nil || !strings.Contains(err.Error(), "base plan id is required") {
+		t.Fatalf("unexpected MigrateSubscriptionBasePlanPrices base plan id error: %v", err)
+	}
+	if err := c.MigrateSubscriptionBasePlanPrices(context.Background(), "com.example.app", "premium_monthly", "monthly", nil); err == nil || !strings.Contains(err.Error(), "migrate prices payload is required") {
+		t.Fatalf("unexpected MigrateSubscriptionBasePlanPrices payload error: %v", err)
+	}
+	if err := c.MigrateSubscriptionBasePlanPrices(context.Background(), "com.example.app", "premium_monthly", "monthly", &androidpublisher.MigrateBasePlanPricesRequest{}); err == nil || !strings.Contains(err.Error(), "at least one regional price migration") {
+		t.Fatalf("unexpected MigrateSubscriptionBasePlanPrices regional migration error: %v", err)
+	}
+	if _, err := c.BatchMigrateSubscriptionBasePlanPrices(context.Background(), "com.example.app", "premium_monthly", nil); err == nil || !strings.Contains(err.Error(), "at least one base plan migration request is required") {
+		t.Fatalf("unexpected BatchMigrateSubscriptionBasePlanPrices empty request error: %v", err)
+	}
+	tooManyMigrateRequests := make([]*androidpublisher.MigrateBasePlanPricesRequest, 101)
+	for i := range tooManyMigrateRequests {
+		tooManyMigrateRequests[i] = &androidpublisher.MigrateBasePlanPricesRequest{
+			BasePlanId: "monthly",
+			RegionalPriceMigrations: []*androidpublisher.RegionalPriceMigrationConfig{
+				{RegionCode: "US", OldestAllowedPriceVersionTime: "2025-01-01T00:00:00Z"},
+			},
+		}
+	}
+	if _, err := c.BatchMigrateSubscriptionBasePlanPrices(context.Background(), "com.example.app", "premium_monthly", tooManyMigrateRequests); err == nil || !strings.Contains(err.Error(), "base plan migration request count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchMigrateSubscriptionBasePlanPrices count error: %v", err)
+	}
+	if _, err := c.BatchMigrateSubscriptionBasePlanPrices(context.Background(), "com.example.app", "premium_monthly", []*androidpublisher.MigrateBasePlanPricesRequest{
+		{RegionalPriceMigrations: []*androidpublisher.RegionalPriceMigrationConfig{{RegionCode: "US", OldestAllowedPriceVersionTime: "2025-01-01T00:00:00Z"}}},
+	}); err == nil || !strings.Contains(err.Error(), "base plan id is required in every migration request") {
+		t.Fatalf("unexpected BatchMigrateSubscriptionBasePlanPrices base plan id error: %v", err)
+	}
+	if _, err := c.BatchMigrateSubscriptionBasePlanPrices(context.Background(), "com.example.app", "premium_monthly", []*androidpublisher.MigrateBasePlanPricesRequest{
+		{BasePlanId: "monthly"},
+	}); err == nil || !strings.Contains(err.Error(), "at least one regional price migration") {
+		t.Fatalf("unexpected BatchMigrateSubscriptionBasePlanPrices regional migration error: %v", err)
+	}
+	if _, err := c.BatchMigrateSubscriptionBasePlanPrices(context.Background(), "com.example.app", "premium_monthly", []*androidpublisher.MigrateBasePlanPricesRequest{
+		{BasePlanId: "monthly", RegionalPriceMigrations: []*androidpublisher.RegionalPriceMigrationConfig{{RegionCode: "US", OldestAllowedPriceVersionTime: "2025-01-01T00:00:00Z"}}},
+		{BasePlanId: "monthly", RegionalPriceMigrations: []*androidpublisher.RegionalPriceMigrationConfig{{RegionCode: "PL", OldestAllowedPriceVersionTime: "2025-01-01T00:00:00Z"}}},
+	}); err == nil || !strings.Contains(err.Error(), "duplicate base plan id") {
+		t.Fatalf("unexpected BatchMigrateSubscriptionBasePlanPrices duplicate base plan id error: %v", err)
 	}
 	if _, err := c.ListSubscriptionOffers(context.Background(), "com.example.app", "", "monthly", 50, "", false); err == nil || !strings.Contains(err.Error(), "product id is required") {
 		t.Fatalf("unexpected ListSubscriptionOffers product id error: %v", err)

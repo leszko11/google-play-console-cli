@@ -362,6 +362,117 @@ func (c *Client) DeleteSubscriptionBasePlan(ctx context.Context, packageName, pr
 	return nil
 }
 
+func (c *Client) MigrateSubscriptionBasePlanPrices(ctx context.Context, packageName, productID, basePlanID string, request *androidpublisher.MigrateBasePlanPricesRequest) error {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return fmt.Errorf("product id is required")
+	}
+	basePlanID = strings.TrimSpace(basePlanID)
+	if basePlanID == "" {
+		return fmt.Errorf("base plan id is required")
+	}
+	if request == nil {
+		return fmt.Errorf("migrate prices payload is required")
+	}
+	if len(request.RegionalPriceMigrations) == 0 {
+		return fmt.Errorf("migrate prices payload must include at least one regional price migration")
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	regionsVersion, err := c.resolveRegionsVersion(ctx, packageName, regionsVersionFromMigrateRequest(request))
+	if err != nil {
+		return err
+	}
+	normalized := normalizeMigrateBasePlanPricesRequest(packageName, productID, basePlanID, request, regionsVersion)
+	if _, err := c.service.Monetization.Subscriptions.BasePlans.MigratePrices(packageName, productID, basePlanID, normalized).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
+func (c *Client) BatchMigrateSubscriptionBasePlanPrices(ctx context.Context, packageName, productID string, requests []*androidpublisher.MigrateBasePlanPricesRequest) (int, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return 0, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return 0, fmt.Errorf("product id is required")
+	}
+	filteredRequests := make([]*androidpublisher.MigrateBasePlanPricesRequest, 0, len(requests))
+	for _, request := range requests {
+		if request == nil {
+			continue
+		}
+		filteredRequests = append(filteredRequests, request)
+	}
+	if len(filteredRequests) == 0 {
+		return 0, fmt.Errorf("at least one base plan migration request is required")
+	}
+	if len(filteredRequests) > 100 {
+		return 0, fmt.Errorf("base plan migration request count must be less than or equal to 100")
+	}
+
+	seenBasePlans := make(map[string]struct{}, len(filteredRequests))
+	validatedRequests := make([]*androidpublisher.MigrateBasePlanPricesRequest, 0, len(filteredRequests))
+	for _, request := range filteredRequests {
+		basePlanID := strings.TrimSpace(request.BasePlanId)
+		if basePlanID == "" {
+			return 0, fmt.Errorf("base plan id is required in every migration request")
+		}
+		if _, exists := seenBasePlans[basePlanID]; exists {
+			return 0, fmt.Errorf("duplicate base plan id in migration requests: %s", basePlanID)
+		}
+		seenBasePlans[basePlanID] = struct{}{}
+		if len(request.RegionalPriceMigrations) == 0 {
+			return 0, fmt.Errorf("every migration request must include at least one regional price migration")
+		}
+		validatedRequests = append(validatedRequests, request)
+	}
+	if c == nil || c.service == nil {
+		return 0, ErrInvalidCredentials
+	}
+
+	normalizedRequests := make([]*androidpublisher.MigrateBasePlanPricesRequest, 0, len(validatedRequests))
+	cachedDefaultRegionsVersion := ""
+	for _, request := range validatedRequests {
+		basePlanID := strings.TrimSpace(request.BasePlanId)
+		fallbackRegionsVersion := regionsVersionFromMigrateRequest(request)
+		if fallbackRegionsVersion == "" {
+			if cachedDefaultRegionsVersion == "" {
+				resolvedDefault, err := c.resolveRegionsVersion(ctx, packageName, "")
+				if err != nil {
+					return 0, err
+				}
+				cachedDefaultRegionsVersion = resolvedDefault
+			}
+			fallbackRegionsVersion = cachedDefaultRegionsVersion
+		}
+		regionsVersion, err := c.resolveRegionsVersion(ctx, packageName, fallbackRegionsVersion)
+		if err != nil {
+			return 0, err
+		}
+		normalizedRequests = append(normalizedRequests, normalizeMigrateBasePlanPricesRequest(packageName, productID, basePlanID, request, regionsVersion))
+	}
+
+	resp, err := c.service.Monetization.Subscriptions.BasePlans.BatchMigratePrices(packageName, productID, &androidpublisher.BatchMigrateBasePlanPricesRequest{
+		Requests: normalizedRequests,
+	}).Context(ctx).Do()
+	if err != nil {
+		return 0, mapGoogleAPIError(err)
+	}
+	if resp == nil {
+		return 0, nil
+	}
+	return len(resp.Responses), nil
+}
+
 func (c *Client) ListSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, pageSize int64, pageToken string, paginate bool) (SubscriptionOffersListInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -797,4 +908,22 @@ func subscriptionInfosFromSlice(subscriptions []*androidpublisher.Subscription) 
 		out = append(out, subscriptionInfoFromSubscription(subscription))
 	}
 	return out
+}
+
+func regionsVersionFromMigrateRequest(request *androidpublisher.MigrateBasePlanPricesRequest) string {
+	if request == nil || request.RegionsVersion == nil {
+		return ""
+	}
+	return strings.TrimSpace(request.RegionsVersion.Version)
+}
+
+func normalizeMigrateBasePlanPricesRequest(packageName, productID, basePlanID string, request *androidpublisher.MigrateBasePlanPricesRequest, regionsVersion string) *androidpublisher.MigrateBasePlanPricesRequest {
+	return &androidpublisher.MigrateBasePlanPricesRequest{
+		PackageName:             packageName,
+		ProductId:               productID,
+		BasePlanId:              basePlanID,
+		LatencyTolerance:        strings.TrimSpace(request.LatencyTolerance),
+		RegionalPriceMigrations: request.RegionalPriceMigrations,
+		RegionsVersion:          &androidpublisher.RegionsVersion{Version: regionsVersion},
+	}
 }
