@@ -74,6 +74,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		track            string
 		releaseStatus    string
 		releaseName      string
+		releaseNotesFile string
 		userFraction     float64
 		mappingFile      string
 		mappingType      string
@@ -89,6 +90,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&track, "track", "", "Track name (e.g. internal, production)")
 	fs.StringVar(&releaseStatus, "status", "", "Release status (draft, inProgress, halted, completed)")
 	fs.StringVar(&releaseName, "release-name", "", "Release name")
+	fs.StringVar(&releaseNotesFile, "release-notes-file", "", "Path to release notes JSON payload (object or array)")
 	fs.Float64Var(&userFraction, "user-fraction", -1, "Rollout user fraction (0-1)")
 	fs.StringVar(&mappingFile, "mapping-file", "", "Path to deobfuscation mapping file")
 	fs.StringVar(&mappingType, "mapping-type", "", "Mapping type: proguard or nativeCode (defaults to proguard)")
@@ -103,7 +105,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
-			params, err := validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseName, userFraction, mappingFile, mappingType, confirm, allowProduction, cleanupOnFailure, dryRun)
+			params, err := validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseName, releaseNotesFile, userFraction, mappingFile, mappingType, confirm, allowProduction, cleanupOnFailure, dryRun)
 			if err != nil {
 				return err
 			}
@@ -130,6 +132,7 @@ type deployParams struct {
 	Track            string
 	ReleaseStatus    string
 	ReleaseName      string
+	ReleaseNotes     []gpc.LocalizedText
 	UserFraction     float64
 	MappingFile      string
 	MappingType      string
@@ -138,7 +141,7 @@ type deployParams struct {
 	DryRun           bool
 }
 
-func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseName string, userFraction float64, mappingFile, mappingType string, confirm, allowProduction, cleanupOnFailure, dryRun bool) (deployParams, error) {
+func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseName, releaseNotesFile string, userFraction float64, mappingFile, mappingType string, confirm, allowProduction, cleanupOnFailure, dryRun bool) (deployParams, error) {
 	pkg, err := shared.ResolvePackageName(packageName)
 	if err != nil {
 		return deployParams{}, err
@@ -197,6 +200,10 @@ func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseN
 			return deployParams{}, shared.UsageErrorf("--mapping-type must be one of: %s, %s", mappingTypeProguard, mappingTypeNativeCode)
 		}
 	}
+	releaseNotes, err := shared.ParseReleaseNotesFile(releaseNotesFile)
+	if err != nil {
+		return deployParams{}, err
+	}
 
 	return deployParams{
 		PackageName:      pkg,
@@ -205,6 +212,7 @@ func validateFlags(packageName, aabPath, apkPath, track, releaseStatus, releaseN
 		Track:            track,
 		ReleaseStatus:    releaseStatus,
 		ReleaseName:      strings.TrimSpace(releaseName),
+		ReleaseNotes:     releaseNotes,
 		UserFraction:     userFraction,
 		MappingFile:      mappingFile,
 		MappingType:      mappingType,
@@ -271,6 +279,7 @@ func executeDeploy(parentCtx, requestCtx context.Context, client Client, out io.
 	_, err = client.UpdateTrack(requestCtx, p.PackageName, result.EditID, p.Track, gpc.TrackUpdate{
 		Status:       p.ReleaseStatus,
 		ReleaseName:  p.ReleaseName,
+		ReleaseNotes: p.ReleaseNotes,
 		UserFraction: p.UserFraction,
 		VersionCodes: []int64{versionCode},
 	})

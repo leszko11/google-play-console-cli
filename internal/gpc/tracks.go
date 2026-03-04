@@ -77,6 +77,23 @@ func (c *Client) UpdateTrack(ctx context.Context, packageName, editID, trackName
 	if len(update.VersionCodes) == 0 {
 		return TrackInfo{}, fmt.Errorf("at least one version code is required")
 	}
+
+	releaseNotes := make([]*androidpublisher.LocalizedText, 0, len(update.ReleaseNotes))
+	for _, note := range update.ReleaseNotes {
+		language := strings.TrimSpace(note.Language)
+		if language == "" {
+			return TrackInfo{}, fmt.Errorf("release note language is required")
+		}
+		text := strings.TrimSpace(note.Text)
+		if text == "" {
+			return TrackInfo{}, fmt.Errorf("release note text is required for locale %q", language)
+		}
+		releaseNotes = append(releaseNotes, &androidpublisher.LocalizedText{
+			Language: language,
+			Text:     text,
+		})
+	}
+
 	if c == nil || c.service == nil {
 		return TrackInfo{}, ErrInvalidCredentials
 	}
@@ -91,6 +108,9 @@ func (c *Client) UpdateTrack(ctx context.Context, packageName, editID, trackName
 	}
 	if update.UpdatePriority > 0 {
 		release.InAppUpdatePriority = update.UpdatePriority
+	}
+	if len(releaseNotes) > 0 {
+		release.ReleaseNotes = releaseNotes
 	}
 
 	req := &androidpublisher.Track{
@@ -125,11 +145,23 @@ func trackReleaseInfoFromRelease(release *androidpublisher.TrackRelease) TrackRe
 	if release == nil {
 		return TrackReleaseInfo{}
 	}
+	releaseNotes := make([]LocalizedText, 0, len(release.ReleaseNotes))
+	for _, note := range release.ReleaseNotes {
+		if note == nil {
+			continue
+		}
+		releaseNotes = append(releaseNotes, LocalizedText{
+			Language: note.Language,
+			Text:     note.Text,
+		})
+	}
+
 	return TrackReleaseInfo{
 		Name:           release.Name,
 		Status:         release.Status,
 		UserFraction:   release.UserFraction,
 		VersionCodes:   release.VersionCodes,
 		UpdatePriority: release.InAppUpdatePriority,
+		ReleaseNotes:   releaseNotes,
 	}
 }

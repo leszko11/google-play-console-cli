@@ -130,6 +130,15 @@ func writeTempFile(t *testing.T, name string) string {
 	return path
 }
 
+func writeReleaseNotesFile(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "release-notes.json")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write release notes file: %v", err)
+	}
+	return path
+}
+
 func TestDeployAABCommitSuccess(t *testing.T) {
 	client := &fakeClient{}
 	deps := Deps{
@@ -357,5 +366,61 @@ func TestDeployValidatesArtifactFileBeforeAPI(t *testing.T) {
 	}
 	if clientCreated {
 		t.Fatal("expected client not to be created when artifact file validation fails")
+	}
+}
+
+func TestDeployPassesReleaseNotesToTrackUpdate(t *testing.T) {
+	client := &fakeClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	_, err := runDeploy(
+		t,
+		deps,
+		"--package-name", "com.example.app",
+		"--aab", writeTempFile(t, "app.aab"),
+		"--track", "internal",
+		"--status", "completed",
+		"--release-notes-file", writeReleaseNotesFile(t, `{"pl-PL":"Notatki wydania","en-US":"Release notes"}`),
+		"--confirm",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if len(client.lastTrack.ReleaseNotes) != 2 {
+		t.Fatalf("expected release notes to be passed to track update, got %+v", client.lastTrack.ReleaseNotes)
+	}
+	if client.lastTrack.ReleaseNotes[0].Language != "en-US" || client.lastTrack.ReleaseNotes[1].Language != "pl-PL" {
+		t.Fatalf("expected deterministic locale order, got %+v", client.lastTrack.ReleaseNotes)
+	}
+}
+
+func TestDeployRejectsInvalidReleaseNotesFile(t *testing.T) {
+	clientCreated := false
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			clientCreated = true
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runDeploy(
+		t,
+		deps,
+		"--package-name", "com.example.app",
+		"--aab", writeTempFile(t, "app.aab"),
+		"--track", "internal",
+		"--status", "completed",
+		"--release-notes-file", writeReleaseNotesFile(t, `{"en-US":{"text":"invalid"}}`),
+		"--confirm",
+	)
+	if err == nil || !strings.Contains(err.Error(), "--release-notes-file must be either a JSON object or array") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if clientCreated {
+		t.Fatal("expected client not to be created when release notes validation fails")
 	}
 }

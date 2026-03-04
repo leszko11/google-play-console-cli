@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -74,6 +76,15 @@ func defaultConfig() config.Config {
 			"default": {ServiceAccountPath: "/tmp/sa.json"},
 		},
 	}
+}
+
+func writeReleaseNotesFile(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "release-notes.json")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write release notes file: %v", err)
+	}
+	return path
 }
 
 func TestTracksList_ReturnsTracks(t *testing.T) {
@@ -183,6 +194,73 @@ func TestTracksUpdate_ReturnsUpdatedStatus(t *testing.T) {
 	}
 	if !strings.Contains(out, `"status":"updated"`) || !strings.Contains(out, `"name":"internal"`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestTracksUpdate_ParsesReleaseNotesFile(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				updateFn: func(_, _, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error) {
+					if trackName != "internal" {
+						t.Fatalf("unexpected track name: %q", trackName)
+					}
+					if len(update.ReleaseNotes) != 2 {
+						t.Fatalf("expected two release notes, got %+v", update.ReleaseNotes)
+					}
+					if update.ReleaseNotes[0].Language != "en-US" || update.ReleaseNotes[1].Language != "pl-PL" {
+						t.Fatalf("expected deterministic locale order, got %+v", update.ReleaseNotes)
+					}
+					return gpc.TrackInfo{Name: "internal"}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runTracks(
+		t,
+		deps,
+		"update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--track", "internal",
+		"--status", "completed",
+		"--version-codes", "1002003",
+		"--release-notes-file", writeReleaseNotesFile(t, `{"pl-PL":"Notatki wydania","en-US":"Release notes"}`),
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"updated"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestTracksUpdate_RejectsInvalidReleaseNotesFile(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runTracks(
+		t,
+		deps,
+		"update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--track", "internal",
+		"--status", "completed",
+		"--version-codes", "1002003",
+		"--release-notes-file", writeReleaseNotesFile(t, `{"en-US":{"text":"invalid"}}`),
+	)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--release-notes-file must be either a JSON object or array") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

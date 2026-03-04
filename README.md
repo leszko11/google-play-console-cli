@@ -246,7 +246,17 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
 # Inspect tracks inside an edit
 gpc tracks list --package-name com.example.app --edit-id <edit-id>
 gpc tracks get --package-name com.example.app --edit-id <edit-id> --track production
+gpc tracks update --package-name com.example.app --edit-id <edit-id> --track internal --status completed --version-codes 123456
 gpc tracks promote --package-name com.example.app --edit-id <edit-id> --from-track internal --to-track production
+
+# Multi-locale release notes payload for track update/deploy
+cat >/tmp/release-notes.json <<'JSON'
+{
+  "en-US": "Bug fixes and performance improvements.",
+  "pl-PL": "Poprawki błędów i wydajności."
+}
+JSON
+gpc tracks update --package-name com.example.app --edit-id <edit-id> --track internal --status completed --version-codes 123456 --release-notes-file /tmp/release-notes.json
 
 # List/upload binaries in an edit
 gpc bundles list --package-name com.example.app --edit-id <edit-id>
@@ -268,6 +278,7 @@ gpc deploy \
   --aab /path/to/app.aab \
   --track internal \
   --status completed \
+  --release-notes-file /tmp/release-notes.json \
   --confirm
 
 # Dry-run deploy (deletes edit instead of commit)

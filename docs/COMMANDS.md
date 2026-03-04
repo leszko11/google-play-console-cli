@@ -799,14 +799,15 @@ USAGE
   update
 
 FLAGS
-  -edit-id string        Edit ID
-  -package-name string   Package name
-  -release-name string   Release name
-  -status string         Release status (draft, inProgress, halted, completed)
-  -track string          Track name (e.g. production, internal)
-  -update-priority 0     In-app update priority (0-5)
-  -user-fraction -1      Rollout user fraction (0-1)
-  -version-codes string  Comma-separated version codes
+  -edit-id string             Edit ID
+  -package-name string        Package name
+  -release-name string        Release name
+  -release-notes-file string  Path to release notes JSON payload (object or array)
+  -status string              Release status (draft, inProgress, halted, completed)
+  -track string               Track name (e.g. production, internal)
+  -update-priority 0          In-app update priority (0-5)
+  -user-fraction -1           Rollout user fraction (0-1)
+  -version-codes string       Comma-separated version codes
 ```
 
 ## `gpc tracks promote --help`
@@ -953,19 +954,20 @@ USAGE
   deploy
 
 FLAGS
-  -aab string               Path to .aab file
-  -allow-production=false   Allow deploys to production track
-  -apk string               Path to .apk file
-  -cleanup-on-failure=true  Delete edit if deploy fails
-  -confirm=false            Confirm committing the edit (required unless --dry-run)
-  -dry-run=false            Run deploy steps, then delete edit instead of committing
-  -mapping-file string      Path to deobfuscation mapping file
-  -mapping-type string      Mapping type: proguard or nativeCode (defaults to proguard)
-  -package-name string      Package name
-  -release-name string      Release name
-  -status string            Release status (draft, inProgress, halted, completed)
-  -track string             Track name (e.g. internal, production)
-  -user-fraction -1         Rollout user fraction (0-1)
+  -aab string                 Path to .aab file
+  -allow-production=false     Allow deploys to production track
+  -apk string                 Path to .apk file
+  -cleanup-on-failure=true    Delete edit if deploy fails
+  -confirm=false              Confirm committing the edit (required unless --dry-run)
+  -dry-run=false              Run deploy steps, then delete edit instead of committing
+  -mapping-file string        Path to deobfuscation mapping file
+  -mapping-type string        Mapping type: proguard or nativeCode (defaults to proguard)
+  -package-name string        Package name
+  -release-name string        Release name
+  -release-notes-file string  Path to release notes JSON payload (object or array)
+  -status string              Release status (draft, inProgress, halted, completed)
+  -track string               Track name (e.g. internal, production)
+  -user-fraction -1           Rollout user fraction (0-1)
 ```
 
 ## `gpc reviews --help`
