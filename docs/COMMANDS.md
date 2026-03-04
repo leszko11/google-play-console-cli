@@ -84,11 +84,14 @@ make generate-command-docs
 - `gpc subscriptions base-plans activate`
 - `gpc subscriptions base-plans deactivate`
 - `gpc subscriptions base-plans delete`
+- `gpc subscriptions base-plans migrate-prices`
+- `gpc subscriptions base-plans batch-migrate-prices`
 - `gpc subscriptions offers`
 - `gpc subscriptions offers list`
 - `gpc subscriptions offers get`
 - `gpc subscriptions offers batch-get`
 - `gpc subscriptions offers batch-update`
+- `gpc subscriptions offers batch-update-states`
 - `gpc subscriptions offers activate`
 - `gpc subscriptions offers deactivate`
 - `gpc subscriptions offers create`
@@ -107,6 +110,7 @@ make generate-command-docs
 - `gpc products offers list`
 - `gpc products offers batch-get`
 - `gpc products offers batch-update`
+- `gpc products offers batch-update-states`
 - `gpc products offers batch-delete`
 - `gpc products offers activate`
 - `gpc products offers deactivate`
@@ -129,6 +133,8 @@ make generate-command-docs
 - `gpc purchases products get`
 - `gpc purchases products acknowledge`
 - `gpc purchases products consume`
+- `gpc purchases products-v2`
+- `gpc purchases products-v2 get`
 - `gpc purchases subscriptions`
 - `gpc purchases subscriptions get`
 - `gpc purchases subscriptions cancel`
@@ -1171,9 +1177,11 @@ USAGE
   base-plans
 
 SUBCOMMANDS
-  activate    Activate a subscription base plan
-  deactivate  Deactivate a subscription base plan
-  delete      Delete a subscription base plan
+  activate              Activate a subscription base plan
+  deactivate            Deactivate a subscription base plan
+  delete                Delete a subscription base plan
+  migrate-prices        Migrate legacy cohorts to current prices for one base plan
+  batch-migrate-prices  Batch migrate legacy cohorts to current prices across base plans
 ```
 
 ## `gpc subscriptions base-plans activate --help`
@@ -1223,6 +1231,39 @@ FLAGS
   -product-id string    Subscription product ID
 ```
 
+## `gpc subscriptions base-plans migrate-prices --help`
+
+```text
+DESCRIPTION
+  Migrate legacy cohorts to current prices for one base plan
+
+USAGE
+  migrate-prices
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -confirm=false        Confirm migrating base plan prices (required)
+  -input string         Path to base plan migrate-prices JSON payload (use - for stdin)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions base-plans batch-migrate-prices --help`
+
+```text
+DESCRIPTION
+  Batch migrate legacy cohorts to current prices across base plans
+
+USAGE
+  batch-migrate-prices
+
+FLAGS
+  -confirm=false        Confirm migrating base plan prices in batch (required)
+  -input string         Path to batch migrate-prices JSON payload (use - for stdin)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
 ## `gpc subscriptions offers --help`
 
 ```text
@@ -1233,15 +1274,16 @@ USAGE
   offers
 
 SUBCOMMANDS
-  list          List offers under a subscription base plan
-  get           Get one subscription offer
-  batch-get     Batch-get subscription offers
-  batch-update  Batch create or update subscription offers
-  activate      Activate a subscription offer
-  deactivate    Deactivate a subscription offer
-  create        Create a subscription offer
-  update        Update a subscription offer
-  delete        Delete a subscription offer
+  list                 List offers under a subscription base plan
+  get                  Get one subscription offer
+  batch-get            Batch-get subscription offers
+  batch-update         Batch create or update subscription offers
+  batch-update-states  Batch update subscription offer states
+  activate             Activate a subscription offer
+  deactivate           Deactivate a subscription offer
+  create               Create a subscription offer
+  update               Update a subscription offer
+  delete               Delete a subscription offer
 ```
 
 ## `gpc subscriptions offers list --help`
@@ -1305,6 +1347,23 @@ USAGE
 FLAGS
   -base-plan-id string  Base plan ID
   -input string         Path to subscription offers batch update JSON payload (use - for stdin)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions offers batch-update-states --help`
+
+```text
+DESCRIPTION
+  Batch update subscription offer states
+
+USAGE
+  batch-update-states
+
+FLAGS
+  -base-plan-id string  Base plan ID
+  -confirm=false        Confirm batch-updating offer states (required)
+  -input string         Path to subscription offer state updates JSON payload (use - for stdin)
   -package-name string  Package name
   -product-id string    Subscription product ID
 ```
@@ -1542,13 +1601,14 @@ USAGE
   offers
 
 SUBCOMMANDS
-  list          List offers for a one-time product purchase option
-  batch-get     Batch-get one-time product offers
-  batch-update  Batch create or update one-time product offers
-  batch-delete  Batch delete one-time product offers
-  activate      Activate a one-time product offer
-  deactivate    Deactivate a one-time product offer
-  cancel        Cancel a one-time product pre-order offer
+  list                 List offers for a one-time product purchase option
+  batch-get            Batch-get one-time product offers
+  batch-update         Batch create or update one-time product offers
+  batch-update-states  Batch update one-time product offer states
+  batch-delete         Batch delete one-time product offers
+  activate             Activate a one-time product offer
+  deactivate           Deactivate a one-time product offer
+  cancel               Cancel a one-time product pre-order offer
 ```
 
 ## `gpc products offers list --help`
@@ -1595,6 +1655,23 @@ USAGE
 
 FLAGS
   -input string               Path to one-time product offers batch update JSON payload (use - for stdin)
+  -package-name string        Package name
+  -product-id string          One-time product ID
+  -purchase-option-id string  Purchase option ID
+```
+
+## `gpc products offers batch-update-states --help`
+
+```text
+DESCRIPTION
+  Batch update one-time product offer states
+
+USAGE
+  batch-update-states
+
+FLAGS
+  -confirm=false              Confirm batch-updating offer states (required)
+  -input string               Path to one-time product offer state updates JSON payload (use - for stdin)
   -package-name string        Package name
   -product-id string          One-time product ID
   -purchase-option-id string  Purchase option ID
@@ -1877,6 +1954,7 @@ USAGE
 
 SUBCOMMANDS
   products       Inspect and mutate one-time product purchases
+  products-v2    Inspect one-time product purchases via Purchases.Productsv2
   subscriptions  Inspect and mutate subscription purchases
   voided         Inspect voided purchases
 ```
@@ -1940,6 +2018,33 @@ FLAGS
   -confirm=false        Confirm consuming the purchase (required)
   -package-name string  Package name
   -product-id string    One-time product ID
+  -token string         Purchase token
+```
+
+## `gpc purchases products-v2 --help`
+
+```text
+DESCRIPTION
+  Inspect one-time product purchases via Purchases.Productsv2
+
+USAGE
+  products-v2
+
+SUBCOMMANDS
+  get  Get one-time product purchase details (v2)
+```
+
+## `gpc purchases products-v2 get --help`
+
+```text
+DESCRIPTION
+  Get one-time product purchase details (v2)
+
+USAGE
+  get
+
+FLAGS
+  -package-name string  Package name
   -token string         Purchase token
 ```
 
