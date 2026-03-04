@@ -33,7 +33,7 @@ func TestUserMethods_ValidateArgs(t *testing.T) {
 	if _, err := c.ListUsers(context.Background(), "", 0, "", false); err == nil || !strings.Contains(err.Error(), "developer id is required") {
 		t.Fatalf("unexpected ListUsers developer id error: %v", err)
 	}
-	if _, err := c.ListUsers(context.Background(), "123", -1, "", false); err == nil || !strings.Contains(err.Error(), "page size must be greater than or equal to zero") {
+	if _, err := c.ListUsers(context.Background(), "123", -2, "", false); err == nil || !strings.Contains(err.Error(), "page size must be -1 or greater") {
 		t.Fatalf("unexpected ListUsers page size error: %v", err)
 	}
 	if _, err := c.CreateUser(context.Background(), "123", nil); err == nil || !strings.Contains(err.Error(), "user payload is required") {

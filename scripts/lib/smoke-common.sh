@@ -43,6 +43,10 @@ run_gpc() {
 ensure_auth() {
   require_env GPC_SERVICE_ACCOUNT
   ensure_config_path
+  if [[ -n "${GPC_TEST_DEVELOPER_ID:-}" ]]; then
+    run_gpc auth init --service-account "${GPC_SERVICE_ACCOUNT}" --developer-id "${GPC_TEST_DEVELOPER_ID}" >/dev/null
+    return
+  fi
   run_gpc auth init --service-account "${GPC_SERVICE_ACCOUNT}" >/dev/null
 }
 

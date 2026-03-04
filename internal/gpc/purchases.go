@@ -250,7 +250,7 @@ func (c *Client) ListVoidedPurchases(ctx context.Context, packageName string, qu
 		return voidedPurchasesListInfoFromResponse(resp), nil
 	}
 
-	result := VoidedPurchasesListInfo{}
+	result := VoidedPurchasesListInfo{VoidedPurchases: make([]VoidedPurchaseInfo, 0)}
 	nextToken := query.Token
 	for {
 		query.Token = nextToken

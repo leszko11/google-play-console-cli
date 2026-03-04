@@ -71,9 +71,9 @@ func newListCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var developerID, pageToken string
-	var pageSize int64
+	var pageSize int64 = -1
 	fs.StringVar(&developerID, "developer-id", "", "Developer account ID (numeric or developers/<id>)")
-	fs.Int64Var(&pageSize, "page-size", 0, "Maximum users per page")
+	fs.Int64Var(&pageSize, "page-size", -1, "Maximum users per page (-1 uses API default)")
 	fs.StringVar(&pageToken, "page-token", "", "Page token for the next page")
 
 	return &ffcli.Command{
@@ -82,26 +82,30 @@ func newListCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
+			resolvedDeveloperID, err := resolveDeveloperID(deps, developerID)
+			if err != nil {
+				return err
+			}
+
 			client, requestCtx, cancel, err := buildClient(ctx, deps)
 			if err != nil {
 				return err
 			}
 			defer cancel()
 
-			developerID = strings.TrimSpace(developerID)
-			if developerID == "" {
-				return fmt.Errorf("--developer-id is required")
+			if pageSize == 0 {
+				pageSize = -1
 			}
-			if pageSize < 0 {
-				return fmt.Errorf("--page-size must be greater than or equal to zero")
+			if pageSize < -1 {
+				return fmt.Errorf("--page-size must be -1 or greater")
 			}
 
-			result, err := client.ListUsers(requestCtx, developerID, pageSize, pageToken, shared.ActiveGlobalFlags().Paginate)
+			result, err := client.ListUsers(requestCtx, resolvedDeveloperID, pageSize, pageToken, shared.ActiveGlobalFlags().Paginate)
 			if err != nil {
 				return fmt.Errorf("failed to list users: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
-				"developerId":   developerID,
+				"developerId":   resolvedDeveloperID,
 				"users":         result.Users,
 				"nextPageToken": result.NextPageToken,
 			})
@@ -122,26 +126,27 @@ func newCreateCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
+			resolvedDeveloperID, err := resolveDeveloperID(deps, developerID)
+			if err != nil {
+				return err
+			}
+
 			client, requestCtx, cancel, err := buildClient(ctx, deps)
 			if err != nil {
 				return err
 			}
 			defer cancel()
 
-			developerID = strings.TrimSpace(developerID)
-			if developerID == "" {
-				return fmt.Errorf("--developer-id is required")
-			}
 			user, err := readUserPayload(inputPath, os.Stdin)
 			if err != nil {
 				return err
 			}
-			created, err := client.CreateUser(requestCtx, developerID, user)
+			created, err := client.CreateUser(requestCtx, resolvedDeveloperID, user)
 			if err != nil {
 				return fmt.Errorf("failed to create user: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
-				"developerId": developerID,
+				"developerId": resolvedDeveloperID,
 				"user":        created,
 				"status":      "created",
 			})
@@ -152,8 +157,10 @@ func newCreateCommand(deps Deps) *ffcli.Command {
 func newUpdateCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var name, inputPath, updateMask string
+	var name, inputPath, updateMask, developerID, userEmail string
 	fs.StringVar(&name, "name", "", "User resource name (developers/<developer-id>/users/<email>)")
+	fs.StringVar(&developerID, "developer-id", "", "Developer account ID (numeric or developers/<id>)")
+	fs.StringVar(&userEmail, "user-email", "", "User email for resource name synthesis")
 	fs.StringVar(&inputPath, "input", "", "Path to user JSON payload (use - for stdin)")
 	fs.StringVar(&updateMask, "update-mask", "", "Comma-separated list of fields to update")
 
@@ -163,26 +170,27 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
+			resolvedName, err := resolveUserName(deps, name, developerID, userEmail)
+			if err != nil {
+				return err
+			}
+
 			client, requestCtx, cancel, err := buildClient(ctx, deps)
 			if err != nil {
 				return err
 			}
 			defer cancel()
 
-			name = strings.TrimSpace(name)
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
 			user, err := readUserPayload(inputPath, os.Stdin)
 			if err != nil {
 				return err
 			}
-			updated, err := client.UpdateUser(requestCtx, name, user, updateMask)
+			updated, err := client.UpdateUser(requestCtx, resolvedName, user, updateMask)
 			if err != nil {
 				return fmt.Errorf("failed to update user: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
-				"name":   name,
+				"name":   resolvedName,
 				"user":   updated,
 				"status": "updated",
 			})
@@ -193,9 +201,11 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 func newDeleteCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var name string
+	var name, developerID, userEmail string
 	var confirm bool
 	fs.StringVar(&name, "name", "", "User resource name (developers/<developer-id>/users/<email>)")
+	fs.StringVar(&developerID, "developer-id", "", "Developer account ID (numeric or developers/<id>)")
+	fs.StringVar(&userEmail, "user-email", "", "User email for resource name synthesis")
 	fs.BoolVar(&confirm, "confirm", false, "Confirm deleting the user (required)")
 
 	return &ffcli.Command{
@@ -204,24 +214,25 @@ func newDeleteCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
+			resolvedName, err := resolveUserName(deps, name, developerID, userEmail)
+			if err != nil {
+				return err
+			}
+
 			client, requestCtx, cancel, err := buildClient(ctx, deps)
 			if err != nil {
 				return err
 			}
 			defer cancel()
 
-			name = strings.TrimSpace(name)
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
 			if !confirm {
-				return fmt.Errorf("--confirm is required to delete user %q", name)
+				return fmt.Errorf("--confirm is required to delete user %q", resolvedName)
 			}
-			if err := client.DeleteUser(requestCtx, name); err != nil {
+			if err := client.DeleteUser(requestCtx, resolvedName); err != nil {
 				return fmt.Errorf("failed to delete user: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
-				"name":   name,
+				"name":   resolvedName,
 				"status": "deleted",
 			})
 		},
@@ -239,6 +250,31 @@ func buildClient(ctx context.Context, deps Deps) (Client, context.Context, conte
 		return nil, nil, nil, err
 	}
 	return client, requestCtx, cancel, nil
+}
+
+func resolveDeveloperID(deps Deps, localValue string) (string, error) {
+	cfg, err := deps.LoadConfig()
+	if err != nil {
+		return "", err
+	}
+	return shared.ResolveDeveloperID(localValue, cfg)
+}
+
+func resolveUserName(deps Deps, name, developerID, userEmail string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name != "" {
+		return name, nil
+	}
+
+	userEmail = strings.TrimSpace(userEmail)
+	if userEmail == "" {
+		return "", fmt.Errorf("--name is required (or provide --user-email with --developer-id)")
+	}
+	resolvedDeveloperID, err := resolveDeveloperID(deps, developerID)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("developers/%s/users/%s", resolvedDeveloperID, userEmail), nil
 }
 
 func readUserPayload(inputPath string, stdin io.Reader) (*androidpublisher.User, error) {

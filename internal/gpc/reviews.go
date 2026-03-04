@@ -27,7 +27,7 @@ func (c *Client) ListReviews(ctx context.Context, packageName string, maxResults
 		return reviewsListInfoFromResponse(resp), nil
 	}
 
-	result := ReviewsListInfo{}
+	result := ReviewsListInfo{Reviews: make([]ReviewInfo, 0)}
 	nextToken := token
 	firstPage := true
 	for {

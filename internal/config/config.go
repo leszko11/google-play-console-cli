@@ -13,6 +13,7 @@ const envConfigPath = "GPC_CONFIG_PATH"
 type Profile struct {
 	ServiceAccountPath string `json:"serviceAccountPath,omitempty"`
 	LastValidatedAt    string `json:"lastValidatedAt,omitempty"`
+	DeveloperID        string `json:"developerId,omitempty"`
 }
 
 type Config struct {

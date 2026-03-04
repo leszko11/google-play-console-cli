@@ -3,6 +3,7 @@ package gpc
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"google.golang.org/api/androidpublisher/v3"
@@ -29,7 +30,7 @@ func (c *Client) ListSubscriptions(ctx context.Context, packageName string, page
 		return subscriptionsListInfoFromResponse(resp), nil
 	}
 
-	result := SubscriptionsListInfo{}
+	result := SubscriptionsListInfo{Subscriptions: make([]SubscriptionInfo, 0)}
 	nextToken := pageToken
 	for {
 		resp, err := c.subscriptionsListCall(ctx, packageName, pageSize, nextToken).Do()
@@ -142,11 +143,23 @@ func (c *Client) CreateSubscription(ctx context.Context, packageName string, sub
 	if subscription == nil {
 		return SubscriptionInfo{}, fmt.Errorf("subscription payload is required")
 	}
+	productID := strings.TrimSpace(subscription.ProductId)
+	if productID == "" {
+		return SubscriptionInfo{}, fmt.Errorf("subscription payload must include productId")
+	}
 	if c == nil || c.service == nil {
 		return SubscriptionInfo{}, ErrInvalidCredentials
 	}
+	regionsVersion, err := c.resolveRegionsVersion(ctx, packageName, "")
+	if err != nil {
+		return SubscriptionInfo{}, err
+	}
 
-	created, err := c.service.Monetization.Subscriptions.Create(packageName, subscription).Context(ctx).Do()
+	created, err := c.service.Monetization.Subscriptions.Create(packageName, subscription).
+		ProductId(productID).
+		RegionsVersionVersion(regionsVersion).
+		Context(ctx).
+		Do()
 	if err != nil {
 		return SubscriptionInfo{}, mapGoogleAPIError(err)
 	}
@@ -168,12 +181,48 @@ func (c *Client) UpdateSubscription(ctx context.Context, packageName, productID 
 	if c == nil || c.service == nil {
 		return SubscriptionInfo{}, ErrInvalidCredentials
 	}
+	updateMask := subscriptionUpdateMask(subscription)
+	if updateMask == "" {
+		return SubscriptionInfo{}, fmt.Errorf("subscription payload must include at least one mutable field")
+	}
+	regionsVersion, err := c.resolveRegionsVersion(ctx, packageName, "")
+	if err != nil {
+		return SubscriptionInfo{}, err
+	}
 
-	updated, err := c.service.Monetization.Subscriptions.Patch(packageName, productID, subscription).Context(ctx).Do()
+	updated, err := c.service.Monetization.Subscriptions.Patch(packageName, productID, subscription).
+		UpdateMask(updateMask).
+		RegionsVersionVersion(regionsVersion).
+		Context(ctx).
+		Do()
 	if err != nil {
 		return SubscriptionInfo{}, mapGoogleAPIError(err)
 	}
 	return subscriptionInfoFromSubscription(updated), nil
+}
+
+func subscriptionUpdateMask(subscription *androidpublisher.Subscription) string {
+	if subscription == nil {
+		return ""
+	}
+	paths := make([]string, 0, 4)
+	if len(subscription.BasePlans) > 0 {
+		paths = append(paths, "basePlans")
+	}
+	if len(subscription.Listings) > 0 {
+		paths = append(paths, "listings")
+	}
+	if subscription.RestrictedPaymentCountries != nil {
+		paths = append(paths, "restrictedPaymentCountries")
+	}
+	if subscription.TaxAndComplianceSettings != nil {
+		paths = append(paths, "taxAndComplianceSettings")
+	}
+	if len(paths) == 0 {
+		return ""
+	}
+	slices.Sort(paths)
+	return strings.Join(paths, ",")
 }
 
 func (c *Client) DeleteSubscription(ctx context.Context, packageName, productID string) error {
@@ -342,7 +391,7 @@ func (c *Client) ListSubscriptionOffers(ctx context.Context, packageName, produc
 		return subscriptionOffersListInfoFromResponse(resp), nil
 	}
 
-	result := SubscriptionOffersListInfo{}
+	result := SubscriptionOffersListInfo{Offers: make([]SubscriptionOfferInfo, 0)}
 	nextToken := pageToken
 	for {
 		resp, err := c.subscriptionOffersListCall(ctx, packageName, productID, basePlanID, pageSize, nextToken).Do()
@@ -503,8 +552,20 @@ func (c *Client) CreateSubscriptionOffer(ctx context.Context, packageName, produ
 	if c == nil || c.service == nil {
 		return SubscriptionOfferInfo{}, ErrInvalidCredentials
 	}
+	offerID := strings.TrimSpace(offer.OfferId)
+	if offerID == "" {
+		return SubscriptionOfferInfo{}, fmt.Errorf("subscription offer payload must include offerId")
+	}
+	regionsVersion, err := c.resolveRegionsVersion(ctx, packageName, "")
+	if err != nil {
+		return SubscriptionOfferInfo{}, err
+	}
 
-	created, err := c.service.Monetization.Subscriptions.BasePlans.Offers.Create(packageName, productID, basePlanID, offer).Context(ctx).Do()
+	created, err := c.service.Monetization.Subscriptions.BasePlans.Offers.Create(packageName, productID, basePlanID, offer).
+		OfferId(offerID).
+		RegionsVersionVersion(regionsVersion).
+		Context(ctx).
+		Do()
 	if err != nil {
 		return SubscriptionOfferInfo{}, mapGoogleAPIError(err)
 	}
@@ -538,9 +599,14 @@ func (c *Client) UpdateSubscriptionOffer(ctx context.Context, packageName, produ
 	if c == nil || c.service == nil {
 		return SubscriptionOfferInfo{}, ErrInvalidCredentials
 	}
+	regionsVersion, err := c.resolveRegionsVersion(ctx, packageName, "")
+	if err != nil {
+		return SubscriptionOfferInfo{}, err
+	}
 
 	updated, err := c.service.Monetization.Subscriptions.BasePlans.Offers.Patch(packageName, productID, basePlanID, offerID, offer).
 		UpdateMask(updateMask).
+		RegionsVersionVersion(regionsVersion).
 		Context(ctx).
 		Do()
 	if err != nil {

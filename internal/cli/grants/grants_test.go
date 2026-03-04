@@ -60,6 +60,14 @@ func defaultConfig() config.Config {
 	}
 }
 
+func configWithDeveloperID(developerID string) config.Config {
+	cfg := defaultConfig()
+	profile := cfg.Profiles["default"]
+	profile.DeveloperID = developerID
+	cfg.Profiles["default"] = profile
+	return cfg
+}
+
 func TestGrantsCreate_ReturnsCreated(t *testing.T) {
 	inputPath := writeJSON(t, `{"name":"developers/123/users/dev@example.com/grants/com.example.app","packageName":"com.example.app","appLevelPermissions":["CAN_VIEW_NON_FINANCIAL_DATA"]}`)
 	deps := Deps{
@@ -109,6 +117,31 @@ func TestGrantsCreate_InvalidJSON(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "invalid grant JSON payload") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGrantsCreate_UsesStoredDeveloperID(t *testing.T) {
+	inputPath := writeJSON(t, `{"packageName":"com.example.app","appLevelPermissions":["CAN_VIEW_NON_FINANCIAL_DATA"]}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				createFn: func(parent string, _ *androidpublisher.Grant) (gpc.GrantInfo, error) {
+					if parent != "developers/9023817352750250026/users/dev@example.com" {
+						t.Fatalf("unexpected parent: %q", parent)
+					}
+					return gpc.GrantInfo{Name: parent + "/grants/com.example.app", PackageName: "com.example.app"}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runGrants(t, deps, "create", "--user-email", "dev@example.com", "--input", inputPath)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"parent":"developers/9023817352750250026/users/dev@example.com"`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
 
@@ -169,6 +202,39 @@ func TestGrantsUpdate_RequiresName(t *testing.T) {
 	}
 }
 
+func TestGrantsUpdate_UsesStoredDeveloperIDAndPackage(t *testing.T) {
+	inputPath := writeJSON(t, `{"appLevelPermissions":["CAN_REPLY_TO_REVIEWS"]}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				updateFn: func(name string, _ *androidpublisher.Grant, _ string) (gpc.GrantInfo, error) {
+					if name != "developers/9023817352750250026/users/dev@example.com/grants/com.example.app" {
+						t.Fatalf("unexpected name: %q", name)
+					}
+					return gpc.GrantInfo{Name: name}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runGrants(
+		t,
+		deps,
+		"update",
+		"--user-email", "dev@example.com",
+		"--package-name", "com.example.app",
+		"--input", inputPath,
+		"--update-mask", "appLevelPermissions",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"name":"developers/9023817352750250026/users/dev@example.com/grants/com.example.app"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
 func TestGrantsDelete_RequiresConfirm(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
@@ -199,6 +265,30 @@ func TestGrantsDelete_ReturnsDeleted(t *testing.T) {
 		t.Fatalf("command failed: %v", err)
 	}
 	if !strings.Contains(out, `"status":"deleted"`) || !strings.Contains(out, `"name":"developers/123/users/dev@example.com/grants/com.example.app"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestGrantsDelete_UsesStoredDeveloperIDAndPackage(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	out, err := runGrants(
+		t,
+		deps,
+		"delete",
+		"--user-email", "dev@example.com",
+		"--package-name", "com.example.app",
+		"--confirm",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"name":"developers/9023817352750250026/users/dev@example.com/grants/com.example.app"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }

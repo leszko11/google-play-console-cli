@@ -29,7 +29,7 @@ func (c *Client) ListIAPs(ctx context.Context, packageName string, maxResults in
 		return iapsListInfoFromResponse(resp), nil
 	}
 
-	result := IAPsListInfo{}
+	result := IAPsListInfo{Products: make([]IAPInfo, 0)}
 	nextToken := pageToken
 	for {
 		resp, err := c.iapsListCall(ctx, packageName, maxResults, nextToken).Do()

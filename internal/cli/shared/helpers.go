@@ -23,6 +23,39 @@ func ResolvePackageName(localValue string) (string, error) {
 	return "", fmt.Errorf("--package-name is required")
 }
 
+func NormalizeDeveloperID(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", nil
+	}
+
+	normalized := strings.TrimPrefix(trimmed, "developers/")
+	normalized = strings.TrimSpace(normalized)
+	if normalized == "" {
+		return "", fmt.Errorf("developer id must not be empty")
+	}
+	for _, r := range normalized {
+		if r < '0' || r > '9' {
+			return "", fmt.Errorf("developer id must be numeric or developers/<id>")
+		}
+	}
+	return normalized, nil
+}
+
+func ResolveDeveloperID(localValue string, cfg config.Config) (string, error) {
+	if id := strings.TrimSpace(localValue); id != "" {
+		return NormalizeDeveloperID(id)
+	}
+	if cfg.ActiveProfile != "" && cfg.Profiles != nil {
+		if profile, ok := cfg.Profiles[cfg.ActiveProfile]; ok {
+			if id := strings.TrimSpace(profile.DeveloperID); id != "" {
+				return NormalizeDeveloperID(id)
+			}
+		}
+	}
+	return "", fmt.Errorf("--developer-id is required (or run `gpc auth init --developer-id <id>` once)")
+}
+
 func ResolveOutput(localValue string) string {
 	if out := strings.TrimSpace(localValue); out != "" {
 		return strings.ToLower(out)

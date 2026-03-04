@@ -68,8 +68,10 @@ func withDefaults(deps Deps) Deps {
 func newCreateCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("create", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var parent, inputPath string
+	var parent, inputPath, developerID, userEmail string
 	fs.StringVar(&parent, "parent", "", "User resource name (developers/<developer-id>/users/<email>)")
+	fs.StringVar(&developerID, "developer-id", "", "Developer account ID (numeric or developers/<id>)")
+	fs.StringVar(&userEmail, "user-email", "", "User email for parent name synthesis (requires --developer-id or stored auth developer ID)")
 	fs.StringVar(&inputPath, "input", "", "Path to grant JSON payload (use - for stdin)")
 
 	return &ffcli.Command{
@@ -78,26 +80,27 @@ func newCreateCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
+			resolvedParent, err := resolveGrantParent(deps, parent, developerID, userEmail)
+			if err != nil {
+				return err
+			}
+
 			client, requestCtx, cancel, err := buildClient(ctx, deps)
 			if err != nil {
 				return err
 			}
 			defer cancel()
 
-			parent = strings.TrimSpace(parent)
-			if parent == "" {
-				return fmt.Errorf("--parent is required")
-			}
 			grant, err := readGrantPayload(inputPath, os.Stdin)
 			if err != nil {
 				return err
 			}
-			created, err := client.CreateGrant(requestCtx, parent, grant)
+			created, err := client.CreateGrant(requestCtx, resolvedParent, grant)
 			if err != nil {
 				return fmt.Errorf("failed to create grant: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
-				"parent": parent,
+				"parent": resolvedParent,
 				"grant":  created,
 				"status": "created",
 			})
@@ -108,8 +111,11 @@ func newCreateCommand(deps Deps) *ffcli.Command {
 func newUpdateCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var name, inputPath, updateMask string
+	var name, inputPath, updateMask, developerID, userEmail, packageName string
 	fs.StringVar(&name, "name", "", "Grant resource name (developers/<developer-id>/users/<email>/grants/<package-name>)")
+	fs.StringVar(&developerID, "developer-id", "", "Developer account ID (numeric or developers/<id>)")
+	fs.StringVar(&userEmail, "user-email", "", "User email for grant name synthesis")
+	fs.StringVar(&packageName, "package-name", "", "Package name for grant name synthesis")
 	fs.StringVar(&inputPath, "input", "", "Path to grant JSON payload (use - for stdin)")
 	fs.StringVar(&updateMask, "update-mask", "", "Comma-separated list of fields to update")
 
@@ -119,26 +125,27 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
+			resolvedName, err := resolveGrantName(deps, name, developerID, userEmail, packageName)
+			if err != nil {
+				return err
+			}
+
 			client, requestCtx, cancel, err := buildClient(ctx, deps)
 			if err != nil {
 				return err
 			}
 			defer cancel()
 
-			name = strings.TrimSpace(name)
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
 			grant, err := readGrantPayload(inputPath, os.Stdin)
 			if err != nil {
 				return err
 			}
-			updated, err := client.UpdateGrant(requestCtx, name, grant, updateMask)
+			updated, err := client.UpdateGrant(requestCtx, resolvedName, grant, updateMask)
 			if err != nil {
 				return fmt.Errorf("failed to update grant: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
-				"name":   name,
+				"name":   resolvedName,
 				"grant":  updated,
 				"status": "updated",
 			})
@@ -149,9 +156,12 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 func newDeleteCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var name string
+	var name, developerID, userEmail, packageName string
 	var confirm bool
 	fs.StringVar(&name, "name", "", "Grant resource name (developers/<developer-id>/users/<email>/grants/<package-name>)")
+	fs.StringVar(&developerID, "developer-id", "", "Developer account ID (numeric or developers/<id>)")
+	fs.StringVar(&userEmail, "user-email", "", "User email for grant name synthesis")
+	fs.StringVar(&packageName, "package-name", "", "Package name for grant name synthesis")
 	fs.BoolVar(&confirm, "confirm", false, "Confirm deleting the grant (required)")
 
 	return &ffcli.Command{
@@ -160,24 +170,25 @@ func newDeleteCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
+			resolvedName, err := resolveGrantName(deps, name, developerID, userEmail, packageName)
+			if err != nil {
+				return err
+			}
+
 			client, requestCtx, cancel, err := buildClient(ctx, deps)
 			if err != nil {
 				return err
 			}
 			defer cancel()
 
-			name = strings.TrimSpace(name)
-			if name == "" {
-				return fmt.Errorf("--name is required")
-			}
 			if !confirm {
-				return fmt.Errorf("--confirm is required to delete grant %q", name)
+				return fmt.Errorf("--confirm is required to delete grant %q", resolvedName)
 			}
-			if err := client.DeleteGrant(requestCtx, name); err != nil {
+			if err := client.DeleteGrant(requestCtx, resolvedName); err != nil {
 				return fmt.Errorf("failed to delete grant: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
-				"name":   name,
+				"name":   resolvedName,
 				"status": "deleted",
 			})
 		},
@@ -195,6 +206,52 @@ func buildClient(ctx context.Context, deps Deps) (Client, context.Context, conte
 		return nil, nil, nil, err
 	}
 	return client, requestCtx, cancel, nil
+}
+
+func resolveGrantParent(deps Deps, parent, developerID, userEmail string) (string, error) {
+	parent = strings.TrimSpace(parent)
+	if parent != "" {
+		return parent, nil
+	}
+
+	userEmail = strings.TrimSpace(userEmail)
+	if userEmail == "" {
+		return "", fmt.Errorf("--parent is required (or provide --user-email with --developer-id)")
+	}
+	resolvedDeveloperID, err := resolveDeveloperID(deps, developerID)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("developers/%s/users/%s", resolvedDeveloperID, userEmail), nil
+}
+
+func resolveGrantName(deps Deps, name, developerID, userEmail, packageName string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name != "" {
+		return name, nil
+	}
+
+	userEmail = strings.TrimSpace(userEmail)
+	if userEmail == "" {
+		return "", fmt.Errorf("--name is required (or provide --user-email and --package-name)")
+	}
+	resolvedPackageName, err := shared.ResolvePackageName(packageName)
+	if err != nil {
+		return "", fmt.Errorf("--name is required (or provide --user-email and --package-name): %w", err)
+	}
+	resolvedDeveloperID, err := resolveDeveloperID(deps, developerID)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("developers/%s/users/%s/grants/%s", resolvedDeveloperID, userEmail, resolvedPackageName), nil
+}
+
+func resolveDeveloperID(deps Deps, localValue string) (string, error) {
+	cfg, err := deps.LoadConfig()
+	if err != nil {
+		return "", err
+	}
+	return shared.ResolveDeveloperID(localValue, cfg)
 }
 
 func readGrantPayload(inputPath string, stdin io.Reader) (*androidpublisher.Grant, error) {
