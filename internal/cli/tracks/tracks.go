@@ -12,6 +12,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
+	notesgen "github.com/leszko11/google-play-console-cli/internal/release/notes"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
@@ -139,6 +140,7 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 	var packageName, editID, trackName, status, releaseName, versionCodesCSV string
 	var userFraction float64
 	var updatePriority int64
+	var releaseNotesFile, releaseNotesLocale, releaseNotesText string
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
 	fs.StringVar(&trackName, "track", "", "Track name (e.g. production, internal)")
@@ -147,6 +149,9 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&versionCodesCSV, "version-codes", "", "Comma-separated version codes")
 	fs.Float64Var(&userFraction, "user-fraction", -1, "Rollout user fraction (0-1)")
 	fs.Int64Var(&updatePriority, "update-priority", 0, "In-app update priority (0-5)")
+	fs.StringVar(&releaseNotesFile, "release-notes-file", "", "Path to release notes text file")
+	fs.StringVar(&releaseNotesLocale, "release-notes-locale", notesgen.DefaultLocale, "Release notes locale (BCP-47)")
+	fs.StringVar(&releaseNotesText, "release-notes-text", "", "Release notes text")
 
 	return &ffcli.Command{
 		Name:      "update",
@@ -179,6 +184,26 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 			if updatePriority < 0 || updatePriority > 5 {
 				return fmt.Errorf("--update-priority must be between 0 and 5")
 			}
+			if strings.TrimSpace(releaseNotesFile) != "" && strings.TrimSpace(releaseNotesText) != "" {
+				return fmt.Errorf("only one of --release-notes-file or --release-notes-text can be set")
+			}
+
+			parsedNotes, err := notesgen.ParseLocalizedInput(
+				releaseNotesFile,
+				releaseNotesText,
+				releaseNotesLocale,
+				os.ReadFile,
+			)
+			if err != nil {
+				return err
+			}
+			releaseNotes := make([]gpc.LocalizedReleaseNote, 0, len(parsedNotes))
+			for _, note := range parsedNotes {
+				releaseNotes = append(releaseNotes, gpc.LocalizedReleaseNote{
+					Language: note.Locale,
+					Text:     note.Text,
+				})
+			}
 
 			track, err := client.UpdateTrack(requestCtx, pkg, eid, trackName, gpc.TrackUpdate{
 				Status:         status,
@@ -186,6 +211,7 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 				UserFraction:   userFraction,
 				VersionCodes:   versionCodes,
 				UpdatePriority: updatePriority,
+				ReleaseNotes:   releaseNotes,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to update track: %w", err)

@@ -56,6 +56,12 @@ func TestTrackInfoFromTrack(t *testing.T) {
 				UserFraction:        0.5,
 				VersionCodes:        []int64{123, 456},
 				InAppUpdatePriority: 3,
+				ReleaseNotes: []*androidpublisher.LocalizedText{
+					{
+						Language: "en-US",
+						Text:     "Bug fixes and stability improvements.",
+					},
+				},
 			},
 		},
 	})
@@ -71,5 +77,44 @@ func TestTrackInfoFromTrack(t *testing.T) {
 	}
 	if len(got.Releases[0].VersionCodes) != 2 || got.Releases[0].VersionCodes[0] != 123 {
 		t.Fatalf("unexpected version codes map: %+v", got.Releases[0])
+	}
+	if len(got.Releases[0].ReleaseNotes) != 1 || got.Releases[0].ReleaseNotes[0].Language != "en-US" {
+		t.Fatalf("unexpected release notes map: %+v", got.Releases[0].ReleaseNotes)
+	}
+}
+
+func TestTrackReleaseRequestFromUpdate(t *testing.T) {
+	release := trackReleaseRequestFromUpdate(TrackUpdate{
+		Status:         "completed",
+		ReleaseName:    "1.0.1",
+		UserFraction:   0.3,
+		VersionCodes:   []int64{123},
+		UpdatePriority: 4,
+		ReleaseNotes: []LocalizedReleaseNote{
+			{
+				Language: "en-US",
+				Text:     "Polish and bug fixes.",
+			},
+			{
+				Language: "",
+				Text:     "ignored because no locale",
+			},
+		},
+	})
+
+	if release == nil {
+		t.Fatal("expected release request")
+	}
+	if release.Status != "completed" || release.Name != "1.0.1" {
+		t.Fatalf("unexpected release metadata: %+v", release)
+	}
+	if len(release.VersionCodes) != 1 || release.VersionCodes[0] != 123 {
+		t.Fatalf("unexpected version codes: %+v", release.VersionCodes)
+	}
+	if release.InAppUpdatePriority != 4 {
+		t.Fatalf("expected update priority 4, got %d", release.InAppUpdatePriority)
+	}
+	if len(release.ReleaseNotes) != 1 || release.ReleaseNotes[0].Language != "en-US" {
+		t.Fatalf("unexpected release notes: %+v", release.ReleaseNotes)
 	}
 }

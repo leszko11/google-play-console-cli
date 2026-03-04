@@ -81,17 +81,7 @@ func (c *Client) UpdateTrack(ctx context.Context, packageName, editID, trackName
 		return TrackInfo{}, ErrInvalidCredentials
 	}
 
-	release := &androidpublisher.TrackRelease{
-		Status:       update.Status,
-		Name:         strings.TrimSpace(update.ReleaseName),
-		VersionCodes: update.VersionCodes,
-	}
-	if update.UserFraction >= 0 {
-		release.UserFraction = update.UserFraction
-	}
-	if update.UpdatePriority > 0 {
-		release.InAppUpdatePriority = update.UpdatePriority
-	}
+	release := trackReleaseRequestFromUpdate(update)
 
 	req := &androidpublisher.Track{
 		Track:    trackName,
@@ -125,11 +115,52 @@ func trackReleaseInfoFromRelease(release *androidpublisher.TrackRelease) TrackRe
 	if release == nil {
 		return TrackReleaseInfo{}
 	}
+	releaseNotes := make([]LocalizedReleaseNote, 0, len(release.ReleaseNotes))
+	for _, note := range release.ReleaseNotes {
+		if note == nil {
+			continue
+		}
+		releaseNotes = append(releaseNotes, LocalizedReleaseNote{
+			Language: note.Language,
+			Text:     note.Text,
+		})
+	}
+
 	return TrackReleaseInfo{
 		Name:           release.Name,
 		Status:         release.Status,
 		UserFraction:   release.UserFraction,
 		VersionCodes:   release.VersionCodes,
 		UpdatePriority: release.InAppUpdatePriority,
+		ReleaseNotes:   releaseNotes,
 	}
+}
+
+func trackReleaseRequestFromUpdate(update TrackUpdate) *androidpublisher.TrackRelease {
+	release := &androidpublisher.TrackRelease{
+		Status:       update.Status,
+		Name:         strings.TrimSpace(update.ReleaseName),
+		VersionCodes: update.VersionCodes,
+	}
+	if update.UserFraction >= 0 {
+		release.UserFraction = update.UserFraction
+	}
+	if update.UpdatePriority > 0 {
+		release.InAppUpdatePriority = update.UpdatePriority
+	}
+	if len(update.ReleaseNotes) > 0 {
+		release.ReleaseNotes = make([]*androidpublisher.LocalizedText, 0, len(update.ReleaseNotes))
+		for _, note := range update.ReleaseNotes {
+			language := strings.TrimSpace(note.Language)
+			text := strings.TrimSpace(note.Text)
+			if language == "" || text == "" {
+				continue
+			}
+			release.ReleaseNotes = append(release.ReleaseNotes, &androidpublisher.LocalizedText{
+				Language: language,
+				Text:     text,
+			})
+		}
+	}
+	return release
 }

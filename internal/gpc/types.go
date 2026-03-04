@@ -244,11 +244,12 @@ type TrackInfo struct {
 }
 
 type TrackReleaseInfo struct {
-	Name           string  `json:"name,omitempty"`
-	Status         string  `json:"status,omitempty"`
-	UserFraction   float64 `json:"userFraction,omitempty"`
-	VersionCodes   []int64 `json:"versionCodes,omitempty"`
-	UpdatePriority int64   `json:"updatePriority,omitempty"`
+	Name           string                 `json:"name,omitempty"`
+	Status         string                 `json:"status,omitempty"`
+	UserFraction   float64                `json:"userFraction,omitempty"`
+	VersionCodes   []int64                `json:"versionCodes,omitempty"`
+	UpdatePriority int64                  `json:"updatePriority,omitempty"`
+	ReleaseNotes   []LocalizedReleaseNote `json:"releaseNotes,omitempty"`
 }
 
 type TrackUpdate struct {
@@ -257,6 +258,12 @@ type TrackUpdate struct {
 	UserFraction   float64
 	VersionCodes   []int64
 	UpdatePriority int64
+	ReleaseNotes   []LocalizedReleaseNote
+}
+
+type LocalizedReleaseNote struct {
+	Language string `json:"language,omitempty"`
+	Text     string `json:"text,omitempty"`
 }
 
 type BundleInfo struct {

@@ -118,15 +118,15 @@ func TestUsersList_RequiresDeveloperID(t *testing.T) {
 
 func TestUsersList_UsesConfiguredDeveloperID(t *testing.T) {
 	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("1234567890123456789"), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return fakeClient{
 				listFn: func(developerID string, _ int64, _ string, _ bool) (gpc.UsersListInfo, error) {
-					if developerID != "9023817352750250026" {
+					if developerID != "1234567890123456789" {
 						t.Fatalf("unexpected developer id: %q", developerID)
 					}
 					return gpc.UsersListInfo{
-						Users: []gpc.UserInfo{{Name: "developers/9023817352750250026/users/dev@example.com", Email: "dev@example.com"}},
+						Users: []gpc.UserInfo{{Name: "developers/1234567890123456789/users/dev@example.com", Email: "dev@example.com"}},
 					}, nil
 				},
 			}, nil
@@ -137,14 +137,14 @@ func TestUsersList_UsesConfiguredDeveloperID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
-	if !strings.Contains(out, `"developerId":"9023817352750250026"`) {
+	if !strings.Contains(out, `"developerId":"1234567890123456789"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
 
 func TestUsersList_DefaultPageSizeIsMinusOne(t *testing.T) {
 	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("1234567890123456789"), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return fakeClient{
 				listFn: func(_ string, pageSize int64, _ string, _ bool) (gpc.UsersListInfo, error) {
@@ -164,7 +164,7 @@ func TestUsersList_DefaultPageSizeIsMinusOne(t *testing.T) {
 
 func TestUsersList_InvalidPageSize(t *testing.T) {
 	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("1234567890123456789"), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return fakeClient{}, nil
 		},
@@ -228,11 +228,11 @@ func TestUsersCreate_InvalidJSON(t *testing.T) {
 func TestUsersCreate_UsesConfiguredDeveloperID(t *testing.T) {
 	inputPath := writeJSON(t, `{"name":"developers/123/users/dev@example.com","email":"dev@example.com"}`)
 	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("1234567890123456789"), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return fakeClient{
 				createFn: func(developerID string, user *androidpublisher.User) (gpc.UserInfo, error) {
-					if developerID != "9023817352750250026" {
+					if developerID != "1234567890123456789" {
 						t.Fatalf("unexpected developer id: %q", developerID)
 					}
 					return gpc.UserInfo{Name: user.Name, Email: user.Email}, nil
@@ -245,7 +245,7 @@ func TestUsersCreate_UsesConfiguredDeveloperID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
-	if !strings.Contains(out, `"developerId":"9023817352750250026"`) || !strings.Contains(out, `"status":"created"`) {
+	if !strings.Contains(out, `"developerId":"1234567890123456789"`) || !strings.Contains(out, `"status":"created"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
@@ -306,11 +306,11 @@ func TestUsersUpdate_RequiresName(t *testing.T) {
 func TestUsersUpdate_UsesStoredDeveloperID(t *testing.T) {
 	inputPath := writeJSON(t, `{"expirationTime":"2026-05-01T00:00:00Z"}`)
 	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("1234567890123456789"), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return fakeClient{
 				updateFn: func(name string, user *androidpublisher.User, updateMask string) (gpc.UserInfo, error) {
-					if name != "developers/9023817352750250026/users/dev@example.com" {
+					if name != "developers/1234567890123456789/users/dev@example.com" {
 						t.Fatalf("unexpected name: %q", name)
 					}
 					if updateMask != "expirationTime" {
@@ -333,7 +333,7 @@ func TestUsersUpdate_UsesStoredDeveloperID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
-	if !strings.Contains(out, `"name":"developers/9023817352750250026/users/dev@example.com"`) {
+	if !strings.Contains(out, `"name":"developers/1234567890123456789/users/dev@example.com"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
@@ -374,7 +374,7 @@ func TestUsersDelete_ReturnsDeleted(t *testing.T) {
 
 func TestUsersDelete_UsesStoredDeveloperID(t *testing.T) {
 	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("9023817352750250026"), nil },
+		LoadConfig: func() (config.Config, error) { return configWithDeveloperID("1234567890123456789"), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return fakeClient{}, nil
 		},
@@ -384,7 +384,7 @@ func TestUsersDelete_UsesStoredDeveloperID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
-	if !strings.Contains(out, `"name":"developers/9023817352750250026/users/dev@example.com"`) {
+	if !strings.Contains(out, `"name":"developers/1234567890123456789/users/dev@example.com"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }

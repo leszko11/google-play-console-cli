@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -74,6 +76,15 @@ func defaultConfig() config.Config {
 			"default": {ServiceAccountPath: "/tmp/sa.json"},
 		},
 	}
+}
+
+func writeTempFile(t *testing.T, name, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write temp file: %v", err)
+	}
+	return path
 }
 
 func TestTracksList_ReturnsTracks(t *testing.T) {
@@ -211,6 +222,49 @@ func TestTracksUpdate_ReturnsAPIError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "failed to update track") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestTracksUpdate_ParsesTaggedReleaseNotesFile(t *testing.T) {
+	var captured gpc.TrackUpdate
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				updateFn: func(_, _, _ string, update gpc.TrackUpdate) (gpc.TrackInfo, error) {
+					captured = update
+					return gpc.TrackInfo{Name: "internal"}, nil
+				},
+			}, nil
+		},
+	}
+
+	notesPath := writeTempFile(t, "notes.txt", `<en-US>
+Bug fixes and stability improvements.
+</en-US>
+<pl-PL>
+Poprawki bledow i ulepszenia stabilnosci.
+</pl-PL>`)
+
+	_, err := runTracks(
+		t,
+		deps,
+		"update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--track", "internal",
+		"--status", "completed",
+		"--version-codes", "1002003",
+		"--release-notes-file", notesPath,
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if len(captured.ReleaseNotes) != 2 {
+		t.Fatalf("expected 2 release notes, got %+v", captured.ReleaseNotes)
+	}
+	if captured.ReleaseNotes[0].Language != "en-US" || captured.ReleaseNotes[1].Language != "pl-PL" {
+		t.Fatalf("unexpected notes locales: %+v", captured.ReleaseNotes)
 	}
 }
 
