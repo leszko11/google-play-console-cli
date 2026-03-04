@@ -438,6 +438,52 @@ func (c *Client) BatchUpdateOneTimeProductOffers(ctx context.Context, packageNam
 	}), nil
 }
 
+func (c *Client) BatchUpdateOneTimeProductOfferStates(ctx context.Context, packageName, productID, purchaseOptionID string, requests []*androidpublisher.UpdateOneTimeProductOfferStateRequest) (OneTimeProductOffersListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("product id is required")
+	}
+	purchaseOptionID = strings.TrimSpace(purchaseOptionID)
+	if purchaseOptionID == "" {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("purchase option id is required")
+	}
+	filteredRequests := make([]*androidpublisher.UpdateOneTimeProductOfferStateRequest, 0, len(requests))
+	for _, request := range requests {
+		if request == nil {
+			continue
+		}
+		filteredRequests = append(filteredRequests, request)
+	}
+	if len(filteredRequests) == 0 {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("at least one batch state update request is required")
+	}
+	if len(filteredRequests) > 100 {
+		return OneTimeProductOffersListInfo{}, fmt.Errorf("batch state update request count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return OneTimeProductOffersListInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Monetization.Onetimeproducts.PurchaseOptions.Offers.BatchUpdateStates(
+		packageName,
+		productID,
+		purchaseOptionID,
+		&androidpublisher.BatchUpdateOneTimeProductOfferStatesRequest{
+			Requests: filteredRequests,
+		},
+	).Context(ctx).Do()
+	if err != nil {
+		return OneTimeProductOffersListInfo{}, mapGoogleAPIError(err)
+	}
+	return oneTimeProductOffersListInfoFromResponse(&androidpublisher.ListOneTimeProductOffersResponse{
+		OneTimeProductOffers: resp.OneTimeProductOffers,
+	}), nil
+}
+
 func (c *Client) BatchDeleteOneTimeProductOffers(ctx context.Context, packageName, productID, purchaseOptionID string, requests []*androidpublisher.DeleteOneTimeProductOfferRequest) error {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
