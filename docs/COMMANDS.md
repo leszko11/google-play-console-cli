@@ -67,6 +67,9 @@ make generate-command-docs
 - `gpc deobfuscation`
 - `gpc deobfuscation upload`
 - `gpc deploy`
+- `gpc release`
+- `gpc release verify`
+- `gpc release alpha`
 - `gpc reviews`
 - `gpc reviews list`
 - `gpc reviews get`
@@ -176,6 +179,7 @@ SUBCOMMANDS
   bundles           Manage Android App Bundles in an edit
   deobfuscation     Manage deobfuscation files in an edit
   deploy            Upload artifact and publish to a track in one flow
+  release           Release workflows for staged Google Play deploys
   reviews           Read and reply to Play Store reviews
   subscriptions     Manage monetization subscriptions
   products          Manage monetization one-time products
@@ -799,15 +803,17 @@ USAGE
   update
 
 FLAGS
-  -edit-id string             Edit ID
-  -package-name string        Package name
-  -release-name string        Release name
-  -release-notes-file string  Path to release notes JSON payload (object or array)
-  -status string              Release status (draft, inProgress, halted, completed)
-  -track string               Track name (e.g. production, internal)
-  -update-priority 0          In-app update priority (0-5)
-  -user-fraction -1           Rollout user fraction (0-1)
-  -version-codes string       Comma-separated version codes
+  -edit-id string              Edit ID
+  -package-name string         Package name
+  -release-name string         Release name
+  -release-notes-file string   Path to release notes file (JSON object/array, tagged blocks, or plain text)
+  -release-notes-locale en-US  Release notes locale (BCP-47)
+  -release-notes-text string   Release notes text
+  -status string               Release status (draft, inProgress, halted, completed)
+  -track string                Track name (e.g. production, internal)
+  -update-priority 0           In-app update priority (0-5)
+  -user-fraction -1            Rollout user fraction (0-1)
+  -version-codes string        Comma-separated version codes
 ```
 
 ## `gpc tracks promote --help`
@@ -954,20 +960,90 @@ USAGE
   deploy
 
 FLAGS
-  -aab string                 Path to .aab file
-  -allow-production=false     Allow deploys to production track
-  -apk string                 Path to .apk file
-  -cleanup-on-failure=true    Delete edit if deploy fails
-  -confirm=false              Confirm committing the edit (required unless --dry-run)
-  -dry-run=false              Run deploy steps, then delete edit instead of committing
-  -mapping-file string        Path to deobfuscation mapping file
-  -mapping-type string        Mapping type: proguard or nativeCode (defaults to proguard)
-  -package-name string        Package name
-  -release-name string        Release name
-  -release-notes-file string  Path to release notes JSON payload (object or array)
-  -status string              Release status (draft, inProgress, halted, completed)
-  -track string               Track name (e.g. internal, production)
-  -user-fraction -1           Rollout user fraction (0-1)
+  -aab string                  Path to .aab file
+  -allow-production=false      Allow deploys to production track
+  -apk string                  Path to .apk file
+  -cleanup-on-failure=true     Delete edit if deploy fails
+  -confirm=false               Confirm committing the edit (required unless --dry-run)
+  -dry-run=false               Run deploy steps, then delete edit instead of committing
+  -mapping-file string         Path to deobfuscation mapping file
+  -mapping-type string         Mapping type: proguard or nativeCode (defaults to proguard)
+  -package-name string         Package name
+  -release-name string         Release name
+  -release-notes-file string   Path to release notes file (JSON object/array, tagged blocks, or plain text)
+  -release-notes-locale en-US  Release notes locale (BCP-47)
+  -release-notes-text string   Release notes text
+  -status string               Release status (draft, inProgress, halted, completed)
+  -track string                Track name (e.g. internal, production)
+  -update-priority 0           In-app update priority (0-5)
+  -user-fraction -1            Rollout user fraction (0-1)
+```
+
+## `gpc release --help`
+
+```text
+DESCRIPTION
+  Release workflows for staged Google Play deploys
+
+USAGE
+  release
+
+SUBCOMMANDS
+  verify  Run non-mutating release readiness checks
+  alpha   Build staging AAB and deploy to alpha track in one flow
+```
+
+## `gpc release verify --help`
+
+```text
+DESCRIPTION
+  Run non-mutating release readiness checks
+
+USAGE
+  verify
+
+FLAGS
+  -build-task :app:bundleStagingRelease  Gradle build task for release bundle
+  -notes-file string                     Release notes file path when notes-mode=file
+  -notes-locale en-US                    Release notes locale
+  -notes-mode git                        Release notes mode: git, file, none
+  -package-name com.example.app.staging  Target package name
+  -probe-track=false                     Create temporary edit and probe target track
+  -project-dir .                         Android project directory
+  -track alpha                           Target track name
+```
+
+## `gpc release alpha --help`
+
+```text
+DESCRIPTION
+  Build staging AAB and deploy to alpha track in one flow
+
+USAGE
+  alpha
+
+FLAGS
+  -aab string                            Path to prebuilt .aab (optional)
+  -allow-production=false                Allow track=production
+  -build-task :app:bundleStagingRelease  Gradle build task
+  -cleanup-on-failure=true               Delete edit when deployment fails
+  -confirm=false                         Confirm committing release (required unless --dry-run)
+  -dry-run=false                         Run all steps but delete edit instead of committing
+  -notes-file string                     Release notes file path when notes-mode=file
+  -notes-locale en-US                    Release notes locale
+  -notes-mode git                        Release notes mode: git, file, none
+  -notes-text string                     Inline release notes text override
+  -package-name com.example.app.staging  Target package name
+  -probe-track=false                     Probe track existence during preflight verify
+  -project-dir .                         Android project directory
+  -release-name string                   Optional release name
+  -skip-build=false                      Skip Gradle build and use prebuilt artifact
+  -status completed                      Release status (draft, inProgress, halted, completed)
+  -track alpha                           Target track name
+  -update-priority 0                     In-app update priority (0-5)
+  -user-fraction -1                      Rollout user fraction (0-1)
+  -version-code 0                        Release versionCode override (default computed if empty)
+  -version-name string                   Release versionName override
 ```
 
 ## `gpc reviews --help`
