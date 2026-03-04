@@ -644,6 +644,52 @@ func (c *Client) BatchUpdateSubscriptionOffers(ctx context.Context, packageName,
 	}), nil
 }
 
+func (c *Client) BatchUpdateSubscriptionOfferStates(ctx context.Context, packageName, productID, basePlanID string, requests []*androidpublisher.UpdateSubscriptionOfferStateRequest) (SubscriptionOffersListInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return SubscriptionOffersListInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return SubscriptionOffersListInfo{}, fmt.Errorf("product id is required")
+	}
+	basePlanID = strings.TrimSpace(basePlanID)
+	if basePlanID == "" {
+		return SubscriptionOffersListInfo{}, fmt.Errorf("base plan id is required")
+	}
+	filteredRequests := make([]*androidpublisher.UpdateSubscriptionOfferStateRequest, 0, len(requests))
+	for _, request := range requests {
+		if request == nil {
+			continue
+		}
+		filteredRequests = append(filteredRequests, request)
+	}
+	if len(filteredRequests) == 0 {
+		return SubscriptionOffersListInfo{}, fmt.Errorf("at least one batch state update request is required")
+	}
+	if len(filteredRequests) > 100 {
+		return SubscriptionOffersListInfo{}, fmt.Errorf("batch state update request count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionOffersListInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Monetization.Subscriptions.BasePlans.Offers.BatchUpdateStates(
+		packageName,
+		productID,
+		basePlanID,
+		&androidpublisher.BatchUpdateSubscriptionOfferStatesRequest{
+			Requests: filteredRequests,
+		},
+	).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionOffersListInfo{}, mapGoogleAPIError(err)
+	}
+	return subscriptionOffersListInfoFromResponse(&androidpublisher.ListSubscriptionOffersResponse{
+		SubscriptionOffers: resp.SubscriptionOffers,
+	}), nil
+}
+
 func (c *Client) CreateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID string, offer *androidpublisher.SubscriptionOffer) (SubscriptionOfferInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {

@@ -46,6 +46,9 @@ func TestOneTimeProductMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.BatchUpdateOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", []*androidpublisher.UpdateOneTimeProductOfferRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from BatchUpdateOneTimeProductOffers, got %v", err)
 	}
+	if _, err := c.BatchUpdateOneTimeProductOfferStates(context.Background(), "com.example.app", "coins_100", "buy", []*androidpublisher.UpdateOneTimeProductOfferStateRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchUpdateOneTimeProductOfferStates, got %v", err)
+	}
 	if err := c.BatchDeleteOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", []*androidpublisher.DeleteOneTimeProductOfferRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from BatchDeleteOneTimeProductOffers, got %v", err)
 	}
@@ -157,6 +160,16 @@ func TestOneTimeProductMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.BatchUpdateOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", tooManyUpdateRequests); err == nil || !strings.Contains(err.Error(), "batch update request count must be less than or equal to 100") {
 		t.Fatalf("unexpected BatchUpdateOneTimeProductOffers count error: %v", err)
+	}
+	if _, err := c.BatchUpdateOneTimeProductOfferStates(context.Background(), "com.example.app", "coins_100", "buy", nil); err == nil || !strings.Contains(err.Error(), "at least one batch state update request is required") {
+		t.Fatalf("unexpected BatchUpdateOneTimeProductOfferStates empty request error: %v", err)
+	}
+	tooManyStateRequests := make([]*androidpublisher.UpdateOneTimeProductOfferStateRequest, 101)
+	for i := range tooManyStateRequests {
+		tooManyStateRequests[i] = &androidpublisher.UpdateOneTimeProductOfferStateRequest{}
+	}
+	if _, err := c.BatchUpdateOneTimeProductOfferStates(context.Background(), "com.example.app", "coins_100", "buy", tooManyStateRequests); err == nil || !strings.Contains(err.Error(), "batch state update request count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchUpdateOneTimeProductOfferStates count error: %v", err)
 	}
 	if err := c.BatchDeleteOneTimeProductOffers(context.Background(), "com.example.app", "coins_100", "buy", nil); err == nil || !strings.Contains(err.Error(), "at least one batch delete request is required") {
 		t.Fatalf("unexpected BatchDeleteOneTimeProductOffers empty request error: %v", err)

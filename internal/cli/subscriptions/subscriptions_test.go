@@ -17,61 +17,64 @@ import (
 )
 
 type fakeClient struct {
-	list                      gpc.SubscriptionsListInfo
-	listErr                   error
-	get                       gpc.SubscriptionInfo
-	getErr                    error
-	batchGet                  gpc.SubscriptionsListInfo
-	batchGetErr               error
-	create                    gpc.SubscriptionInfo
-	createErr                 error
-	batchUpdate               gpc.SubscriptionsListInfo
-	batchUpdateErr            error
-	update                    gpc.SubscriptionInfo
-	updateErr                 error
-	deleteErr                 error
-	archiveErr                error
-	offersList                gpc.SubscriptionOffersListInfo
-	offersListErr             error
-	offersBatchGet            gpc.SubscriptionOffersListInfo
-	offersBatchGetErr         error
-	offersBatchUpdate         gpc.SubscriptionOffersListInfo
-	offersBatchUpdateErr      error
-	offerGet                  gpc.SubscriptionOfferInfo
-	offerGetErr               error
-	offerCreate               gpc.SubscriptionOfferInfo
-	offerCreateErr            error
-	offerActivate             gpc.SubscriptionOfferInfo
-	offerActivateErr          error
-	offerDeactivate           gpc.SubscriptionOfferInfo
-	offerDeactivateErr        error
-	offerUpdate               gpc.SubscriptionOfferInfo
-	offerUpdateErr            error
-	offerDeleteErr            error
-	basePlanUpdates           []gpc.SubscriptionInfo
-	basePlanActErr            error
-	basePlanDeactErr          error
-	basePlanDeleteErr         error
-	basePlanMigrateErr        error
-	basePlanBatchMigrateErr   error
-	basePlanMigrateInput      *androidpublisher.MigrateBasePlanPricesRequest
-	basePlanBatchMigrateInput []*androidpublisher.MigrateBasePlanPricesRequest
-	basePlanBatchMigrateCount int
-	capturedInput             *androidpublisher.Subscription
-	capturedOfferInput        *androidpublisher.SubscriptionOffer
-	captured                  struct {
+	list                       gpc.SubscriptionsListInfo
+	listErr                    error
+	get                        gpc.SubscriptionInfo
+	getErr                     error
+	batchGet                   gpc.SubscriptionsListInfo
+	batchGetErr                error
+	create                     gpc.SubscriptionInfo
+	createErr                  error
+	batchUpdate                gpc.SubscriptionsListInfo
+	batchUpdateErr             error
+	update                     gpc.SubscriptionInfo
+	updateErr                  error
+	deleteErr                  error
+	archiveErr                 error
+	offersList                 gpc.SubscriptionOffersListInfo
+	offersListErr              error
+	offersBatchGet             gpc.SubscriptionOffersListInfo
+	offersBatchGetErr          error
+	offersBatchUpdate          gpc.SubscriptionOffersListInfo
+	offersBatchUpdateErr       error
+	offersBatchUpdateStates    gpc.SubscriptionOffersListInfo
+	offersBatchUpdateStatesErr error
+	offerGet                   gpc.SubscriptionOfferInfo
+	offerGetErr                error
+	offerCreate                gpc.SubscriptionOfferInfo
+	offerCreateErr             error
+	offerActivate              gpc.SubscriptionOfferInfo
+	offerActivateErr           error
+	offerDeactivate            gpc.SubscriptionOfferInfo
+	offerDeactivateErr         error
+	offerUpdate                gpc.SubscriptionOfferInfo
+	offerUpdateErr             error
+	offerDeleteErr             error
+	basePlanUpdates            []gpc.SubscriptionInfo
+	basePlanActErr             error
+	basePlanDeactErr           error
+	basePlanDeleteErr          error
+	basePlanMigrateErr         error
+	basePlanBatchMigrateErr    error
+	basePlanMigrateInput       *androidpublisher.MigrateBasePlanPricesRequest
+	basePlanBatchMigrateInput  []*androidpublisher.MigrateBasePlanPricesRequest
+	basePlanBatchMigrateCount  int
+	capturedInput              *androidpublisher.Subscription
+	capturedOfferInput         *androidpublisher.SubscriptionOffer
+	captured                   struct {
 		pageSize int64
 		pageTok  string
 		paginate bool
 	}
-	productID           string
-	productIDs          []string
-	basePlanID          string
-	offerID             string
-	offerIDs            []string
-	updateMask          string
-	updateRequests      []*androidpublisher.UpdateSubscriptionRequest
-	offerUpdateRequests []*androidpublisher.UpdateSubscriptionOfferRequest
+	productID                string
+	productIDs               []string
+	basePlanID               string
+	offerID                  string
+	offerIDs                 []string
+	updateMask               string
+	updateRequests           []*androidpublisher.UpdateSubscriptionRequest
+	offerUpdateRequests      []*androidpublisher.UpdateSubscriptionOfferRequest
+	offerStateUpdateRequests []*androidpublisher.UpdateSubscriptionOfferStateRequest
 }
 
 func (f *fakeClient) ListSubscriptions(_ context.Context, _ string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionsListInfo, error) {
@@ -178,6 +181,13 @@ func (f *fakeClient) BatchUpdateSubscriptionOffers(_ context.Context, _ string, 
 	return f.offersBatchUpdate, f.offersBatchUpdateErr
 }
 
+func (f *fakeClient) BatchUpdateSubscriptionOfferStates(_ context.Context, _ string, productID, basePlanID string, requests []*androidpublisher.UpdateSubscriptionOfferStateRequest) (gpc.SubscriptionOffersListInfo, error) {
+	f.productID = productID
+	f.basePlanID = basePlanID
+	f.offerStateUpdateRequests = append([]*androidpublisher.UpdateSubscriptionOfferStateRequest(nil), requests...)
+	return f.offersBatchUpdateStates, f.offersBatchUpdateStatesErr
+}
+
 func (f *fakeClient) CreateSubscriptionOffer(_ context.Context, _ string, productID, basePlanID string, offer *androidpublisher.SubscriptionOffer) (gpc.SubscriptionOfferInfo, error) {
 	f.productID = productID
 	f.basePlanID = basePlanID
@@ -276,6 +286,16 @@ func writeOfferBatchUpdatePayload(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "offer-batch-update.json")
 	payload := `{"requests":[{"allowMissing":true,"updateMask":"offerTags","subscriptionOffer":{"packageName":"com.example.app","productId":"premium_monthly","basePlanId":"monthly","offerId":"intro","offerTags":[{"tag":"cli-test"}]}}]}`
+	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	return path
+}
+
+func writeOfferBatchUpdateStatesPayload(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "offer-batch-update-states.json")
+	payload := `{"requests":[{"activateSubscriptionOfferRequest":{"packageName":"com.example.app","productId":"premium_monthly","basePlanId":"monthly","offerId":"intro"}}]}`
 	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
 		t.Fatalf("write payload: %v", err)
 	}
@@ -856,6 +876,69 @@ func TestSubscriptionsOffersBatchUpdate_ReturnsUpdated(t *testing.T) {
 	}
 	if fc.offerUpdateRequests[0] == nil || fc.offerUpdateRequests[0].SubscriptionOffer == nil || fc.offerUpdateRequests[0].SubscriptionOffer.OfferId != "intro" {
 		t.Fatalf("unexpected parsed update request: %+v", fc.offerUpdateRequests[0])
+	}
+}
+
+func TestSubscriptionsOffersBatchUpdateStates_RequiresConfirm(t *testing.T) {
+	payloadPath := writeOfferBatchUpdateStatesPayload(t)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runSubscriptions(
+		t,
+		deps,
+		"offers", "batch-update-states",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--base-plan-id", "monthly",
+		"--input", payloadPath,
+	)
+	if err == nil || !strings.Contains(err.Error(), "--confirm is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSubscriptionsOffersBatchUpdateStates_ReturnsUpdated(t *testing.T) {
+	payloadPath := writeOfferBatchUpdateStatesPayload(t)
+	fc := &fakeClient{
+		offersBatchUpdateStates: gpc.SubscriptionOffersListInfo{
+			Offers: []gpc.SubscriptionOfferInfo{
+				{PackageName: "com.example.app", ProductID: "premium_monthly", BasePlanID: "monthly", OfferID: "intro"},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(
+		t,
+		deps,
+		"offers", "batch-update-states",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--base-plan-id", "monthly",
+		"--input", payloadPath,
+		"--confirm",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"updated"`) || !strings.Contains(out, `"offerId":"intro"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if len(fc.offerStateUpdateRequests) != 1 {
+		t.Fatalf("unexpected request count passed to client: %d", len(fc.offerStateUpdateRequests))
+	}
+	if fc.offerStateUpdateRequests[0] == nil || fc.offerStateUpdateRequests[0].ActivateSubscriptionOfferRequest == nil || fc.offerStateUpdateRequests[0].ActivateSubscriptionOfferRequest.OfferId != "intro" {
+		t.Fatalf("unexpected parsed state update request: %+v", fc.offerStateUpdateRequests[0])
 	}
 }
 
