@@ -16,6 +16,8 @@ import (
 type fakeClient struct {
 	productPurchase      gpc.ProductPurchaseInfo
 	productPurchaseErr   error
+	productPurchaseV2    gpc.ProductPurchaseV2Info
+	productPurchaseV2Err error
 	ackErr               error
 	consumeErr           error
 	subscriptionPurchase gpc.SubscriptionPurchaseInfo
@@ -41,6 +43,11 @@ func (f *fakeClient) GetProductPurchase(_ context.Context, _, productID, token s
 	f.capturedProductID = productID
 	f.capturedToken = token
 	return f.productPurchase, f.productPurchaseErr
+}
+
+func (f *fakeClient) GetProductPurchaseV2(_ context.Context, _, token string) (gpc.ProductPurchaseV2Info, error) {
+	f.capturedToken = token
+	return f.productPurchaseV2, f.productPurchaseV2Err
 }
 
 func (f *fakeClient) AcknowledgeProductPurchase(_ context.Context, _, productID, token, developerPayload string) error {
@@ -130,6 +137,40 @@ func TestPurchasesProductsGet_ReturnsPurchase(t *testing.T) {
 	}
 	if !strings.Contains(out, `"orderId":"GPA.1"`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestPurchasesProductsV2Get_ReturnsPurchase(t *testing.T) {
+	fc := &fakeClient{
+		productPurchaseV2: gpc.ProductPurchaseV2Info{OrderID: "GPA.2", PurchaseState: "PENDING"},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runPurchases(t, deps, "products-v2", "get", "--package-name", "com.example.app", "--token", "tok-1")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"orderId":"GPA.2"`) || !strings.Contains(out, `"purchaseState":"PENDING"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestPurchasesProductsGet_PackageNotFoundHint(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{productPurchaseErr: gpc.ErrPackageNotFound}, nil
+		},
+	}
+
+	_, err := runPurchases(t, deps, "products", "get", "--package-name", "com.example.app", "--product-id", "premium", "--token", "tok-1")
+	if err == nil || !strings.Contains(err.Error(), "purchase history is unavailable") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -276,6 +317,20 @@ func TestPurchasesVoidedList_ReturnsAPIError(t *testing.T) {
 
 	_, err := runPurchases(t, deps, "voided", "list", "--package-name", "com.example.app")
 	if err == nil || !strings.Contains(err.Error(), "failed to list voided purchases") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPurchasesVoidedList_PackageNotFoundHint(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{voidedErr: gpc.ErrPackageNotFound}, nil
+		},
+	}
+
+	_, err := runPurchases(t, deps, "voided", "list", "--package-name", "com.example.app")
+	if err == nil || !strings.Contains(err.Error(), "purchase history is unavailable") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

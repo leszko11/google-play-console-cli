@@ -17,4 +17,10 @@ else
   log "phase3 smoke skipped (set GPC_ENABLE_PHASE3=1 to enable)"
 fi
 
+if [[ "${GPC_ENABLE_PHASE5:-0}" == "1" ]]; then
+  "${SCRIPT_DIR}/smoke-test-phase5.sh"
+else
+  log "phase5 smoke skipped (set GPC_ENABLE_PHASE5=1 to enable)"
+fi
+
 log "all requested smoke phases passed"

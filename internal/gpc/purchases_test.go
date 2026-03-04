@@ -15,6 +15,9 @@ func TestPurchaseMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.GetProductPurchase(context.Background(), "com.example.app", "premium", "token"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from GetProductPurchase, got %v", err)
 	}
+	if _, err := c.GetProductPurchaseV2(context.Background(), "com.example.app", "token"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from GetProductPurchaseV2, got %v", err)
+	}
 	if err := c.AcknowledgeProductPurchase(context.Background(), "com.example.app", "premium", "token", "payload"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from AcknowledgeProductPurchase, got %v", err)
 	}
@@ -43,6 +46,12 @@ func TestPurchaseMethods_ValidateArgs(t *testing.T) {
 
 	if _, err := c.GetProductPurchase(context.Background(), "", "premium", "token"); err == nil || !strings.Contains(err.Error(), "package name is required") {
 		t.Fatalf("unexpected GetProductPurchase package error: %v", err)
+	}
+	if _, err := c.GetProductPurchaseV2(context.Background(), "", "token"); err == nil || !strings.Contains(err.Error(), "package name is required") {
+		t.Fatalf("unexpected GetProductPurchaseV2 package error: %v", err)
+	}
+	if _, err := c.GetProductPurchaseV2(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "purchase token is required") {
+		t.Fatalf("unexpected GetProductPurchaseV2 token error: %v", err)
 	}
 	if err := c.AcknowledgeProductPurchase(context.Background(), "com.example.app", "", "token", "payload"); err == nil || !strings.Contains(err.Error(), "product id is required") {
 		t.Fatalf("unexpected AcknowledgeProductPurchase product error: %v", err)
@@ -89,6 +98,21 @@ func TestProductPurchaseInfoFromProductPurchase(t *testing.T) {
 	})
 	if got.OrderID != "GPA.1" || got.ProductID != "premium" || got.PurchaseToken != "token-1" {
 		t.Fatalf("unexpected product purchase map: %+v", got)
+	}
+}
+
+func TestProductPurchaseV2InfoFromProductPurchaseV2(t *testing.T) {
+	got := productPurchaseV2InfoFromProductPurchaseV2(&androidpublisher.ProductPurchaseV2{
+		Kind:                   "androidpublisher#productPurchaseV2",
+		OrderId:                "GPA.10",
+		AcknowledgementState:   "ACKNOWLEDGEMENT_STATE_PENDING",
+		PurchaseStateContext:   &androidpublisher.PurchaseStateContext{PurchaseState: "PENDING"},
+		RegionCode:             "PL",
+		PurchaseCompletionTime: "2026-03-01T10:00:00Z",
+		ProductLineItem:        []*androidpublisher.ProductLineItem{{}, {}},
+	})
+	if got.OrderID != "GPA.10" || got.PurchaseState != "PENDING" || got.LineItemCount != 2 {
+		t.Fatalf("unexpected product purchase v2 map: %+v", got)
 	}
 }
 

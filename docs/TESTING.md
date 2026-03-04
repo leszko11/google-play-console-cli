@@ -16,6 +16,7 @@ Phase scripts:
 scripts/smoke-test-phase1.sh
 scripts/smoke-test-phase2.sh
 scripts/smoke-test-phase3.sh
+scripts/smoke-test-phase5.sh
 scripts/smoke-test-all.sh
 ```
 
@@ -35,9 +36,15 @@ Optional environment variables:
 - `GPC_CONFIG_PATH`: config path for isolated smoke runs.
 - `GPC_TEST_DEVELOPER_ID`: optional developer ID passed to `auth init` to avoid interactive prompt in smoke scripts.
 - `GPC_ENABLE_PHASE3=1`: enables phase 3 in `smoke-test-all.sh`.
+- `GPC_ENABLE_PHASE5=1`: enables phase 5 in `smoke-test-all.sh`.
 - `GPC_TEST_AAB` or `GPC_TEST_APK`: exactly one is required for phase 3.
 - `GPC_EXPECT_VERSION_CODE`: optional assertion for phase-3 version code.
 - `GPC_MAPPING_FILE`, `GPC_MAPPING_TYPE`: optional mapping upload in phase 3.
+- `GPC_PHASE5_PAGE_SIZE`: optional page size for phase 5 list checks (default `50`).
+- `GPC_STRICT_PHASE5_PURCHASES=1`: fail phase 5 when purchases endpoints return package/permission skips.
+- `GPC_TEST_SUBSCRIPTION_PRODUCT_ID`, `GPC_TEST_PRODUCT_ID`: optional IDs for `subscriptions get` / `products get` checks.
+- `GPC_TEST_SUBSCRIPTION_TOKEN`, `GPC_TEST_SUBSCRIPTION_ETAG`: optional purchase token + etag for `purchases subscriptions get` and `defer --validate-only`.
+- `GPC_TEST_PRODUCT_TOKEN`: optional purchase token for `purchases products get` when `GPC_TEST_PRODUCT_ID` is set.
 
 Example:
 
@@ -162,6 +169,7 @@ gpc iap update --package-name com.example.app --sku coins_100 --input /path/to/i
 gpc iap batch-delete --package-name com.example.app --input /path/to/inappproducts-batch-delete.json --confirm
 gpc iap delete --package-name com.example.app --sku coins_100 --confirm
 gpc purchases products get --package-name com.example.app --product-id premium --token <purchase-token>
+gpc purchases products-v2 get --package-name com.example.app --token <purchase-token>
 gpc purchases products acknowledge --package-name com.example.app --product-id premium --token <purchase-token>
 gpc purchases products consume --package-name com.example.app --product-id premium --token <purchase-token> --confirm
 gpc purchases subscriptions get --package-name com.example.app --token <subscription-token>
