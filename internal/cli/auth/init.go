@@ -3,6 +3,7 @@ package auth
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
@@ -43,6 +45,11 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
+			profile = strings.TrimSpace(profile)
+			if profile == "" {
+				return shared.UsageErrorf("--profile is required")
+			}
+
 			if strings.TrimSpace(serviceAccountPath) == "" {
 				serviceAccountPath = strings.TrimSpace(shared.ActiveGlobalFlags().ServiceAccount)
 			}
@@ -51,6 +58,14 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 			}
 			if strings.TrimSpace(serviceAccountPath) == "" {
 				return shared.UsageErrorf("--service-account is required or set %s", shared.EnvServiceAccountPath)
+			}
+			serviceAccountPath = strings.TrimSpace(serviceAccountPath)
+			serviceAccountJSON, err := os.ReadFile(serviceAccountPath)
+			if err != nil {
+				return fmt.Errorf("failed to read service account file: %w", err)
+			}
+			if !json.Valid(serviceAccountJSON) {
+				return shared.UsageErrorf("service account file is not valid JSON")
 			}
 
 			cfg, err := deps.LoadConfig()
@@ -71,7 +86,10 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 				requestCtx, cancel := shared.ContextWithTimeout(ctx, shared.ActiveGlobalFlags().Timeout)
 				defer cancel()
 
-				client, err := deps.NewClient(requestCtx, gpc.CredentialInput{ServiceAccountPath: serviceAccountPath})
+				client, err := deps.NewClient(requestCtx, gpc.CredentialInput{
+					ServiceAccountPath: serviceAccountPath,
+					ServiceAccountJSON: serviceAccountJSON,
+				})
 				if err != nil {
 					return err
 				}
@@ -91,12 +109,30 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 
+			storageBackend := "config"
+			warnings := []string{}
+			if authresolver.ShouldBypassKeychain(deps.LookupEnv) {
+				warnings = append(warnings, "keychain bypassed via GPC_BYPASS_KEYCHAIN")
+			} else {
+				if err := authresolver.StoreProfileCredential(profile, serviceAccountJSON); err == nil {
+					storageBackend = "keychain"
+				} else if authresolver.IsKeyringUnavailable(err) {
+					warnings = append(warnings, "system keychain unavailable; profile stored with config path metadata")
+				} else {
+					return fmt.Errorf("failed to store profile credential: %w", err)
+				}
+			}
+
 			out := map[string]any{
 				"activeProfile":      cfg.ActiveProfile,
 				"serviceAccountPath": serviceAccountPath,
+				"storageBackend":     storageBackend,
 			}
 			if resolvedDeveloperID != "" {
 				out["developerId"] = resolvedDeveloperID
+			}
+			if len(warnings) > 0 {
+				out["warnings"] = warnings
 			}
 			return shared.WriteJSON(deps.Stdout, out)
 		},

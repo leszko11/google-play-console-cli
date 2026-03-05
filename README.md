@@ -43,6 +43,9 @@ make dev
 ```
 
 Detailed smoke tests: `docs/TESTING.md`.
+Auth behavior and credential source model: `docs/AUTH.md`.
+Google Play API caveats: `docs/API_NOTES.md`.
+Endpoint index notes: `docs/openapi/README.md`.
 
 GitHub smoke workflow: `.github/workflows/smoke-tests.yml`.
 Use workflow-dispatch inputs `run_phase3` / `run_phase5` to enable optional deploy/monetization smoke phases.
@@ -56,11 +59,22 @@ gpc --version
 # Initialize credentials
 gpc auth init --service-account /path/to/service-account.json
 
+# Initialize additional profiles (multi-identity)
+gpc auth init --profile work --service-account /path/to/work-service-account.json
+gpc auth init --profile personal --service-account /path/to/personal-service-account.json
+
 # Optional: save your developer account ID once for developer-level commands
 gpc auth init --service-account /path/to/service-account.json --developer-id <developer-id>
 
 # Show current auth profile
 gpc auth status
+gpc auth profiles list --output table
+
+# Profile override without mutating persisted active profile
+gpc --profile work auth status --output json
+
+# Strict auth source policy (fails on mixed sources)
+gpc --strict-auth apps get --package-name com.example.app
 
 # Global flags are available from root and apply to all commands
 gpc --package-name com.example.app --service-account /path/to/service-account.json --timeout 90s --pretty apps get
@@ -318,6 +332,39 @@ gpc release alpha \
   --confirm
 ```
 
+## Auth Profiles and Credential Sources
+
+Credential source precedence:
+
+1. `--service-account`
+2. `GPC_SERVICE_ACCOUNT_PATH`
+3. keychain credential for selected profile
+4. profile `serviceAccountPath` in config
+
+Profile selection precedence:
+
+1. `--profile`
+2. config `activeProfile`
+
+Useful commands:
+
+```bash
+gpc auth profiles list --output table
+gpc auth switch --profile work
+gpc --profile personal auth status --output json
+gpc auth logout --profile work
+gpc auth logout --all
+```
+
+Keychain controls:
+
+- `GPC_BYPASS_KEYCHAIN=1` disables keychain usage for current process.
+- if keychain is unavailable, CLI falls back to config-path metadata and reports warnings in auth output.
+
+Strict source policy:
+
+- `--strict-auth` or `GPC_STRICT_AUTH=1` fails when multiple credential sources are present.
+
 ## Bootstrap New Apps
 
 Google Play API can only manage packages that were initialized with at least one artifact uploaded in Play Console UI.
@@ -347,7 +394,9 @@ When CLI output includes `access denied` or `missing Play Console permissions`:
 ## Global Flags
 
 - `--package-name`: default package for commands that support package-level operations.
-- `--service-account`: credential path override (`flag > env > config`).
+- `--service-account`: credential override (`flag > env > keychain > config`).
+- `--profile`: select auth profile for this command invocation.
+- `--strict-auth`: fail when credentials resolve from multiple sources.
 - `--output`: default output format for commands that support output variants.
 - `--pretty`: pretty-print JSON output.
 - `--timeout`: timeout for standard API requests.
@@ -375,4 +424,5 @@ gpc purchases --help
 gpc users --help
 gpc grants --help
 gpc internal-sharing --help
+gpc completion --help
 ```

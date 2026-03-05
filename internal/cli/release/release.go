@@ -91,13 +91,13 @@ func buildClient(ctx context.Context, deps Deps) (Client, context.Context, conte
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	serviceAccountPath, err := shared.ResolveServiceAccountPath(cfg, deps.LookupEnv)
+	resolved, err := shared.ResolveCredentials(cfg, deps.LookupEnv)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
 	requestCtx, cancel := shared.ContextWithTimeout(ctx, shared.ActiveGlobalFlags().Timeout)
-	client, err := deps.NewClient(requestCtx, gpc.CredentialInput{ServiceAccountPath: serviceAccountPath})
+	client, err := deps.NewClient(requestCtx, resolved.Input)
 	if err != nil {
 		cancel()
 		return nil, nil, nil, err

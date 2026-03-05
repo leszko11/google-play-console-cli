@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
-	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
@@ -46,7 +45,7 @@ func NewListCommand(deps Deps) *ffcli.Command {
 			}
 
 			if verify && len(items) > 0 {
-				serviceAccountPath, err := shared.ResolveServiceAccountPath(cfg, deps.LookupEnv)
+				resolved, err := shared.ResolveCredentials(cfg, deps.LookupEnv)
 				if err != nil {
 					return err
 				}
@@ -54,7 +53,7 @@ func NewListCommand(deps Deps) *ffcli.Command {
 				requestCtx, cancel := shared.ContextWithTimeout(ctx, shared.ActiveGlobalFlags().Timeout)
 				defer cancel()
 
-				client, err := deps.NewClient(requestCtx, gpc.CredentialInput{ServiceAccountPath: serviceAccountPath})
+				client, err := deps.NewClient(requestCtx, resolved.Input)
 				if err != nil {
 					return err
 				}

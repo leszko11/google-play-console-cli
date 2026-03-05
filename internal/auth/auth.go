@@ -13,24 +13,32 @@ var (
 type SourceKind string
 
 const (
-	SourceFlag   SourceKind = "flag"
-	SourceEnv    SourceKind = "env"
-	SourceConfig SourceKind = "config"
+	SourceFlag     SourceKind = "flag"
+	SourceEnv      SourceKind = "env"
+	SourceConfig   SourceKind = "config"
+	SourceKeychain SourceKind = "keychain"
 )
 
 type Source struct {
 	Kind SourceKind
 	Path string
+	JSON []byte
 }
 
 type Input struct {
-	FlagPath   string
-	EnvPath    string
-	ConfigPath string
-	Strict     bool
+	FlagPath     string
+	EnvPath      string
+	ConfigPath   string
+	KeychainJSON []byte
+	Strict       bool
 }
 
 func ResolveCredentialSource(in Input) (Source, error) {
+	normalizedKeychain := []byte{}
+	if len(in.KeychainJSON) > 0 {
+		normalizedKeychain = []byte(string(in.KeychainJSON))
+	}
+
 	sources := make([]Source, 0, 3)
 	if in.FlagPath != "" {
 		sources = append(sources, Source{Kind: SourceFlag, Path: in.FlagPath})
@@ -38,7 +46,9 @@ func ResolveCredentialSource(in Input) (Source, error) {
 	if in.EnvPath != "" {
 		sources = append(sources, Source{Kind: SourceEnv, Path: in.EnvPath})
 	}
-	if in.ConfigPath != "" {
+	if len(normalizedKeychain) > 0 {
+		sources = append(sources, Source{Kind: SourceKeychain, JSON: normalizedKeychain})
+	} else if in.ConfigPath != "" {
 		sources = append(sources, Source{Kind: SourceConfig, Path: in.ConfigPath})
 	}
 
@@ -50,12 +60,15 @@ func ResolveCredentialSource(in Input) (Source, error) {
 		return Source{}, fmt.Errorf("%w: found %d", ErrMultipleSources, len(sources))
 	}
 
-	// Precedence: flag > env > config
+	// Precedence: flag > env > keychain > config
 	if in.FlagPath != "" {
 		return Source{Kind: SourceFlag, Path: in.FlagPath}, nil
 	}
 	if in.EnvPath != "" {
 		return Source{Kind: SourceEnv, Path: in.EnvPath}, nil
+	}
+	if len(normalizedKeychain) > 0 {
+		return Source{Kind: SourceKeychain, JSON: normalizedKeychain}, nil
 	}
 	return Source{Kind: SourceConfig, Path: in.ConfigPath}, nil
 }

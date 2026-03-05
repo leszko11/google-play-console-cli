@@ -1,10 +1,14 @@
 package shared
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
 	"github.com/leszko11/google-play-console-cli/internal/config"
+	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
 
 func TestResolvePackageName_GlobalFallback(t *testing.T) {
@@ -206,5 +210,153 @@ func TestResolveDeveloperID_RequiresValue(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--developer-id is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestResolveProfileName_GlobalOverride(t *testing.T) {
+	prev := boundGlobalFlags
+	defer func() { boundGlobalFlags = prev }()
+
+	boundGlobalFlags = &GlobalFlags{Profile: "override"}
+	cfg := config.Config{ActiveProfile: "default"}
+	if got := ResolveProfileName(cfg); got != "override" {
+		t.Fatalf("expected override profile, got %q", got)
+	}
+}
+
+func TestResolveStrictAuth_FromEnv(t *testing.T) {
+	prev := boundGlobalFlags
+	defer func() { boundGlobalFlags = prev }()
+
+	boundGlobalFlags = &GlobalFlags{}
+	if !ResolveStrictAuth(func(name string) string {
+		if name == EnvStrictAuth {
+			return "true"
+		}
+		return ""
+	}) {
+		t.Fatal("expected strict auth from env")
+	}
+}
+
+func TestResolveCredentials_StrictAuthConflict(t *testing.T) {
+	prev := boundGlobalFlags
+	defer func() { boundGlobalFlags = prev }()
+
+	boundGlobalFlags = &GlobalFlags{
+		ServiceAccount: "/tmp/flag.json",
+		StrictAuth:     true,
+	}
+	cfg := config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {ServiceAccountPath: "/tmp/config.json"},
+		},
+	}
+	_, err := ResolveCredentials(cfg, func(name string) string {
+		switch name {
+		case EnvServiceAccountPath:
+			return "/tmp/env.json"
+		case authresolver.EnvBypassKeychain:
+			return "1"
+		default:
+			return ""
+		}
+	})
+	if err == nil {
+		t.Fatal("expected strict conflict error")
+	}
+	if !strings.Contains(err.Error(), "multiple credential sources found") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestResolveCredentials_UsesProfileOverride(t *testing.T) {
+	prev := boundGlobalFlags
+	defer func() { boundGlobalFlags = prev }()
+
+	boundGlobalFlags = &GlobalFlags{Profile: "ci"}
+	cfg := config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {ServiceAccountPath: "/tmp/default.json"},
+			"ci":      {ServiceAccountPath: "/tmp/ci.json"},
+		},
+	}
+	resolved, err := ResolveCredentials(cfg, func(name string) string {
+		if name == authresolver.EnvBypassKeychain {
+			return "1"
+		}
+		return ""
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolved.Profile != "ci" {
+		t.Fatalf("expected profile ci, got %q", resolved.Profile)
+	}
+	if resolved.Input.ServiceAccountPath != "/tmp/ci.json" {
+		t.Fatalf("expected ci path, got %q", resolved.Input.ServiceAccountPath)
+	}
+}
+
+func TestResolveCredentials_KeychainSource(t *testing.T) {
+	prevGlobals := boundGlobalFlags
+	prevBypass := resolveCredentialsShouldBypassKeychain
+	prevLoad := resolveCredentialsLoadProfileCredential
+	prevNotFound := resolveCredentialsIsCredentialNotFound
+	prevUnavailable := resolveCredentialsIsKeyringUnavailable
+	defer func() {
+		boundGlobalFlags = prevGlobals
+		resolveCredentialsShouldBypassKeychain = prevBypass
+		resolveCredentialsLoadProfileCredential = prevLoad
+		resolveCredentialsIsCredentialNotFound = prevNotFound
+		resolveCredentialsIsKeyringUnavailable = prevUnavailable
+	}()
+
+	boundGlobalFlags = &GlobalFlags{}
+	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return false }
+	resolveCredentialsLoadProfileCredential = func(profile string) ([]byte, error) {
+		if profile != "default" {
+			t.Fatalf("unexpected profile: %q", profile)
+		}
+		return []byte(`{"type":"service_account","project_id":"example"}`), nil
+	}
+	resolveCredentialsIsCredentialNotFound = func(error) bool { return false }
+	resolveCredentialsIsKeyringUnavailable = func(error) bool { return false }
+
+	cfg := config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {ServiceAccountPath: "/tmp/default.json"},
+		},
+	}
+	resolved, err := ResolveCredentials(cfg, func(string) string { return "" })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolved.Source != authresolver.SourceKeychain {
+		t.Fatalf("expected keychain source, got %q", resolved.Source)
+	}
+	if len(resolved.Input.ServiceAccountJSON) == 0 {
+		t.Fatal("expected keychain json payload")
+	}
+	if !CredentialLocallyValid(resolved.Input) {
+		t.Fatal("expected locally valid keychain credential")
+	}
+}
+
+func TestCredentialLocallyValid_PathFailures(t *testing.T) {
+	if CredentialLocallyValid(gpc.CredentialInput{ServiceAccountPath: "/definitely/missing/path.json"}) {
+		t.Fatal("expected missing path to be invalid")
+	}
+
+	tmpDir := t.TempDir()
+	invalidPath := filepath.Join(tmpDir, "invalid.json")
+	if err := os.WriteFile(invalidPath, []byte("not-json"), 0o600); err != nil {
+		t.Fatalf("write invalid file: %v", err)
+	}
+	if CredentialLocallyValid(gpc.CredentialInput{ServiceAccountPath: invalidPath}) {
+		t.Fatal("expected invalid json path to be invalid")
 	}
 }

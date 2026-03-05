@@ -38,6 +38,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			NewInitCommand(deps),
 			NewStatusCommand(deps),
+			NewProfilesCommand(deps),
 			NewSwitchCommand(deps),
 			NewLogoutCommand(deps),
 		},
