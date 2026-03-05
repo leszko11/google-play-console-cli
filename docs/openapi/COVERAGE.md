@@ -16,9 +16,9 @@ make generate-openapi-coverage
 | Metric | Count |
 | --- | ---: |
 | Total discovery endpoints | 136 |
-| Implemented endpoints | 102 |
-| Missing endpoints | 34 |
-| Detected service method IDs | 102 |
+| Implemented endpoints | 105 |
+| Missing endpoints | 31 |
+| Detected service method IDs | 105 |
 | Unmatched service method IDs | 0 |
 
 ## Family Summary
@@ -26,7 +26,7 @@ make generate-openapi-coverage
 | Family | Implemented | Missing | Total |
 | --- | ---: | ---: | ---: |
 | `applications.dataSafety` | 0 | 1 | 1 |
-| `applications.deviceTierConfigs` | 0 | 3 | 3 |
+| `applications.deviceTierConfigs` | 3 | 0 | 3 |
 | `apprecovery` | 0 | 5 | 5 |
 | `edits` | 5 | 0 | 5 |
 | `edits.apks` | 2 | 1 | 3 |
@@ -62,12 +62,6 @@ make generate-openapi-coverage
 ### `applications.dataSafety`
 
 - `androidpublisher.applications.dataSafety` | `POST` `androidpublisher/v3/applications/{packageName}/dataSafety`
-
-### `applications.deviceTierConfigs`
-
-- `androidpublisher.applications.deviceTierConfigs.list` | `GET` `androidpublisher/v3/applications/{packageName}/deviceTierConfigs`
-- `androidpublisher.applications.deviceTierConfigs.get` | `GET` `androidpublisher/v3/applications/{packageName}/deviceTierConfigs/{deviceTierConfigId}`
-- `androidpublisher.applications.deviceTierConfigs.create` | `POST` `androidpublisher/v3/applications/{packageName}/deviceTierConfigs`
 
 ### `apprecovery`
 

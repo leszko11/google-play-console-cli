@@ -154,6 +154,10 @@ gpc orders refund --package-name com.example.app --order-id GPA.1234-5678-9012-3
 gpc external-transactions get --package-name com.example.app --external-transaction-id ext-monthly-20260305
 gpc external-transactions create --package-name com.example.app --external-transaction-id ext-monthly-20260305 --input /path/to/external-transaction.json
 gpc external-transactions refund --package-name com.example.app --external-transaction-id ext-monthly-20260305 --input /path/to/external-transaction-refund.json --confirm
+gpc device-tier-configs list --package-name com.example.app --page-size 100
+gpc device-tier-configs get --package-name com.example.app --device-tier-config-id 123
+gpc device-tier-configs create --package-name com.example.app --input /path/to/device-tier-config.json
+gpc device-tier-configs create --package-name com.example.app --input /path/to/device-tier-config.json --allow-unknown-devices
 gpc subscriptions list --package-name com.example.app --page-size 100
 gpc --paginate subscriptions list --package-name com.example.app --page-size 100
 gpc subscriptions get --package-name com.example.app --product-id premium_monthly

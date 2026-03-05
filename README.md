@@ -19,6 +19,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Reviews management (`reviews list/get/reply`)
 - Orders API support (`orders get/batch-get/refund`)
 - External transactions API support (`external-transactions get/create/refund`)
+- Device tier config support (`device-tier-configs list/get/create`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Monetization one-time product commands (`products ...`)
 - Legacy in-app product commands (`iap ...`)
@@ -152,6 +153,12 @@ gpc orders refund --package-name com.example.app --order-id GPA.1234-5678-9012-3
 gpc external-transactions get --package-name com.example.app --external-transaction-id ext-monthly-20260305
 gpc external-transactions create --package-name com.example.app --external-transaction-id ext-monthly-20260305 --input /path/to/external-transaction.json
 gpc external-transactions refund --package-name com.example.app --external-transaction-id ext-monthly-20260305 --input /path/to/external-transaction-refund.json --confirm
+
+# Manage device tier configs used for app bundle targeting
+gpc device-tier-configs list --package-name com.example.app --page-size 100
+gpc device-tier-configs get --package-name com.example.app --device-tier-config-id 123
+gpc device-tier-configs create --package-name com.example.app --input /path/to/device-tier-config.json
+gpc device-tier-configs create --package-name com.example.app --input /path/to/device-tier-config.json --allow-unknown-devices
 
 # List/get subscription products
 gpc subscriptions list --package-name com.example.app --page-size 100
@@ -433,6 +440,7 @@ gpc release --help
 gpc reviews --help
 gpc orders --help
 gpc external-transactions --help
+gpc device-tier-configs --help
 gpc subscriptions --help
 gpc products --help
 gpc iap --help
