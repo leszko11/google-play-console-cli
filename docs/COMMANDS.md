@@ -55,6 +55,11 @@ make generate-command-docs
 - `gpc edits images upload`
 - `gpc edits images delete`
 - `gpc edits images delete-all`
+- `gpc edits expansion-files`
+- `gpc edits expansion-files get`
+- `gpc edits expansion-files patch`
+- `gpc edits expansion-files update`
+- `gpc edits expansion-files upload`
 - `gpc tracks`
 - `gpc tracks list`
 - `gpc tracks get`
@@ -412,6 +417,7 @@ SUBCOMMANDS
   country-availability  Inspect track country availability inside an edit
   listings              Manage listing changes inside an edit
   images                Manage store listing images inside an edit
+  expansion-files       Manage APK expansion files inside an edit
 ```
 
 ## `gpc edits create --help`
@@ -796,6 +802,89 @@ FLAGS
   -image-type string    Image type (icon, featureGraphic, phoneScreenshots, ...)
   -locale string        Listing locale (BCP-47, e.g. en-US)
   -package-name string  Package name
+```
+
+## `gpc edits expansion-files --help`
+
+```text
+DESCRIPTION
+  Manage APK expansion files inside an edit
+
+USAGE
+  expansion-files
+
+SUBCOMMANDS
+  get     Get expansion file configuration for one APK inside an edit
+  patch   Patch expansion file reference for one APK inside an edit
+  update  Update expansion file reference for one APK inside an edit
+  upload  Upload an expansion file for one APK inside an edit
+```
+
+## `gpc edits expansion-files get --help`
+
+```text
+DESCRIPTION
+  Get expansion file configuration for one APK inside an edit
+
+USAGE
+  get
+
+FLAGS
+  -apk-version-code 0          APK version code
+  -edit-id string              Edit ID
+  -expansion-file-type string  Expansion file type: main or patch
+  -package-name string         Package name
+```
+
+## `gpc edits expansion-files patch --help`
+
+```text
+DESCRIPTION
+  Patch expansion file reference for one APK inside an edit
+
+USAGE
+  patch
+
+FLAGS
+  -apk-version-code 0          APK version code
+  -edit-id string              Edit ID
+  -expansion-file-type string  Expansion file type: main or patch
+  -package-name string         Package name
+  -references-version 0        APK version code whose expansion file should be referenced
+```
+
+## `gpc edits expansion-files update --help`
+
+```text
+DESCRIPTION
+  Update expansion file reference for one APK inside an edit
+
+USAGE
+  update
+
+FLAGS
+  -apk-version-code 0          APK version code
+  -edit-id string              Edit ID
+  -expansion-file-type string  Expansion file type: main or patch
+  -package-name string         Package name
+  -references-version 0        APK version code whose expansion file should be referenced
+```
+
+## `gpc edits expansion-files upload --help`
+
+```text
+DESCRIPTION
+  Upload an expansion file for one APK inside an edit
+
+USAGE
+  upload
+
+FLAGS
+  -apk-version-code 0          APK version code
+  -edit-id string              Edit ID
+  -expansion-file-type string  Expansion file type: main or patch
+  -file string                 Path to expansion file to upload
+  -package-name string         Package name
 ```
 
 ## `gpc tracks --help`

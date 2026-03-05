@@ -41,6 +41,8 @@ Notes:
 
 - Some apps accept AAB only; APK upload may fail with API error text about APK disallowance
 - Use `bundles upload` or `deploy --aab ...` for AAB-only apps
+- Expansion files are legacy APK-only artifacts; they do not apply to AAB-only delivery flows
+- `edits expansion-files patch|update` reference another APK version's expansion file instead of uploading a new OBB
 
 ## Release Notes and Locales
 

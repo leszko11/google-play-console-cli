@@ -12,6 +12,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Testers and country availability inside edits
 - Track management inside edits (`tracks list/get/update/promote`)
 - Store images inside edits (`edits images list/upload/delete/delete-all`)
+- APK expansion files inside edits (`edits expansion-files get/patch/update/upload`)
 - Binary uploads in edits (`apks list/upload`, `bundles list/upload`)
 - Deobfuscation mapping upload (`deobfuscation upload`)
 - End-to-end deploy orchestration (`deploy`)
@@ -124,6 +125,12 @@ gpc edits images list --package-name com.example.app --edit-id <edit-id> --local
 gpc edits images upload --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type icon --file /path/to/icon-512.png
 gpc edits images delete --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots --image-id <image-id>
 gpc edits images delete-all --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
+
+# Manage APK expansion files in an edit
+gpc edits expansion-files get --package-name com.example.app --edit-id <edit-id> --apk-version-code 123 --expansion-file-type main
+gpc edits expansion-files patch --package-name com.example.app --edit-id <edit-id> --apk-version-code 123 --expansion-file-type main --references-version 122
+gpc edits expansion-files update --package-name com.example.app --edit-id <edit-id> --apk-version-code 123 --expansion-file-type patch --references-version 122
+gpc edits expansion-files upload --package-name com.example.app --edit-id <edit-id> --apk-version-code 123 --expansion-file-type main --file /path/to/main.obb
 
 # Local image validation (pre-API)
 # - Supported image types: featureGraphic, icon, phoneScreenshots, promoGraphic,

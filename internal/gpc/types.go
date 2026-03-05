@@ -69,6 +69,11 @@ type ImageInfo struct {
 	URL    string `json:"url,omitempty"`
 }
 
+type ExpansionFileInfo struct {
+	FileSize          int64 `json:"fileSize,omitempty"`
+	ReferencesVersion int64 `json:"referencesVersion,omitempty"`
+}
+
 type TestersInfo struct {
 	Track        string   `json:"track,omitempty"`
 	GoogleGroups []string `json:"googleGroups,omitempty"`

@@ -63,6 +63,18 @@ func TestEditMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.DeleteAllImages(context.Background(), "com.example.app", "edit-1", "en-US", "phoneScreenshots"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from DeleteAllImages, got %v", err)
 	}
+	if _, err := c.GetExpansionFile(context.Background(), "com.example.app", "edit-1", 123, "main"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from GetExpansionFile, got %v", err)
+	}
+	if _, err := c.PatchExpansionFile(context.Background(), "com.example.app", "edit-1", 123, "main", 456); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from PatchExpansionFile, got %v", err)
+	}
+	if _, err := c.UpdateExpansionFile(context.Background(), "com.example.app", "edit-1", 123, "main", 456); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from UpdateExpansionFile, got %v", err)
+	}
+	if _, err := c.UploadExpansionFile(context.Background(), "com.example.app", "edit-1", 123, "main", "/tmp/main.obb"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from UploadExpansionFile, got %v", err)
+	}
 }
 
 func TestEditMethods_ValidateArgs(t *testing.T) {
@@ -149,6 +161,21 @@ func TestListingMethods_ValidateArgs(t *testing.T) {
 	if _, err := c.DeleteAllImages(context.Background(), "com.example.app", "edit-1", "en-US", ""); err == nil || !strings.Contains(err.Error(), "image type is required") {
 		t.Fatalf("unexpected DeleteAllImages image type error: %v", err)
 	}
+	if _, err := c.GetExpansionFile(context.Background(), "com.example.app", "edit-1", 0, "main"); err == nil || !strings.Contains(err.Error(), "apk version code must be greater than zero") {
+		t.Fatalf("unexpected GetExpansionFile apk version code error: %v", err)
+	}
+	if _, err := c.GetExpansionFile(context.Background(), "com.example.app", "edit-1", 123, ""); err == nil || !strings.Contains(err.Error(), "expansion file type must be one of") {
+		t.Fatalf("unexpected GetExpansionFile type error: %v", err)
+	}
+	if _, err := c.PatchExpansionFile(context.Background(), "com.example.app", "edit-1", 123, "main", 0); err == nil || !strings.Contains(err.Error(), "references version must be greater than zero") {
+		t.Fatalf("unexpected PatchExpansionFile references version error: %v", err)
+	}
+	if _, err := c.UpdateExpansionFile(context.Background(), "com.example.app", "edit-1", 123, "patch", 0); err == nil || !strings.Contains(err.Error(), "references version must be greater than zero") {
+		t.Fatalf("unexpected UpdateExpansionFile references version error: %v", err)
+	}
+	if _, err := c.UploadExpansionFile(context.Background(), "com.example.app", "edit-1", 123, "main", ""); err == nil || !strings.Contains(err.Error(), "expansion file path is required") {
+		t.Fatalf("unexpected UploadExpansionFile file path error: %v", err)
+	}
 }
 
 func TestListingInfoFromListing(t *testing.T) {
@@ -207,5 +234,15 @@ func TestImageInfoFromImage(t *testing.T) {
 	})
 	if got.ID != "image-1" || got.SHA1 != "sha1" || got.SHA256 != "sha256" || got.URL != "https://example.com/image.png" {
 		t.Fatalf("unexpected image map: %+v", got)
+	}
+}
+
+func TestExpansionFileInfoFromExpansionFile(t *testing.T) {
+	got := expansionFileInfoFromExpansionFile(&androidpublisher.ExpansionFile{
+		FileSize:          123456,
+		ReferencesVersion: 789,
+	})
+	if got.FileSize != 123456 || got.ReferencesVersion != 789 {
+		t.Fatalf("unexpected expansion file map: %+v", got)
 	}
 }

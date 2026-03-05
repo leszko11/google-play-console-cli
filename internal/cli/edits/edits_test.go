@@ -17,38 +17,47 @@ import (
 )
 
 type fakeClient struct {
-	create           gpc.EditInfo
-	createErr        error
-	get              gpc.EditInfo
-	getErr           error
-	validate         error
-	commit           gpc.EditInfo
-	commitErr        error
-	deleteErr        error
-	appDetails       gpc.AppDetailsInfo
-	appDetailsErr    error
-	updateDetailsErr error
-	updateDetailsFn  func(packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
-	testers          gpc.TestersInfo
-	testersErr       error
-	updateTestersErr error
-	updateTestersFn  func(packageName, editID, track string, googleGroups []string) (gpc.TestersInfo, error)
-	countryAvail     gpc.CountryAvailabilityInfo
-	countryAvailErr  error
-	listing          gpc.ListingInfo
-	listings         []gpc.ListingInfo
-	listErr          error
-	updateErr        error
-	updateListingFn  func(packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
-	delListErr       error
-	delAllErr        error
-	images           []gpc.ImageInfo
-	image            gpc.ImageInfo
-	imagesErr        error
-	uploadImageErr   error
-	deleteImageErr   error
-	deleteAllImgErr  error
-	uploadImageFn    func(packageName, editID, language, imageType, imagePath string) (gpc.ImageInfo, error)
+	create             gpc.EditInfo
+	createErr          error
+	get                gpc.EditInfo
+	getErr             error
+	validate           error
+	commit             gpc.EditInfo
+	commitErr          error
+	deleteErr          error
+	appDetails         gpc.AppDetailsInfo
+	appDetailsErr      error
+	updateDetailsErr   error
+	updateDetailsFn    func(packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
+	testers            gpc.TestersInfo
+	testersErr         error
+	updateTestersErr   error
+	updateTestersFn    func(packageName, editID, track string, googleGroups []string) (gpc.TestersInfo, error)
+	countryAvail       gpc.CountryAvailabilityInfo
+	countryAvailErr    error
+	listing            gpc.ListingInfo
+	listings           []gpc.ListingInfo
+	listErr            error
+	updateErr          error
+	updateListingFn    func(packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
+	delListErr         error
+	delAllErr          error
+	images             []gpc.ImageInfo
+	image              gpc.ImageInfo
+	imagesErr          error
+	uploadImageErr     error
+	deleteImageErr     error
+	deleteAllImgErr    error
+	uploadImageFn      func(packageName, editID, language, imageType, imagePath string) (gpc.ImageInfo, error)
+	expansionFile      gpc.ExpansionFileInfo
+	expansionFileErr   error
+	uploadExpansionErr error
+	patchExpansionErr  error
+	updateExpansionErr error
+	getExpansionFn     func(packageName, editID string, apkVersionCode int64, expansionFileType string) (gpc.ExpansionFileInfo, error)
+	patchExpansionFn   func(packageName, editID string, apkVersionCode int64, expansionFileType string, referencesVersion int64) (gpc.ExpansionFileInfo, error)
+	updateExpansionFn  func(packageName, editID string, apkVersionCode int64, expansionFileType string, referencesVersion int64) (gpc.ExpansionFileInfo, error)
+	uploadExpansionFn  func(packageName, editID string, apkVersionCode int64, expansionFileType, filePath string) (gpc.ExpansionFileInfo, error)
 }
 
 func (f fakeClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, error) {
@@ -111,6 +120,30 @@ func (f fakeClient) DeleteImage(_ context.Context, _, _, _, _, _ string) error {
 }
 func (f fakeClient) DeleteAllImages(_ context.Context, _, _, _, _ string) ([]gpc.ImageInfo, error) {
 	return f.images, f.deleteAllImgErr
+}
+func (f fakeClient) GetExpansionFile(_ context.Context, packageName, editID string, apkVersionCode int64, expansionFileType string) (gpc.ExpansionFileInfo, error) {
+	if f.getExpansionFn != nil {
+		return f.getExpansionFn(packageName, editID, apkVersionCode, expansionFileType)
+	}
+	return f.expansionFile, f.expansionFileErr
+}
+func (f fakeClient) PatchExpansionFile(_ context.Context, packageName, editID string, apkVersionCode int64, expansionFileType string, referencesVersion int64) (gpc.ExpansionFileInfo, error) {
+	if f.patchExpansionFn != nil {
+		return f.patchExpansionFn(packageName, editID, apkVersionCode, expansionFileType, referencesVersion)
+	}
+	return f.expansionFile, f.patchExpansionErr
+}
+func (f fakeClient) UpdateExpansionFile(_ context.Context, packageName, editID string, apkVersionCode int64, expansionFileType string, referencesVersion int64) (gpc.ExpansionFileInfo, error) {
+	if f.updateExpansionFn != nil {
+		return f.updateExpansionFn(packageName, editID, apkVersionCode, expansionFileType, referencesVersion)
+	}
+	return f.expansionFile, f.updateExpansionErr
+}
+func (f fakeClient) UploadExpansionFile(_ context.Context, packageName, editID string, apkVersionCode int64, expansionFileType, filePath string) (gpc.ExpansionFileInfo, error) {
+	if f.uploadExpansionFn != nil {
+		return f.uploadExpansionFn(packageName, editID, apkVersionCode, expansionFileType, filePath)
+	}
+	return f.expansionFile, f.uploadExpansionErr
 }
 
 func runEdits(t *testing.T, deps Deps, args ...string) (string, error) {
@@ -866,6 +899,91 @@ func TestEditsImagesList_RequiresImageType(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--image-type is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEditsExpansionFilesGet_ReturnsExpansionFile(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{expansionFile: gpc.ExpansionFileInfo{FileSize: 123456}}, nil
+		},
+	}
+
+	out, err := runEdits(t, deps, "expansion-files", "get", "--package-name", "com.example.app", "--edit-id", "edit-1", "--apk-version-code", "123", "--expansion-file-type", "main")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"fileSize":123456`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsExpansionFilesPatch_ReturnsPatched(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				patchExpansionFn: func(_ string, _ string, apkVersionCode int64, expansionFileType string, referencesVersion int64) (gpc.ExpansionFileInfo, error) {
+					if expansionFileType != "patch" || apkVersionCode != 123 || referencesVersion != 456 {
+						t.Fatalf("unexpected patch args: type=%s apk=%d ref=%d", expansionFileType, apkVersionCode, referencesVersion)
+					}
+					return gpc.ExpansionFileInfo{ReferencesVersion: referencesVersion}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(t, deps, "expansion-files", "patch", "--package-name", "com.example.app", "--edit-id", "edit-1", "--apk-version-code", "123", "--expansion-file-type", "patch", "--references-version", "456")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"patched"`) || !strings.Contains(out, `"referencesVersion":456`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsExpansionFilesUpdate_RequiresReferencesVersion(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(t, deps, "expansion-files", "update", "--package-name", "com.example.app", "--edit-id", "edit-1", "--apk-version-code", "123", "--expansion-file-type", "main")
+	if err == nil || !strings.Contains(err.Error(), "--references-version must be greater than zero") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEditsExpansionFilesUpload_ReturnsUploaded(t *testing.T) {
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "main.obb")
+	if err := os.WriteFile(filePath, []byte("obb-data"), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				uploadExpansionFn: func(_ string, _ string, apkVersionCode int64, expansionFileType, uploadPath string) (gpc.ExpansionFileInfo, error) {
+					if expansionFileType != "main" || apkVersionCode != 123 || uploadPath != filePath {
+						t.Fatalf("unexpected upload args: type=%s apk=%d path=%s", expansionFileType, apkVersionCode, uploadPath)
+					}
+					return gpc.ExpansionFileInfo{FileSize: 8}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(t, deps, "expansion-files", "upload", "--package-name", "com.example.app", "--edit-id", "edit-1", "--apk-version-code", "123", "--expansion-file-type", "main", "--file", filePath)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"uploaded"`) || !strings.Contains(out, `"fileSize":8`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
 
