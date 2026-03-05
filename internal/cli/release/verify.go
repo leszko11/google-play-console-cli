@@ -220,7 +220,12 @@ func runVerify(ctx context.Context, deps Deps, opts verifyOptions) (verifyResult
 		if notesResult.Mode == notesgen.ModeNone {
 			result.addWarn("notes_source", "release notes disabled")
 		} else {
-			result.addOK("notes_source", fmt.Sprintf("notes ready (%s)", notesResult.Source))
+			parsedNotes, parseErr := notesgen.ParseLocalizedText(notesResult.Text, notesResult.Locale)
+			if parseErr != nil {
+				result.addBlocking("notes_source", parseErr.Error())
+			} else {
+				result.addOK("notes_source", fmt.Sprintf("notes ready (%s, locales=%d)", notesResult.Source, len(parsedNotes)))
+			}
 		}
 	}
 

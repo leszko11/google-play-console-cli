@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
@@ -170,6 +171,9 @@ func TestValidateAlphaOptions(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "--allow-production is required") {
 		t.Fatalf("unexpected production validation error: %v", err)
 	}
+	if !shared.IsUsageError(err) {
+		t.Fatalf("expected usage error, got %T: %v", err, err)
+	}
 
 	err = validateAlphaOptions(alphaOptions{
 		PackageName:    "com.example.app",
@@ -181,6 +185,9 @@ func TestValidateAlphaOptions(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "--update-priority must be between 0 and 5") {
 		t.Fatalf("unexpected priority validation error: %v", err)
+	}
+	if !shared.IsUsageError(err) {
+		t.Fatalf("expected usage error, got %T: %v", err, err)
 	}
 }
 

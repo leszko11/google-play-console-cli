@@ -167,11 +167,11 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 
 			trackName = strings.TrimSpace(trackName)
 			if trackName == "" {
-				return fmt.Errorf("--track is required")
+				return shared.UsageErrorf("--track is required")
 			}
 			status = strings.TrimSpace(status)
 			if status == "" {
-				return fmt.Errorf("--status is required")
+				return shared.UsageErrorf("--status is required")
 			}
 
 			versionCodes, err := parseVersionCodes(versionCodesCSV)
@@ -179,10 +179,10 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 			if userFraction > 1 || (userFraction >= 0 && userFraction <= 0) {
-				return fmt.Errorf("--user-fraction must be within (0,1] when set")
+				return shared.UsageErrorf("--user-fraction must be within (0,1] when set")
 			}
 			if updatePriority < 0 || updatePriority > 5 {
-				return fmt.Errorf("--update-priority must be between 0 and 5")
+				return shared.UsageErrorf("--update-priority must be between 0 and 5")
 			}
 			releaseNotes, err := shared.ParseReleaseNotesInput(
 				releaseNotesFile,
@@ -240,14 +240,14 @@ func newPromoteCommand(deps Deps) *ffcli.Command {
 
 			fromTrack = strings.TrimSpace(fromTrack)
 			if fromTrack == "" {
-				return fmt.Errorf("--from-track is required")
+				return shared.UsageErrorf("--from-track is required")
 			}
 			toTrack = strings.TrimSpace(toTrack)
 			if toTrack == "" {
-				return fmt.Errorf("--to-track is required")
+				return shared.UsageErrorf("--to-track is required")
 			}
 			if fromTrack == toTrack {
-				return fmt.Errorf("--from-track and --to-track must be different")
+				return shared.UsageErrorf("--from-track and --to-track must be different")
 			}
 
 			sourceTrack, err := client.GetTrack(requestCtx, pkg, eid, fromTrack)
@@ -305,7 +305,7 @@ func buildClient(ctx context.Context, deps Deps, packageName, editID string, upl
 	}
 	editID = strings.TrimSpace(editID)
 	if editID == "" {
-		return nil, "", "", nil, nil, fmt.Errorf("--edit-id is required")
+		return nil, "", "", nil, nil, shared.UsageErrorf("--edit-id is required")
 	}
 
 	client, requestCtx, cancel, err := shared.BuildClient[Client](ctx, shared.BuildClientDeps[Client]{
@@ -324,7 +324,7 @@ func buildClient(ctx context.Context, deps Deps, packageName, editID string, upl
 func parseVersionCodes(raw string) ([]int64, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil, fmt.Errorf("--version-codes is required")
+		return nil, shared.UsageErrorf("--version-codes is required")
 	}
 
 	parts := strings.Split(raw, ",")
@@ -336,13 +336,13 @@ func parseVersionCodes(raw string) ([]int64, error) {
 		}
 		code, err := strconv.ParseInt(part, 10, 64)
 		if err != nil || code <= 0 {
-			return nil, fmt.Errorf("invalid version code %q", part)
+			return nil, shared.UsageErrorf("invalid version code %q", part)
 		}
 		versionCodes = append(versionCodes, code)
 	}
 
 	if len(versionCodes) == 0 {
-		return nil, fmt.Errorf("--version-codes must include at least one valid integer")
+		return nil, shared.UsageErrorf("--version-codes must include at least one valid integer")
 	}
 	return versionCodes, nil
 }

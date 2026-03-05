@@ -113,25 +113,25 @@ func newAlphaCommand(deps Deps) *ffcli.Command {
 
 func validateAlphaOptions(opts alphaOptions) error {
 	if strings.TrimSpace(opts.PackageName) == "" {
-		return fmt.Errorf("--package-name is required")
+		return shared.UsageErrorf("--package-name is required")
 	}
 	if strings.TrimSpace(opts.Track) == "" {
-		return fmt.Errorf("--track is required")
+		return shared.UsageErrorf("--track is required")
 	}
 	if opts.Track == "production" && !opts.AllowProduction {
-		return fmt.Errorf("--allow-production is required when --track=production")
+		return shared.UsageErrorf("--allow-production is required when --track=production")
 	}
 	if strings.TrimSpace(opts.ReleaseStatus) == "" {
-		return fmt.Errorf("--status is required")
+		return shared.UsageErrorf("--status is required")
 	}
 	if !opts.DryRun && !opts.Confirm {
-		return fmt.Errorf("--confirm is required unless --dry-run is set")
+		return shared.UsageErrorf("--confirm is required unless --dry-run is set")
 	}
 	if opts.UserFraction > 1 || (opts.UserFraction >= 0 && opts.UserFraction <= 0) {
-		return fmt.Errorf("--user-fraction must be within (0,1] when set")
+		return shared.UsageErrorf("--user-fraction must be within (0,1] when set")
 	}
 	if opts.UpdatePriority < 0 || opts.UpdatePriority > 5 {
-		return fmt.Errorf("--update-priority must be between 0 and 5")
+		return shared.UsageErrorf("--update-priority must be between 0 and 5")
 	}
 	return nil
 }
@@ -327,7 +327,7 @@ func resolveVersionInfo(opts alphaOptions, lookupEnv func(string) string, now fu
 
 	if opts.VersionCode > 0 {
 		if opts.VersionCode > maxAndroidVersionCode {
-			return 0, "", fmt.Errorf("--version-code exceeds Play maximum (%d)", maxAndroidVersionCode)
+			return 0, "", shared.UsageErrorf("--version-code exceeds Play maximum (%d)", maxAndroidVersionCode)
 		}
 		return opts.VersionCode, versionName, nil
 	}

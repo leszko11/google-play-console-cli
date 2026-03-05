@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
@@ -175,6 +176,9 @@ func TestTracksUpdate_RejectsInvalidVersionCodes(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "invalid version code") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if !shared.IsUsageError(err) {
+		t.Fatalf("expected usage error, got %T: %v", err, err)
 	}
 }
 

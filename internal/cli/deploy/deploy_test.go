@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
@@ -186,6 +187,9 @@ func TestDeployRequiresExactlyOneArtifact(t *testing.T) {
 	)
 	if err == nil || !strings.Contains(err.Error(), "exactly one of --aab or --apk is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if !shared.IsUsageError(err) {
+		t.Fatalf("expected usage error, got %T: %v", err, err)
 	}
 
 	_, err = runDeploy(

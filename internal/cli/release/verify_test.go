@@ -99,3 +99,38 @@ func TestRunVerifySuccess(t *testing.T) {
 		t.Fatalf("expected ok status, got %+v", result)
 	}
 }
+
+func TestRunVerifyBlocksOnInvalidNotesFormat(t *testing.T) {
+	projectDir := t.TempDir()
+	mustWriteFile(t, projectDir+"/gradlew", "#!/bin/bash\n")
+	mustWriteFile(t, projectDir+"/notes.txt", "<en-US>\nBroken notes without closing tag\n")
+
+	client := &fakeReleaseClient{}
+	deps := baseReleaseDeps(t, client)
+
+	result, err := runVerify(context.Background(), deps, verifyOptions{
+		PackageName: "com.example.app",
+		Track:       "alpha",
+		ProjectDir:  projectDir,
+		BuildTask:   defaultBuildTask,
+		NotesMode:   "file",
+		NotesFile:   projectDir + "/notes.txt",
+		NotesLocale: "en-US",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Status != "failed" {
+		t.Fatalf("expected failed status, got %+v", result)
+	}
+	found := false
+	for _, issue := range result.BlockingIssues {
+		if strings.Contains(issue, "missing closing tag") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected invalid notes format blocking issue, got %+v", result.BlockingIssues)
+	}
+}
