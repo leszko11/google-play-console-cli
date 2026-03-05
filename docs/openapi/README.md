@@ -5,6 +5,7 @@ This directory tracks a lightweight endpoint index for Android Publisher API v3.
 Files:
 
 - `paths.txt`: normalized endpoint list for quick grep/review
+- `COVERAGE.md`: generated implemented-vs-missing endpoint report based on live `internal/gpc` service usage
 
 ## Regenerate `paths.txt`
 
@@ -25,6 +26,12 @@ Custom output:
 
 ```bash
 python3 scripts/update-openapi-paths.py --fetch --output /tmp/paths.txt
+```
+
+Generate the coverage report:
+
+```bash
+python3 scripts/generate-openapi-coverage.py
 ```
 
 ## Format

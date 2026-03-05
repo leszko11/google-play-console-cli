@@ -36,6 +36,9 @@ jobs:
           GPC_BIN: ""
         run: make check-command-docs
 
+      - name: OpenAPI coverage sync
+        run: make check-openapi-coverage
+
       - name: Run tests
         run: go test ./...
 

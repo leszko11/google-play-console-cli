@@ -16,6 +16,7 @@ dist/
 # Code coverage profiles and other test artifacts
 *.out
 coverage.*
+!docs/openapi/COVERAGE.md
 *.coverprofile
 profile.cov
 
