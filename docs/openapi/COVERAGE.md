@@ -16,9 +16,9 @@ make generate-openapi-coverage
 | Metric | Count |
 | --- | ---: |
 | Total discovery endpoints | 136 |
-| Implemented endpoints | 99 |
-| Missing endpoints | 37 |
-| Detected service method IDs | 99 |
+| Implemented endpoints | 102 |
+| Missing endpoints | 34 |
+| Detected service method IDs | 102 |
 | Unmatched service method IDs | 0 |
 
 ## Family Summary
@@ -39,7 +39,7 @@ make generate-openapi-coverage
 | `edits.listings` | 5 | 1 | 6 |
 | `edits.testers` | 2 | 1 | 3 |
 | `edits.tracks` | 3 | 2 | 5 |
-| `externaltransactions` | 0 | 3 | 3 |
+| `externaltransactions` | 3 | 0 | 3 |
 | `generatedapks` | 0 | 2 | 2 |
 | `grants` | 3 | 0 | 3 |
 | `inappproducts` | 8 | 1 | 9 |
@@ -104,12 +104,6 @@ make generate-openapi-coverage
 
 - `androidpublisher.edits.tracks.patch` | `PATCH` `androidpublisher/v3/applications/{packageName}/edits/{editId}/tracks/{track}`
 - `androidpublisher.edits.tracks.create` | `POST` `androidpublisher/v3/applications/{packageName}/edits/{editId}/tracks`
-
-### `externaltransactions`
-
-- `androidpublisher.externaltransactions.getexternaltransaction` | `GET` `androidpublisher/v3/applications/{applicationsId}/externalTransactions/{externalTransactionsId}`
-- `androidpublisher.externaltransactions.createexternaltransaction` | `POST` `androidpublisher/v3/applications/{applicationsId}/externalTransactions`
-- `androidpublisher.externaltransactions.refundexternaltransaction` | `POST` `androidpublisher/v3/applications/{applicationsId}/externalTransactions/{externalTransactionsId}:refund`
 
 ### `generatedapks`
 
