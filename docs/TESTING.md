@@ -147,6 +147,10 @@ gpc release alpha --package-name com.example.app --project-dir /path/to/android-
 gpc reviews list --package-name com.example.app --max-results 50
 gpc reviews get --package-name com.example.app --review-id <review-id>
 gpc reviews reply --package-name com.example.app --review-id <review-id> --reply-text "Thanks for your feedback!"
+gpc orders get --package-name com.example.app --order-id GPA.1234-5678-9012-34567
+gpc orders batch-get --package-name com.example.app --order-ids GPA.1234-5678-9012-34567,GPA.1234-5678-9012-34568
+gpc orders refund --package-name com.example.app --order-id GPA.1234-5678-9012-34567 --confirm
+gpc orders refund --package-name com.example.app --order-id GPA.1234-5678-9012-34567 --revoke --confirm
 gpc subscriptions list --package-name com.example.app --page-size 100
 gpc --paginate subscriptions list --package-name com.example.app --page-size 100
 gpc subscriptions get --package-name com.example.app --product-id premium_monthly

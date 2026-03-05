@@ -17,6 +17,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - End-to-end deploy orchestration (`deploy`)
 - Staging release workflows (`release verify`, `release alpha`)
 - Reviews management (`reviews list/get/reply`)
+- Orders API support (`orders get/batch-get/refund`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Monetization one-time product commands (`products ...`)
 - Legacy in-app product commands (`iap ...`)
@@ -139,6 +140,12 @@ gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
 gpc reviews list --package-name com.example.app --max-results 50
 gpc reviews get --package-name com.example.app --review-id <review-id>
 gpc reviews reply --package-name com.example.app --review-id <review-id> --reply-text "Thanks for your feedback!"
+
+# Inspect or refund Play orders
+gpc orders get --package-name com.example.app --order-id GPA.1234-5678-9012-34567
+gpc orders batch-get --package-name com.example.app --order-ids GPA.1234-5678-9012-34567,GPA.1234-5678-9012-34568
+gpc orders refund --package-name com.example.app --order-id GPA.1234-5678-9012-34567 --confirm
+gpc orders refund --package-name com.example.app --order-id GPA.1234-5678-9012-34567 --revoke --confirm
 
 # List/get subscription products
 gpc subscriptions list --package-name com.example.app --page-size 100
@@ -418,6 +425,7 @@ gpc deobfuscation --help
 gpc deploy --help
 gpc release --help
 gpc reviews --help
+gpc orders --help
 gpc subscriptions --help
 gpc products --help
 gpc iap --help

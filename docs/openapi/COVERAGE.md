@@ -16,9 +16,9 @@ make generate-openapi-coverage
 | Metric | Count |
 | --- | ---: |
 | Total discovery endpoints | 136 |
-| Implemented endpoints | 96 |
-| Missing endpoints | 40 |
-| Detected service method IDs | 96 |
+| Implemented endpoints | 99 |
+| Missing endpoints | 37 |
+| Detected service method IDs | 99 |
 | Unmatched service method IDs | 0 |
 
 ## Family Summary
@@ -47,7 +47,7 @@ make generate-openapi-coverage
 | `monetization.convertRegionPrices` | 1 | 0 | 1 |
 | `monetization.onetimeproducts` | 17 | 0 | 17 |
 | `monetization.subscriptions` | 22 | 2 | 24 |
-| `orders` | 0 | 3 | 3 |
+| `orders` | 3 | 0 | 3 |
 | `purchases.products` | 3 | 0 | 3 |
 | `purchases.productsv2` | 1 | 0 | 1 |
 | `purchases.subscriptions` | 0 | 6 | 6 |
@@ -124,12 +124,6 @@ make generate-openapi-coverage
 
 - `androidpublisher.monetization.subscriptions.basePlans.activate` | `POST` `androidpublisher/v3/applications/{packageName}/subscriptions/{productId}/basePlans/{basePlanId}:activate`
 - `androidpublisher.monetization.subscriptions.basePlans.deactivate` | `POST` `androidpublisher/v3/applications/{packageName}/subscriptions/{productId}/basePlans/{basePlanId}:deactivate`
-
-### `orders`
-
-- `androidpublisher.orders.get` | `GET` `androidpublisher/v3/applications/{packageName}/orders/{orderId}`
-- `androidpublisher.orders.batchget` | `GET` `androidpublisher/v3/applications/{packageName}/orders:batchGet`
-- `androidpublisher.orders.refund` | `POST` `androidpublisher/v3/applications/{packageName}/orders/{orderId}:refund`
 
 ### `purchases.subscriptions`
 
