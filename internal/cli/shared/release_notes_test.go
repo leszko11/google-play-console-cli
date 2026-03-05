@@ -3,6 +3,7 @@ package shared
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -60,6 +61,21 @@ func TestParseReleaseNotesFile_RejectsDuplicateLocale(t *testing.T) {
 	}
 }
 
+func TestParseReleaseNotesFile_RejectsDuplicateLocaleCaseInsensitive(t *testing.T) {
+	path := writeReleaseNotesFixture(t, `[{"language":"en-US","text":"A"},{"language":"en-us","text":"B"}]`)
+
+	_, err := ParseReleaseNotesFile(path)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !IsUsageError(err) {
+		t.Fatalf("expected usage error, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "duplicate release note locale") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestParseReleaseNotesFile_RejectsInvalidShape(t *testing.T) {
 	path := writeReleaseNotesFixture(t, `{"en-US":{"text":"invalid"}}`)
 
@@ -79,5 +95,38 @@ func TestParseReleaseNotesFile_EmptyPathIsNoop(t *testing.T) {
 	}
 	if notes != nil {
 		t.Fatalf("expected nil notes, got %+v", notes)
+	}
+}
+
+func TestParseReleaseNotesInput_ParsesTaggedFile(t *testing.T) {
+	path := writeReleaseNotesFixture(t, `<en-US>
+Bug fixes.
+</en-US>
+<pl-PL>
+Poprawki.
+</pl-PL>`)
+
+	notes, err := ParseReleaseNotesInput(path, "", "en-US", os.ReadFile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(notes) != 2 {
+		t.Fatalf("expected 2 notes, got %d", len(notes))
+	}
+	if notes[0].Language != "en-US" || notes[1].Language != "pl-PL" {
+		t.Fatalf("unexpected notes: %+v", notes)
+	}
+}
+
+func TestParseReleaseNotesInput_ParsesInlinePlainTextWithDefaultLocale(t *testing.T) {
+	notes, err := ParseReleaseNotesInput("", "Single note", "cs-CZ", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(notes) != 1 {
+		t.Fatalf("expected 1 note, got %d", len(notes))
+	}
+	if notes[0].Language != "cs-CZ" || notes[0].Text != "Single note" {
+		t.Fatalf("unexpected note: %+v", notes[0])
 	}
 }

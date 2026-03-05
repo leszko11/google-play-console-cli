@@ -123,10 +123,11 @@ func normalizeReleaseNotes(notes []gpc.LocalizedText) ([]gpc.LocalizedText, erro
 		if text == "" {
 			return nil, UsageErrorf("release note text must not be empty for locale %q", locale)
 		}
-		if _, ok := seenLocales[locale]; ok {
+		localeKey := strings.ToLower(locale)
+		if _, ok := seenLocales[localeKey]; ok {
 			return nil, UsageErrorf("duplicate release note locale %q", locale)
 		}
-		seenLocales[locale] = struct{}{}
+		seenLocales[localeKey] = struct{}{}
 		normalized = append(normalized, gpc.LocalizedText{
 			Language: locale,
 			Text:     text,
