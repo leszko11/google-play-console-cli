@@ -84,6 +84,10 @@ make generate-command-docs
 - `gpc external-transactions get`
 - `gpc external-transactions create`
 - `gpc external-transactions refund`
+- `gpc device-tier-configs`
+- `gpc device-tier-configs list`
+- `gpc device-tier-configs get`
+- `gpc device-tier-configs create`
 - `gpc subscriptions`
 - `gpc subscriptions list`
 - `gpc subscriptions get`
@@ -193,6 +197,7 @@ SUBCOMMANDS
   reviews                Read and reply to Play Store reviews
   orders                 Inspect and refund Play orders
   external-transactions  Report and refund external transactions
+  device-tier-configs    Manage application device tier configs
   subscriptions          Manage monetization subscriptions
   products               Manage monetization one-time products
   iap                    Manage legacy in-app products
@@ -1269,6 +1274,65 @@ FLAGS
   -external-transaction-id string  External transaction ID
   -input string                    Path to refund request JSON payload (use - for stdin)
   -package-name string             Package name
+```
+
+## `gpc device-tier-configs --help`
+
+```text
+DESCRIPTION
+  Manage application device tier configs
+
+USAGE
+  device-tier-configs
+
+SUBCOMMANDS
+  list    List device tier configs
+  get     Get a device tier config by ID
+  create  Create a device tier config
+```
+
+## `gpc device-tier-configs list --help`
+
+```text
+DESCRIPTION
+  List device tier configs
+
+USAGE
+  list
+
+FLAGS
+  -package-name string  Package name
+  -page-size 0          Maximum device tier configs per page
+  -page-token string    Page token for the next page
+```
+
+## `gpc device-tier-configs get --help`
+
+```text
+DESCRIPTION
+  Get a device tier config by ID
+
+USAGE
+  get
+
+FLAGS
+  -device-tier-config-id 0  Device tier config ID
+  -package-name string      Package name
+```
+
+## `gpc device-tier-configs create --help`
+
+```text
+DESCRIPTION
+  Create a device tier config
+
+USAGE
+  create
+
+FLAGS
+  -allow-unknown-devices=false  Allow device IDs unknown to Play's device catalog
+  -input string                 Path to device tier config JSON payload (use - for stdin)
+  -package-name string          Package name
 ```
 
 ## `gpc subscriptions --help`

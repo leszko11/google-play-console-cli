@@ -82,6 +82,13 @@ For monetization create/update flows:
 - `external-transactions refund` requires a JSON payload with `refundTime` and exactly one of `fullRefund` or `partialRefund`
 - Create and refund payloads map directly to Android Publisher API schemas, so keep sample payloads under version control for repeatable operations
 
+## Device Tier Configs API
+
+- Device tier configs control bundle delivery targeting; they matter only for apps that actively use device-tier aware bundle delivery
+- `device-tier-configs create` accepts raw Android Publisher `DeviceTierConfig` JSON payloads
+- Use `--allow-unknown-devices` only when you intentionally want Play to accept device IDs outside the known catalog during config creation
+- `device-tier-configs list` is paginated and supports `--paginate` for full inventory export
+
 ## Timeouts
 
 - `--timeout` controls standard API request deadline
