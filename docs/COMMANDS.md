@@ -20,6 +20,8 @@ make generate-command-docs
 - `gpc auth`
 - `gpc auth init`
 - `gpc auth status`
+- `gpc auth profiles`
+- `gpc auth profiles list`
 - `gpc auth switch`
 - `gpc auth logout`
 - `gpc apps`
@@ -197,7 +199,9 @@ FLAGS
   -package-name string     App package name
   -paginate=false          Fetch all paginated API responses
   -pretty=false            Pretty print JSON output
+  -profile string          Authentication profile override
   -service-account string  Path to service account JSON
+  -strict-auth=false       Fail when credentials are resolved from multiple sources
   -timeout 0s              Request timeout
   -upload-timeout 0s       Upload request timeout
   -version=false           Show build version information
@@ -213,10 +217,11 @@ USAGE
   auth
 
 SUBCOMMANDS
-  init    Initialize authentication profile
-  status  Show authentication status
-  switch  Switch active authentication profile
-  logout  Log out current profile
+  init      Initialize authentication profile
+  status    Show authentication status
+  profiles  Manage authentication profiles
+  switch    Switch active authentication profile
+  logout    Log out current profile
 ```
 
 ## `gpc auth init --help`
@@ -249,6 +254,32 @@ FLAGS
   -output string  Output format: json, table
 ```
 
+## `gpc auth profiles --help`
+
+```text
+DESCRIPTION
+  Manage authentication profiles
+
+USAGE
+  profiles
+
+SUBCOMMANDS
+  list  List authentication profiles
+```
+
+## `gpc auth profiles list --help`
+
+```text
+DESCRIPTION
+  List authentication profiles
+
+USAGE
+  list
+
+FLAGS
+  -output string  Output format: json, table
+```
+
 ## `gpc auth switch --help`
 
 ```text
@@ -270,6 +301,10 @@ DESCRIPTION
 
 USAGE
   logout
+
+FLAGS
+  -all=false       Remove all stored profiles and credentials
+  -profile string  Profile name to remove (defaults to selected active profile)
 ```
 
 ## `gpc apps --help`

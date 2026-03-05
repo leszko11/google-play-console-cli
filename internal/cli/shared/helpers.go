@@ -2,6 +2,7 @@ package shared
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -14,6 +15,19 @@ import (
 
 var resolveOutputLookupEnv = os.Getenv
 var resolveOutputDetectTTY = detectStdoutTTY
+var resolveCredentialsShouldBypassKeychain = authresolver.ShouldBypassKeychain
+var resolveCredentialsLoadProfileCredential = authresolver.LoadProfileCredential
+var resolveCredentialsIsCredentialNotFound = authresolver.IsCredentialNotFound
+var resolveCredentialsIsKeyringUnavailable = authresolver.IsKeyringUnavailable
+var resolveCredentialsResolveSource = authresolver.ResolveCredentialSource
+
+type ResolvedCredentials struct {
+	Input              gpc.CredentialInput
+	Source             authresolver.SourceKind
+	Profile            string
+	ServiceAccountPath string
+	Warnings           []string
+}
 
 func ResolvePackageName(localValue string) (string, error) {
 	if pkg := strings.TrimSpace(localValue); pkg != "" {
@@ -48,8 +62,9 @@ func ResolveDeveloperID(localValue string, cfg config.Config) (string, error) {
 	if id := strings.TrimSpace(localValue); id != "" {
 		return NormalizeDeveloperID(id)
 	}
-	if cfg.ActiveProfile != "" && cfg.Profiles != nil {
-		if profile, ok := cfg.Profiles[cfg.ActiveProfile]; ok {
+	resolvedProfile := ResolveProfileName(cfg)
+	if resolvedProfile != "" && cfg.Profiles != nil {
+		if profile, ok := cfg.Profiles[resolvedProfile]; ok {
 			if id := strings.TrimSpace(profile.DeveloperID); id != "" {
 				return NormalizeDeveloperID(id)
 			}
@@ -74,30 +89,94 @@ func ResolveOutput(localValue string) string {
 	return "json"
 }
 
-func ResolveServiceAccountPath(cfg config.Config, lookupEnv func(string) string) (string, error) {
+func ResolveProfileName(cfg config.Config) string {
+	if profile := strings.TrimSpace(ActiveGlobalFlags().Profile); profile != "" {
+		return profile
+	}
+	return strings.TrimSpace(cfg.ActiveProfile)
+}
+
+func ResolveStrictAuth(lookupEnv func(string) string) bool {
+	if lookupEnv == nil {
+		lookupEnv = os.Getenv
+	}
+	if ActiveGlobalFlags().StrictAuth {
+		return true
+	}
+	return isTruthy(lookupEnv(EnvStrictAuth))
+}
+
+func ResolveCredentials(cfg config.Config, lookupEnv func(string) string) (ResolvedCredentials, error) {
 	if lookupEnv == nil {
 		lookupEnv = os.Getenv
 	}
 
+	profileName := ResolveProfileName(cfg)
 	var cfgPath string
-	if cfg.ActiveProfile != "" && cfg.Profiles != nil {
-		if profile, ok := cfg.Profiles[cfg.ActiveProfile]; ok {
+	if profileName != "" && cfg.Profiles != nil {
+		if profile, ok := cfg.Profiles[profileName]; ok {
 			cfgPath = strings.TrimSpace(profile.ServiceAccountPath)
 		}
 	}
 
-	source, err := authresolver.ResolveCredentialSource(authresolver.Input{
-		FlagPath:   strings.TrimSpace(ActiveGlobalFlags().ServiceAccount),
-		EnvPath:    strings.TrimSpace(lookupEnv(EnvServiceAccountPath)),
-		ConfigPath: cfgPath,
+	warnings := []string{}
+	var keychainJSON []byte
+	if profileName != "" {
+		if resolveCredentialsShouldBypassKeychain(lookupEnv) {
+			warnings = append(warnings, "keychain bypassed via GPC_BYPASS_KEYCHAIN")
+		} else {
+			payload, err := resolveCredentialsLoadProfileCredential(profileName)
+			if err == nil {
+				keychainJSON = payload
+			} else if resolveCredentialsIsCredentialNotFound(err) {
+				// Profile may still have config path fallback.
+			} else if resolveCredentialsIsKeyringUnavailable(err) {
+				warnings = append(warnings, "system keychain unavailable; using config/environment/flags")
+			} else {
+				return ResolvedCredentials{}, err
+			}
+		}
+	}
+
+	source, err := resolveCredentialsResolveSource(authresolver.Input{
+		FlagPath:     strings.TrimSpace(ActiveGlobalFlags().ServiceAccount),
+		EnvPath:      strings.TrimSpace(lookupEnv(EnvServiceAccountPath)),
+		ConfigPath:   cfgPath,
+		KeychainJSON: keychainJSON,
+		Strict:       ResolveStrictAuth(lookupEnv),
 	})
 	if err != nil {
 		if errors.Is(err, authresolver.ErrNoCredentialSources) {
-			return "", UsageErrorf("no service account configured")
+			return ResolvedCredentials{}, UsageErrorf("no service account configured")
 		}
+		if errors.Is(err, authresolver.ErrMultipleSources) {
+			return ResolvedCredentials{}, UsageErrorf("%v", err)
+		}
+		return ResolvedCredentials{}, err
+	}
+
+	input := gpc.CredentialInput{
+		ServiceAccountPath: source.Path,
+		ServiceAccountJSON: source.JSON,
+	}
+	return ResolvedCredentials{
+		Input:              input,
+		Source:             source.Kind,
+		Profile:            profileName,
+		ServiceAccountPath: source.Path,
+		Warnings:           warnings,
+	}, nil
+}
+
+func ResolveServiceAccountPath(cfg config.Config, lookupEnv func(string) string) (string, error) {
+	resolved, err := ResolveCredentials(cfg, lookupEnv)
+	if err != nil {
 		return "", err
 	}
-	return source.Path, nil
+	if strings.TrimSpace(resolved.ServiceAccountPath) == "" {
+		return "", UsageErrorf("resolved credentials from %q do not expose --service-account path", resolved.Source)
+	}
+	return resolved.ServiceAccountPath, nil
 }
 
 func WriteJSON(out io.Writer, v any) error {
@@ -134,13 +213,13 @@ func BuildClient[T any](ctx context.Context, deps BuildClientDeps[T]) (T, contex
 		return zero, nil, noopCancel, err
 	}
 
-	serviceAccountPath, err := ResolveServiceAccountPath(cfg, deps.LookupEnv)
+	resolved, err := ResolveCredentials(cfg, deps.LookupEnv)
 	if err != nil {
 		cancel()
 		return zero, nil, noopCancel, err
 	}
 
-	client, err := deps.NewClient(requestCtx, gpc.CredentialInput{ServiceAccountPath: serviceAccountPath})
+	client, err := deps.NewClient(requestCtx, resolved.Input)
 	if err != nil {
 		cancel()
 		return zero, nil, noopCancel, err
@@ -155,4 +234,28 @@ func detectStdoutTTY() bool {
 		return false
 	}
 	return info.Mode()&os.ModeCharDevice != 0
+}
+
+func CredentialLocallyValid(input gpc.CredentialInput) bool {
+	if len(input.ServiceAccountJSON) > 0 {
+		return json.Valid(input.ServiceAccountJSON)
+	}
+	path := strings.TrimSpace(input.ServiceAccountPath)
+	if path == "" {
+		return false
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	return json.Valid(raw)
+}
+
+func isTruthy(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }

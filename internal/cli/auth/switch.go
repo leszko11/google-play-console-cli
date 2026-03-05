@@ -5,7 +5,9 @@ import (
 	"flag"
 	"strings"
 
+	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
@@ -34,13 +36,34 @@ func NewSwitchCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 
-			if cfg.Profiles == nil {
-				return shared.UsageErrorf("profile %q not found", profile)
+			exists := false
+			if cfg.Profiles != nil {
+				if _, ok := cfg.Profiles[profile]; ok {
+					exists = true
+				}
 			}
-			if _, ok := cfg.Profiles[profile]; !ok {
+			if !exists && !authresolver.ShouldBypassKeychain(deps.LookupEnv) {
+				names, err := authresolver.ListKeychainProfiles()
+				if err != nil && !authresolver.IsKeyringUnavailable(err) {
+					return err
+				}
+				for _, name := range names {
+					if name == profile {
+						exists = true
+						break
+					}
+				}
+			}
+			if !exists {
 				return shared.UsageErrorf("profile %q not found", profile)
 			}
 
+			if cfg.Profiles == nil {
+				cfg.Profiles = map[string]config.Profile{}
+			}
+			if _, ok := cfg.Profiles[profile]; !ok {
+				cfg.Profiles[profile] = config.Profile{}
+			}
 			cfg.ActiveProfile = profile
 			if err := deps.SaveConfig(cfg); err != nil {
 				return err

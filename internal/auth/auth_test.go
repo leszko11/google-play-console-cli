@@ -41,3 +41,20 @@ func TestResolveCredentialSource_EnvOverConfig(t *testing.T) {
 		t.Fatalf("unexpected source: %+v", got)
 	}
 }
+
+func TestResolveCredentialSource_KeychainOverConfig(t *testing.T) {
+	got, err := ResolveCredentialSource(Input{
+		ConfigPath:   "/tmp/config.json",
+		KeychainJSON: []byte(`{"type":"service_account"}`),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got.Kind != SourceKeychain {
+		t.Fatalf("unexpected source kind: %+v", got)
+	}
+	if string(got.JSON) != `{"type":"service_account"}` {
+		t.Fatalf("unexpected source payload: %s", string(got.JSON))
+	}
+}

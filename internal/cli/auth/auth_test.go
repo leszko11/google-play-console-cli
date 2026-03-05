@@ -3,10 +3,14 @@ package auth
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
@@ -32,11 +36,28 @@ func runAuthWithErr(t *testing.T, deps Deps, args ...string) (string, error) {
 	t.Helper()
 
 	var out bytes.Buffer
+	if deps.LookupEnv == nil {
+		deps.LookupEnv = func(name string) string {
+			if name == authresolver.EnvBypassKeychain {
+				return "1"
+			}
+			return ""
+		}
+	}
 	deps.Stdout = &out
 	deps.Stderr = &bytes.Buffer{}
 	cmd := NewCommand(deps)
 	err := cmd.ParseAndRun(context.Background(), args)
 	return out.String(), err
+}
+
+func writeServiceAccountFile(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "service-account.json")
+	if err := os.WriteFile(path, []byte(`{"type":"service_account","project_id":"example"}`), 0o600); err != nil {
+		t.Fatalf("write service account file: %v", err)
+	}
+	return path
 }
 
 func TestAuthInitStoresProfileMetadata(t *testing.T) {
@@ -56,7 +77,8 @@ func TestAuthInitStoresProfileMetadata(t *testing.T) {
 		Now: func() time.Time { return time.Date(2026, 2, 6, 1, 2, 3, 0, time.UTC) },
 	}
 
-	runAuth(t, deps, "init", "--service-account", "/tmp/sa.json")
+	saPath := writeServiceAccountFile(t)
+	runAuth(t, deps, "init", "--service-account", saPath)
 
 	if !saved {
 		t.Fatal("expected config to be saved")
@@ -64,7 +86,7 @@ func TestAuthInitStoresProfileMetadata(t *testing.T) {
 	if stored.ActiveProfile != "default" {
 		t.Fatalf("unexpected active profile: %q", stored.ActiveProfile)
 	}
-	if stored.Profiles["default"].ServiceAccountPath != "/tmp/sa.json" {
+	if stored.Profiles["default"].ServiceAccountPath != saPath {
 		t.Fatalf("unexpected path: %+v", stored.Profiles["default"])
 	}
 	if stored.Profiles["default"].DeveloperID != "" {
@@ -86,7 +108,8 @@ func TestAuthInitStoresDeveloperID(t *testing.T) {
 		Now: func() time.Time { return time.Date(2026, 2, 6, 1, 2, 3, 0, time.UTC) },
 	}
 
-	runAuth(t, deps, "init", "--service-account", "/tmp/sa.json", "--developer-id", "developers/123")
+	saPath := writeServiceAccountFile(t)
+	runAuth(t, deps, "init", "--service-account", saPath, "--developer-id", "developers/123")
 
 	if stored.Profiles["default"].DeveloperID != "123" {
 		t.Fatalf("unexpected developer id: %+v", stored.Profiles["default"])
@@ -110,7 +133,8 @@ func TestAuthInitPromptsForDeveloperID(t *testing.T) {
 		Now: func() time.Time { return time.Date(2026, 2, 6, 1, 2, 3, 0, time.UTC) },
 	}
 
-	runAuth(t, deps, "init", "--service-account", "/tmp/sa.json", "--prompt-developer-id")
+	saPath := writeServiceAccountFile(t)
+	runAuth(t, deps, "init", "--service-account", saPath, "--prompt-developer-id")
 
 	if stored.Profiles["default"].DeveloperID != "1234567890123456789" {
 		t.Fatalf("unexpected developer id: %+v", stored.Profiles["default"])
@@ -136,7 +160,8 @@ func TestAuthInitDoesNotPromptByDefault(t *testing.T) {
 		Now: func() time.Time { return time.Date(2026, 2, 6, 1, 2, 3, 0, time.UTC) },
 	}
 
-	runAuth(t, deps, "init", "--service-account", "/tmp/sa.json")
+	saPath := writeServiceAccountFile(t)
+	runAuth(t, deps, "init", "--service-account", saPath)
 	if promptCalled {
 		t.Fatal("did not expect developer-id prompt by default")
 	}
@@ -148,12 +173,19 @@ func TestAuthInitDoesNotPromptByDefault(t *testing.T) {
 func TestAuthStatusPrintsActiveProfileJSON(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) {
+			saPath := writeServiceAccountFile(t)
 			return config.Config{
 				ActiveProfile: "default",
 				Profiles: map[string]config.Profile{
-					"default": {ServiceAccountPath: "/tmp/sa.json", DeveloperID: "1234567890123456789"},
+					"default": {ServiceAccountPath: saPath, DeveloperID: "1234567890123456789"},
 				},
 			}, nil
+		},
+		LookupEnv: func(name string) string {
+			if name == authresolver.EnvBypassKeychain {
+				return "1"
+			}
+			return ""
 		},
 	}
 
@@ -169,12 +201,19 @@ func TestAuthStatusPrintsActiveProfileJSON(t *testing.T) {
 func TestAuthStatus_TableOutput(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) {
+			saPath := writeServiceAccountFile(t)
 			return config.Config{
 				ActiveProfile: "default",
 				Profiles: map[string]config.Profile{
-					"default": {ServiceAccountPath: "/tmp/sa.json"},
+					"default": {ServiceAccountPath: saPath},
 				},
 			}, nil
+		},
+		LookupEnv: func(name string) string {
+			if name == authresolver.EnvBypassKeychain {
+				return "1"
+			}
+			return ""
 		},
 	}
 
@@ -183,6 +222,59 @@ func TestAuthStatus_TableOutput(t *testing.T) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 	if !bytes.Contains([]byte(out), []byte("authenticated\ttrue")) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestAuthStatus_UnauthenticatedWhenPathMissing(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{
+				ActiveProfile: "default",
+				Profiles: map[string]config.Profile{
+					"default": {ServiceAccountPath: "/definitely/missing/path.json"},
+				},
+			}, nil
+		},
+		LookupEnv: func(name string) string {
+			if name == authresolver.EnvBypassKeychain {
+				return "1"
+			}
+			return ""
+		},
+	}
+
+	out := runAuth(t, deps, "status", "--output", "json")
+	if !bytes.Contains([]byte(out), []byte(`"authenticated":false`)) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestAuthStatus_UnauthenticatedWhenPathInvalidJSON(t *testing.T) {
+	invalidPath := filepath.Join(t.TempDir(), "invalid-service-account.json")
+	if err := os.WriteFile(invalidPath, []byte("not-json"), 0o600); err != nil {
+		t.Fatalf("write invalid file: %v", err)
+	}
+
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{
+				ActiveProfile: "default",
+				Profiles: map[string]config.Profile{
+					"default": {ServiceAccountPath: invalidPath},
+				},
+			}, nil
+		},
+		LookupEnv: func(name string) string {
+			if name == authresolver.EnvBypassKeychain {
+				return "1"
+			}
+			return ""
+		},
+	}
+
+	out := runAuth(t, deps, "status", "--output", "json")
+	if !bytes.Contains([]byte(out), []byte(`"authenticated":false`)) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
@@ -207,7 +299,7 @@ func TestAuthLogoutRemovesActiveProfile(t *testing.T) {
 	stored := config.Config{
 		ActiveProfile: "default",
 		Profiles: map[string]config.Profile{
-			"default": {ServiceAccountPath: "/tmp/sa.json"},
+			"default": {ServiceAccountPath: writeServiceAccountFile(t)},
 		},
 	}
 
@@ -226,5 +318,90 @@ func TestAuthLogoutRemovesActiveProfile(t *testing.T) {
 	}
 	if _, ok := stored.Profiles["default"]; ok {
 		t.Fatalf("expected default profile removed, got %+v", stored.Profiles)
+	}
+}
+
+func TestAuthInitRejectsBlankProfile(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return config.Config{}, nil },
+		SaveConfig: func(config.Config) error { return nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (PackageVerifier, error) {
+			return fakeClient{}, nil
+		},
+	}
+	saPath := writeServiceAccountFile(t)
+	_, err := runAuthWithErr(t, deps, "init", "--service-account", saPath, "--profile", "   ")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("--profile is required")) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAuthSwitchRejectsBlankProfile(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return config.Config{}, nil },
+		SaveConfig: func(config.Config) error { return nil },
+	}
+	_, err := runAuthWithErr(t, deps, "switch", "--profile", "   ")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("--profile is required")) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAuthProfilesListJSON(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{
+				ActiveProfile: "default",
+				Profiles: map[string]config.Profile{
+					"default": {ServiceAccountPath: writeServiceAccountFile(t)},
+					"ci":      {ServiceAccountPath: writeServiceAccountFile(t)},
+				},
+			}, nil
+		},
+	}
+
+	out := runAuth(t, deps, "profiles", "list", "--output", "json")
+	var payload struct {
+		Profiles []struct {
+			Profile string `json:"profile"`
+			Active  bool   `json:"active"`
+		} `json:"profiles"`
+	}
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if len(payload.Profiles) != 2 {
+		t.Fatalf("expected 2 profiles, got %d", len(payload.Profiles))
+	}
+}
+
+func TestAuthLogoutAll(t *testing.T) {
+	stored := config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {ServiceAccountPath: writeServiceAccountFile(t)},
+			"ci":      {ServiceAccountPath: writeServiceAccountFile(t)},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return stored, nil },
+		SaveConfig: func(cfg config.Config) error {
+			stored = cfg
+			return nil
+		},
+	}
+
+	runAuth(t, deps, "logout", "--all")
+	if stored.ActiveProfile != "" {
+		t.Fatalf("expected empty active profile, got %q", stored.ActiveProfile)
+	}
+	if len(stored.Profiles) != 0 {
+		t.Fatalf("expected empty profiles, got %#v", stored.Profiles)
 	}
 }

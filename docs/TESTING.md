@@ -45,6 +45,8 @@ Optional environment variables:
 - `GPC_TEST_SUBSCRIPTION_PRODUCT_ID`, `GPC_TEST_PRODUCT_ID`: optional IDs for `subscriptions get` / `products get` checks.
 - `GPC_TEST_SUBSCRIPTION_TOKEN`, `GPC_TEST_SUBSCRIPTION_ETAG`: optional purchase token + etag for `purchases subscriptions get` and `defer --validate-only`.
 - `GPC_TEST_PRODUCT_TOKEN`: optional purchase token for `purchases products get` when `GPC_TEST_PRODUCT_ID` is set.
+- `GPC_BYPASS_KEYCHAIN=1`: force config-path auth fallback (useful for deterministic CI).
+- `GPC_STRICT_AUTH=1`: enable strict mixed-source auth failure mode.
 
 Example:
 
@@ -89,11 +91,17 @@ Phase 5 can be enabled via workflow-dispatch input `run_phase5=true`. If purchas
 gpc --version
 gpc --help
 gpc auth init --service-account /path/to/service-account.json
+gpc auth init --profile work --service-account /path/to/service-account.json
 gpc auth init --service-account /path/to/service-account.json --developer-id <developer-id>
 gpc auth init --service-account /path/to/service-account.json --prompt-developer-id
 gpc auth status
 gpc auth status --output table
 gpc auth status --output json
+gpc auth profiles list --output table
+gpc auth switch --profile work
+gpc --profile work auth status --output json
+gpc auth logout --profile work
+gpc auth logout --all
 gpc --package-name com.example.app --service-account /path/to/service-account.json --pretty apps get
 gpc apps add-package --package-name com.example.app
 gpc apps list --output json
