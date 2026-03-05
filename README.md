@@ -46,6 +46,7 @@ Detailed smoke tests: `docs/TESTING.md`.
 Auth behavior and credential source model: `docs/AUTH.md`.
 Google Play API caveats: `docs/API_NOTES.md`.
 Endpoint index notes: `docs/openapi/README.md`.
+Endpoint coverage report: `docs/openapi/COVERAGE.md`.
 
 GitHub smoke workflow: `.github/workflows/smoke-tests.yml`.
 Use workflow-dispatch inputs `run_phase3` / `run_phase5` to enable optional deploy/monetization smoke phases.
