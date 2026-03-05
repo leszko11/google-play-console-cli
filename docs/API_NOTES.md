@@ -75,6 +75,13 @@ For monetization create/update flows:
 - Discovery docs note a maximum of 1000 orders per batch request
 - Order and refund automation counts against Play Developer API quota, so bulk sync jobs should be explicit and rate-aware
 
+## External Transactions API
+
+- External transactions cover alternative billing / external offer reporting flows, not standard Play Billing order lookups
+- `external-transactions create` requires a caller-supplied `externalTransactionId`; treat it as an immutable business identifier and never store PII in it
+- `external-transactions refund` requires a JSON payload with `refundTime` and exactly one of `fullRefund` or `partialRefund`
+- Create and refund payloads map directly to Android Publisher API schemas, so keep sample payloads under version control for repeatable operations
+
 ## Timeouts
 
 - `--timeout` controls standard API request deadline

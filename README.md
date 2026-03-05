@@ -18,6 +18,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Staging release workflows (`release verify`, `release alpha`)
 - Reviews management (`reviews list/get/reply`)
 - Orders API support (`orders get/batch-get/refund`)
+- External transactions API support (`external-transactions get/create/refund`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Monetization one-time product commands (`products ...`)
 - Legacy in-app product commands (`iap ...`)
@@ -146,6 +147,11 @@ gpc orders get --package-name com.example.app --order-id GPA.1234-5678-9012-3456
 gpc orders batch-get --package-name com.example.app --order-ids GPA.1234-5678-9012-34567,GPA.1234-5678-9012-34568
 gpc orders refund --package-name com.example.app --order-id GPA.1234-5678-9012-34567 --confirm
 gpc orders refund --package-name com.example.app --order-id GPA.1234-5678-9012-34567 --revoke --confirm
+
+# Report and refund external transactions
+gpc external-transactions get --package-name com.example.app --external-transaction-id ext-monthly-20260305
+gpc external-transactions create --package-name com.example.app --external-transaction-id ext-monthly-20260305 --input /path/to/external-transaction.json
+gpc external-transactions refund --package-name com.example.app --external-transaction-id ext-monthly-20260305 --input /path/to/external-transaction-refund.json --confirm
 
 # List/get subscription products
 gpc subscriptions list --package-name com.example.app --page-size 100
@@ -426,6 +432,7 @@ gpc deploy --help
 gpc release --help
 gpc reviews --help
 gpc orders --help
+gpc external-transactions --help
 gpc subscriptions --help
 gpc products --help
 gpc iap --help

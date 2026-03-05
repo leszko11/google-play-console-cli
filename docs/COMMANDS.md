@@ -80,6 +80,10 @@ make generate-command-docs
 - `gpc orders get`
 - `gpc orders batch-get`
 - `gpc orders refund`
+- `gpc external-transactions`
+- `gpc external-transactions get`
+- `gpc external-transactions create`
+- `gpc external-transactions refund`
 - `gpc subscriptions`
 - `gpc subscriptions list`
 - `gpc subscriptions get`
@@ -177,25 +181,26 @@ USAGE
   gpc [flags] <command>
 
 SUBCOMMANDS
-  auth              Manage authentication profiles
-  apps              App visibility and metadata commands
-  edits             Manage Google Play edit transactions
-  tracks            Manage release tracks inside an edit
-  apks              Manage APK uploads in an edit
-  bundles           Manage Android App Bundles in an edit
-  deobfuscation     Manage deobfuscation files in an edit
-  deploy            Upload artifact and publish to a track in one flow
-  release           Release workflows for staged Google Play deploys
-  reviews           Read and reply to Play Store reviews
-  orders            Inspect and refund Play orders
-  subscriptions     Manage monetization subscriptions
-  products          Manage monetization one-time products
-  iap               Manage legacy in-app products
-  purchases         Manage one-time and subscription purchases
-  users             Manage Play Console account users
-  grants            Manage per-app user grants
-  internal-sharing  Upload artifacts for internal app sharing
-  completion        Generate shell completion script
+  auth                   Manage authentication profiles
+  apps                   App visibility and metadata commands
+  edits                  Manage Google Play edit transactions
+  tracks                 Manage release tracks inside an edit
+  apks                   Manage APK uploads in an edit
+  bundles                Manage Android App Bundles in an edit
+  deobfuscation          Manage deobfuscation files in an edit
+  deploy                 Upload artifact and publish to a track in one flow
+  release                Release workflows for staged Google Play deploys
+  reviews                Read and reply to Play Store reviews
+  orders                 Inspect and refund Play orders
+  external-transactions  Report and refund external transactions
+  subscriptions          Manage monetization subscriptions
+  products               Manage monetization one-time products
+  iap                    Manage legacy in-app products
+  purchases              Manage one-time and subscription purchases
+  users                  Manage Play Console account users
+  grants                 Manage per-app user grants
+  internal-sharing       Upload artifacts for internal app sharing
+  completion             Generate shell completion script
 
 FLAGS
   -bootstrap-assist=false  Enable interactive bootstrap build assistance
@@ -1204,6 +1209,66 @@ FLAGS
   -order-id string      Order ID
   -package-name string  Package name
   -revoke=false         Also revoke the purchase entitlement
+```
+
+## `gpc external-transactions --help`
+
+```text
+DESCRIPTION
+  Report and refund external transactions
+
+USAGE
+  external-transactions
+
+SUBCOMMANDS
+  get     Get an external transaction by ID
+  create  Create an external transaction report
+  refund  Refund an external transaction
+```
+
+## `gpc external-transactions get --help`
+
+```text
+DESCRIPTION
+  Get an external transaction by ID
+
+USAGE
+  get
+
+FLAGS
+  -external-transaction-id string  External transaction ID
+  -package-name string             Package name
+```
+
+## `gpc external-transactions create --help`
+
+```text
+DESCRIPTION
+  Create an external transaction report
+
+USAGE
+  create
+
+FLAGS
+  -external-transaction-id string  External transaction ID
+  -input string                    Path to external transaction JSON payload (use - for stdin)
+  -package-name string             Package name
+```
+
+## `gpc external-transactions refund --help`
+
+```text
+DESCRIPTION
+  Refund an external transaction
+
+USAGE
+  refund
+
+FLAGS
+  -confirm=false                   Confirm refunding the external transaction (required)
+  -external-transaction-id string  External transaction ID
+  -input string                    Path to refund request JSON payload (use - for stdin)
+  -package-name string             Package name
 ```
 
 ## `gpc subscriptions --help`
