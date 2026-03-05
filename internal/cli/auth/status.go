@@ -47,14 +47,14 @@ func NewStatusCommand(deps Deps) *ffcli.Command {
 }
 
 type statusPayload struct {
-	ActiveProfile      string `json:"activeProfile,omitempty"`
-	SelectedProfile    string `json:"selectedProfile,omitempty"`
-	Authenticated      bool   `json:"authenticated"`
-	Source             string `json:"source,omitempty"`
-	StorageBackend     string `json:"storageBackend,omitempty"`
-	ServiceAccountPath string `json:"serviceAccountPath,omitempty"`
-	LastValidatedAt    string `json:"lastValidatedAt,omitempty"`
-	DeveloperID        string `json:"developerId,omitempty"`
+	ActiveProfile      string   `json:"activeProfile,omitempty"`
+	SelectedProfile    string   `json:"selectedProfile,omitempty"`
+	Authenticated      bool     `json:"authenticated"`
+	Source             string   `json:"source,omitempty"`
+	StorageBackend     string   `json:"storageBackend,omitempty"`
+	ServiceAccountPath string   `json:"serviceAccountPath,omitempty"`
+	LastValidatedAt    string   `json:"lastValidatedAt,omitempty"`
+	DeveloperID        string   `json:"developerId,omitempty"`
 	Warnings           []string `json:"warnings,omitempty"`
 }
 
@@ -65,9 +65,9 @@ func buildStatus(cfg config.Config, lookupEnv func(string) string) statusPayload
 
 	selectedProfile := shared.ResolveProfileName(cfg)
 	out := statusPayload{
-		ActiveProfile: cfg.ActiveProfile,
+		ActiveProfile:   cfg.ActiveProfile,
 		SelectedProfile: selectedProfile,
-		Authenticated: false,
+		Authenticated:   false,
 	}
 
 	profile, ok := cfg.Profiles[selectedProfile]
