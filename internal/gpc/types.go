@@ -9,6 +9,27 @@ type AppInfo struct {
 	PackageName string `json:"packageName"`
 }
 
+type MoneyInfo struct {
+	CurrencyCode string `json:"currencyCode,omitempty"`
+	Units        int64  `json:"units,omitempty"`
+	Nanos        int64  `json:"nanos,omitempty"`
+}
+
+type OrderInfo struct {
+	OrderID                 string    `json:"orderId,omitempty"`
+	PurchaseToken           string    `json:"purchaseToken,omitempty"`
+	State                   string    `json:"state,omitempty"`
+	SalesChannel            string    `json:"salesChannel,omitempty"`
+	CreateTime              string    `json:"createTime,omitempty"`
+	LastEventTime           string    `json:"lastEventTime,omitempty"`
+	BuyerCountry            string    `json:"buyerCountry,omitempty"`
+	LineItemCount           int       `json:"lineItemCount,omitempty"`
+	LineItemProductIDs      []string  `json:"lineItemProductIds,omitempty"`
+	Total                   MoneyInfo `json:"total,omitempty"`
+	Tax                     MoneyInfo `json:"tax,omitempty"`
+	DeveloperRevenueInBuyer MoneyInfo `json:"developerRevenueInBuyerCurrency,omitempty"`
+}
+
 type EditInfo struct {
 	ID                string `json:"id"`
 	ExpiryTimeSeconds string `json:"expiryTimeSeconds,omitempty"`

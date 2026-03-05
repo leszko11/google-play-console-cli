@@ -69,6 +69,12 @@ For monetization create/update flows:
 - Large lists can increase runtime and API quota usage
 - Prefer bounded page sizes for scripts with strict time budgets
 
+## Orders API
+
+- Orders API supports direct order lookup, batch lookup, and refunds
+- Discovery docs note a maximum of 1000 orders per batch request
+- Order and refund automation counts against Play Developer API quota, so bulk sync jobs should be explicit and rate-aware
+
 ## Timeouts
 
 - `--timeout` controls standard API request deadline

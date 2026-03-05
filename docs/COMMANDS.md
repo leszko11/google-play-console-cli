@@ -76,6 +76,10 @@ make generate-command-docs
 - `gpc reviews list`
 - `gpc reviews get`
 - `gpc reviews reply`
+- `gpc orders`
+- `gpc orders get`
+- `gpc orders batch-get`
+- `gpc orders refund`
 - `gpc subscriptions`
 - `gpc subscriptions list`
 - `gpc subscriptions get`
@@ -183,6 +187,7 @@ SUBCOMMANDS
   deploy            Upload artifact and publish to a track in one flow
   release           Release workflows for staged Google Play deploys
   reviews           Read and reply to Play Store reviews
+  orders            Inspect and refund Play orders
   subscriptions     Manage monetization subscriptions
   products          Manage monetization one-time products
   iap               Manage legacy in-app products
@@ -1140,6 +1145,65 @@ FLAGS
   -package-name string  Package name
   -reply-text string    Reply text
   -review-id string     Review ID
+```
+
+## `gpc orders --help`
+
+```text
+DESCRIPTION
+  Inspect and refund Play orders
+
+USAGE
+  orders
+
+SUBCOMMANDS
+  get        Get one Play order by ID
+  batch-get  Get multiple Play orders by ID
+  refund     Refund a Play order
+```
+
+## `gpc orders get --help`
+
+```text
+DESCRIPTION
+  Get one Play order by ID
+
+USAGE
+  get
+
+FLAGS
+  -order-id string      Order ID
+  -package-name string  Package name
+```
+
+## `gpc orders batch-get --help`
+
+```text
+DESCRIPTION
+  Get multiple Play orders by ID
+
+USAGE
+  batch-get
+
+FLAGS
+  -order-ids string     Comma-separated order IDs
+  -package-name string  Package name
+```
+
+## `gpc orders refund --help`
+
+```text
+DESCRIPTION
+  Refund a Play order
+
+USAGE
+  refund
+
+FLAGS
+  -confirm=false        Confirm refunding the order (required)
+  -order-id string      Order ID
+  -package-name string  Package name
+  -revoke=false         Also revoke the purchase entitlement
 ```
 
 ## `gpc subscriptions --help`
