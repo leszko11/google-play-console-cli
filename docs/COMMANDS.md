@@ -29,6 +29,12 @@ make generate-command-docs
 - `gpc apps get`
 - `gpc apps add-package`
 - `gpc apps remove-package`
+- `gpc app-recoveries`
+- `gpc app-recoveries list`
+- `gpc app-recoveries create`
+- `gpc app-recoveries add-targeting`
+- `gpc app-recoveries cancel`
+- `gpc app-recoveries deploy`
 - `gpc edits`
 - `gpc edits create`
 - `gpc edits get`
@@ -200,6 +206,7 @@ USAGE
 SUBCOMMANDS
   auth                   Manage authentication profiles
   apps                   App visibility and metadata commands
+  app-recoveries         Manage Play app recovery actions
   edits                  Manage Google Play edit transactions
   tracks                 Manage release tracks inside an edit
   apks                   Manage APK uploads in an edit
@@ -405,6 +412,96 @@ USAGE
 
 FLAGS
   -package-name string  Package name to remove from local app list
+```
+
+## `gpc app-recoveries --help`
+
+```text
+DESCRIPTION
+  Manage Play app recovery actions
+
+USAGE
+  app-recoveries
+
+SUBCOMMANDS
+  list           List app recovery actions for one version code
+  create         Create a draft app recovery action
+  add-targeting  Add targeting to an app recovery action
+  cancel         Cancel an app recovery action
+  deploy         Deploy an app recovery action
+```
+
+## `gpc app-recoveries list --help`
+
+```text
+DESCRIPTION
+  List app recovery actions for one version code
+
+USAGE
+  list
+
+FLAGS
+  -package-name string  Package name
+  -version-code 0       Version code targeted by the recovery actions
+```
+
+## `gpc app-recoveries create --help`
+
+```text
+DESCRIPTION
+  Create a draft app recovery action
+
+USAGE
+  create
+
+FLAGS
+  -input string         Path to app recovery JSON payload (use - for stdin)
+  -package-name string  Package name
+```
+
+## `gpc app-recoveries add-targeting --help`
+
+```text
+DESCRIPTION
+  Add targeting to an app recovery action
+
+USAGE
+  add-targeting
+
+FLAGS
+  -app-recovery-id 0    App recovery action ID
+  -input string         Path to targeting update JSON payload (use - for stdin)
+  -package-name string  Package name
+```
+
+## `gpc app-recoveries cancel --help`
+
+```text
+DESCRIPTION
+  Cancel an app recovery action
+
+USAGE
+  cancel
+
+FLAGS
+  -app-recovery-id 0    App recovery action ID
+  -confirm=false        Confirm canceling the app recovery action (required)
+  -package-name string  Package name
+```
+
+## `gpc app-recoveries deploy --help`
+
+```text
+DESCRIPTION
+  Deploy an app recovery action
+
+USAGE
+  deploy
+
+FLAGS
+  -app-recovery-id 0    App recovery action ID
+  -confirm=false        Confirm deploying the app recovery action (required)
+  -package-name string  Package name
 ```
 
 ## `gpc edits --help`

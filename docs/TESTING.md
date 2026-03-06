@@ -168,6 +168,11 @@ gpc system-apks create --package-name com.example.app --version-code 123 --input
 gpc system-apks download --package-name com.example.app --version-code 123 --variant-id 7 --output /tmp/system.apk
 gpc generated-apks list --package-name com.example.app --version-code 123
 gpc generated-apks download --package-name com.example.app --version-code 123 --download-id download-1 --output /tmp/generated.apk
+gpc app-recoveries list --package-name com.example.app --version-code 123
+gpc app-recoveries create --package-name com.example.app --input /path/to/app-recovery.json
+gpc app-recoveries add-targeting --package-name com.example.app --app-recovery-id 7 --input /path/to/app-recovery-targeting.json
+gpc app-recoveries cancel --package-name com.example.app --app-recovery-id 7 --confirm
+gpc app-recoveries deploy --package-name com.example.app --app-recovery-id 7 --confirm
 gpc subscriptions list --package-name com.example.app --page-size 100
 gpc --paginate subscriptions list --package-name com.example.app --page-size 100
 gpc subscriptions get --package-name com.example.app --product-id premium_monthly

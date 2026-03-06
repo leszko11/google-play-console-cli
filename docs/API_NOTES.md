@@ -103,6 +103,13 @@ For monetization create/update flows:
 - `generated-apks download` writes the APK to a local path and refuses to overwrite an existing file
 - Generated APK metadata is bundle-version specific, so both commands require `--version-code`
 
+## App Recovery API
+
+- `app-recoveries list` requires `--version-code`; recovery actions are scoped to the targeted bundle version
+- `app-recoveries create` accepts raw Android Publisher `CreateDraftAppRecoveryRequest` JSON and produces a draft recovery action
+- `app-recoveries add-targeting` accepts raw `AddTargetingRequest` JSON and can only expand criteria that were selected at creation time
+- `app-recoveries cancel` and `app-recoveries deploy` are state transitions and require explicit confirmation flags in the CLI
+
 ## Timeouts
 
 - `--timeout` controls standard API request deadline
