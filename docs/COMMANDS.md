@@ -93,6 +93,11 @@ make generate-command-docs
 - `gpc device-tier-configs list`
 - `gpc device-tier-configs get`
 - `gpc device-tier-configs create`
+- `gpc system-apks`
+- `gpc system-apks list`
+- `gpc system-apks get`
+- `gpc system-apks create`
+- `gpc system-apks download`
 - `gpc subscriptions`
 - `gpc subscriptions list`
 - `gpc subscriptions get`
@@ -203,6 +208,7 @@ SUBCOMMANDS
   orders                 Inspect and refund Play orders
   external-transactions  Report and refund external transactions
   device-tier-configs    Manage application device tier configs
+  system-apks            Manage generated system APK variants
   subscriptions          Manage monetization subscriptions
   products               Manage monetization one-time products
   iap                    Manage legacy in-app products
@@ -1422,6 +1428,82 @@ FLAGS
   -allow-unknown-devices=false  Allow device IDs unknown to Play's device catalog
   -input string                 Path to device tier config JSON payload (use - for stdin)
   -package-name string          Package name
+```
+
+## `gpc system-apks --help`
+
+```text
+DESCRIPTION
+  Manage generated system APK variants
+
+USAGE
+  system-apks
+
+SUBCOMMANDS
+  list      List generated system APK variants
+  get       Get a generated system APK variant
+  create    Create a generated system APK variant
+  download  Download a generated system APK variant
+```
+
+## `gpc system-apks list --help`
+
+```text
+DESCRIPTION
+  List generated system APK variants
+
+USAGE
+  list
+
+FLAGS
+  -package-name string  Package name
+  -version-code 0       Version code of the App Bundle
+```
+
+## `gpc system-apks get --help`
+
+```text
+DESCRIPTION
+  Get a generated system APK variant
+
+USAGE
+  get
+
+FLAGS
+  -package-name string  Package name
+  -variant-id 0         System APK variant ID
+  -version-code 0       Version code of the App Bundle
+```
+
+## `gpc system-apks create --help`
+
+```text
+DESCRIPTION
+  Create a generated system APK variant
+
+USAGE
+  create
+
+FLAGS
+  -input string         Path to system APK variant JSON payload (use - for stdin)
+  -package-name string  Package name
+  -version-code 0       Version code of the App Bundle
+```
+
+## `gpc system-apks download --help`
+
+```text
+DESCRIPTION
+  Download a generated system APK variant
+
+USAGE
+  download
+
+FLAGS
+  -output string        Path to write the downloaded APK
+  -package-name string  Package name
+  -variant-id 0         System APK variant ID
+  -version-code 0       Version code of the App Bundle
 ```
 
 ## `gpc subscriptions --help`

@@ -16,9 +16,9 @@ make generate-openapi-coverage
 | Metric | Count |
 | --- | ---: |
 | Total discovery endpoints | 136 |
-| Implemented endpoints | 109 |
-| Missing endpoints | 27 |
-| Detected service method IDs | 109 |
+| Implemented endpoints | 113 |
+| Missing endpoints | 23 |
+| Detected service method IDs | 113 |
 | Unmatched service method IDs | 0 |
 
 ## Family Summary
@@ -54,7 +54,7 @@ make generate-openapi-coverage
 | `purchases.subscriptionsv2` | 4 | 0 | 4 |
 | `purchases.voidedpurchases` | 1 | 0 | 1 |
 | `reviews` | 3 | 0 | 3 |
-| `systemapks` | 0 | 4 | 4 |
+| `systemapks` | 4 | 0 | 4 |
 | `users` | 4 | 0 | 4 |
 
 ## Missing Endpoints
@@ -114,13 +114,6 @@ make generate-openapi-coverage
 - `androidpublisher.purchases.subscriptions.defer` | `POST` `androidpublisher/v3/applications/{packageName}/purchases/subscriptions/{subscriptionId}/tokens/{token}:defer`
 - `androidpublisher.purchases.subscriptions.refund` | `POST` `androidpublisher/v3/applications/{packageName}/purchases/subscriptions/{subscriptionId}/tokens/{token}:refund`
 - `androidpublisher.purchases.subscriptions.revoke` | `POST` `androidpublisher/v3/applications/{packageName}/purchases/subscriptions/{subscriptionId}/tokens/{token}:revoke`
-
-### `systemapks`
-
-- `androidpublisher.systemapks.variants.list` | `GET` `androidpublisher/v3/applications/{packageName}/systemApks/{versionCode}/variants`
-- `androidpublisher.systemapks.variants.get` | `GET` `androidpublisher/v3/applications/{packageName}/systemApks/{versionCode}/variants/{variantId}`
-- `androidpublisher.systemapks.variants.download` | `GET` `androidpublisher/v3/applications/{packageName}/systemApks/{versionCode}/variants/{variantId}:download`
-- `androidpublisher.systemapks.variants.create` | `POST` `androidpublisher/v3/applications/{packageName}/systemApks/{versionCode}/variants`
 
 ## Unmatched Service Method IDs
 

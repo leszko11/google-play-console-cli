@@ -21,6 +21,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/reviews"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/cli/subscriptions"
+	"github.com/leszko11/google-play-console-cli/internal/cli/systemapks"
 	"github.com/leszko11/google-play-console-cli/internal/cli/tracks"
 	"github.com/leszko11/google-play-console-cli/internal/cli/users"
 	"github.com/peterbourgon/ff/v3/ffcli"
@@ -47,6 +48,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		orders.NewCommand(orders.Deps{}),
 		externaltransactions.NewCommand(externaltransactions.Deps{}),
 		devicetierconfigs.NewCommand(devicetierconfigs.Deps{}),
+		systemapks.NewCommand(systemapks.Deps{}),
 		subscriptions.NewCommand(subscriptions.Deps{}),
 		products.NewCommand(products.Deps{}),
 		iap.NewCommand(iap.Deps{}),

@@ -91,6 +91,12 @@ For monetization create/update flows:
 - Use `--allow-unknown-devices` only when you intentionally want Play to accept device IDs outside the known catalog during config creation
 - `device-tier-configs list` is paginated and supports `--paginate` for full inventory export
 
+## System APK Variants API
+
+- `system-apks create` accepts raw Android Publisher `Variant` JSON payloads with `deviceSpec` and optional `options`
+- `system-apks download` writes the APK to a local path and refuses to overwrite an existing file
+- System APK variants are scoped to a specific App Bundle `versionCode`, so every command in this surface requires `--version-code`
+
 ## Timeouts
 
 - `--timeout` controls standard API request deadline
