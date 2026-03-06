@@ -461,6 +461,90 @@ func (c *Client) DeleteAllImages(ctx context.Context, packageName, editID, langu
 	return deleted, nil
 }
 
+func (c *Client) GetExpansionFile(ctx context.Context, packageName, editID string, apkVersionCode int64, expansionFileType string) (ExpansionFileInfo, error) {
+	packageName, editID, apkVersionCode, expansionFileType, err := normalizeExpansionFileTarget(packageName, editID, apkVersionCode, expansionFileType)
+	if err != nil {
+		return ExpansionFileInfo{}, err
+	}
+	if c == nil || c.service == nil {
+		return ExpansionFileInfo{}, ErrInvalidCredentials
+	}
+
+	file, err := c.service.Edits.Expansionfiles.Get(packageName, editID, apkVersionCode, expansionFileType).Context(ctx).Do()
+	if err != nil {
+		return ExpansionFileInfo{}, mapGoogleAPIError(err)
+	}
+	return expansionFileInfoFromExpansionFile(file), nil
+}
+
+func (c *Client) PatchExpansionFile(ctx context.Context, packageName, editID string, apkVersionCode int64, expansionFileType string, referencesVersion int64) (ExpansionFileInfo, error) {
+	packageName, editID, apkVersionCode, expansionFileType, err := normalizeExpansionFileTarget(packageName, editID, apkVersionCode, expansionFileType)
+	if err != nil {
+		return ExpansionFileInfo{}, err
+	}
+	if referencesVersion <= 0 {
+		return ExpansionFileInfo{}, fmt.Errorf("references version must be greater than zero")
+	}
+	if c == nil || c.service == nil {
+		return ExpansionFileInfo{}, ErrInvalidCredentials
+	}
+
+	file, err := c.service.Edits.Expansionfiles.Patch(packageName, editID, apkVersionCode, expansionFileType, &androidpublisher.ExpansionFile{
+		ReferencesVersion: referencesVersion,
+	}).Context(ctx).Do()
+	if err != nil {
+		return ExpansionFileInfo{}, mapGoogleAPIError(err)
+	}
+	return expansionFileInfoFromExpansionFile(file), nil
+}
+
+func (c *Client) UpdateExpansionFile(ctx context.Context, packageName, editID string, apkVersionCode int64, expansionFileType string, referencesVersion int64) (ExpansionFileInfo, error) {
+	packageName, editID, apkVersionCode, expansionFileType, err := normalizeExpansionFileTarget(packageName, editID, apkVersionCode, expansionFileType)
+	if err != nil {
+		return ExpansionFileInfo{}, err
+	}
+	if referencesVersion <= 0 {
+		return ExpansionFileInfo{}, fmt.Errorf("references version must be greater than zero")
+	}
+	if c == nil || c.service == nil {
+		return ExpansionFileInfo{}, ErrInvalidCredentials
+	}
+
+	file, err := c.service.Edits.Expansionfiles.Update(packageName, editID, apkVersionCode, expansionFileType, &androidpublisher.ExpansionFile{
+		ReferencesVersion: referencesVersion,
+	}).Context(ctx).Do()
+	if err != nil {
+		return ExpansionFileInfo{}, mapGoogleAPIError(err)
+	}
+	return expansionFileInfoFromExpansionFile(file), nil
+}
+
+func (c *Client) UploadExpansionFile(ctx context.Context, packageName, editID string, apkVersionCode int64, expansionFileType, filePath string) (ExpansionFileInfo, error) {
+	packageName, editID, apkVersionCode, expansionFileType, err := normalizeExpansionFileTarget(packageName, editID, apkVersionCode, expansionFileType)
+	if err != nil {
+		return ExpansionFileInfo{}, err
+	}
+	filePath = strings.TrimSpace(filePath)
+	if filePath == "" {
+		return ExpansionFileInfo{}, fmt.Errorf("expansion file path is required")
+	}
+	if c == nil || c.service == nil {
+		return ExpansionFileInfo{}, ErrInvalidCredentials
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return ExpansionFileInfo{}, fmt.Errorf("open expansion file: %w", err)
+	}
+	defer file.Close()
+
+	resp, err := c.service.Edits.Expansionfiles.Upload(packageName, editID, apkVersionCode, expansionFileType).Media(file).Context(ctx).Do()
+	if err != nil {
+		return ExpansionFileInfo{}, mapGoogleAPIError(err)
+	}
+	return expansionFileInfoFromExpansionFile(resp.ExpansionFile), nil
+}
+
 func (c *Client) DeleteListing(ctx context.Context, packageName, editID, language string) error {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -549,6 +633,45 @@ func imageInfoFromImage(image *androidpublisher.Image) ImageInfo {
 		SHA1:   image.Sha1,
 		SHA256: image.Sha256,
 		URL:    image.Url,
+	}
+}
+
+func normalizeExpansionFileTarget(packageName, editID string, apkVersionCode int64, expansionFileType string) (string, string, int64, string, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return "", "", 0, "", fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return "", "", 0, "", fmt.Errorf("edit id is required")
+	}
+	if apkVersionCode <= 0 {
+		return "", "", 0, "", fmt.Errorf("apk version code must be greater than zero")
+	}
+	expansionFileType, err := normalizeExpansionFileType(expansionFileType)
+	if err != nil {
+		return "", "", 0, "", err
+	}
+	return packageName, editID, apkVersionCode, expansionFileType, nil
+}
+
+func normalizeExpansionFileType(expansionFileType string) (string, error) {
+	expansionFileType = strings.ToLower(strings.TrimSpace(expansionFileType))
+	switch expansionFileType {
+	case "main", "patch":
+		return expansionFileType, nil
+	default:
+		return "", fmt.Errorf("expansion file type must be one of: main, patch")
+	}
+}
+
+func expansionFileInfoFromExpansionFile(file *androidpublisher.ExpansionFile) ExpansionFileInfo {
+	if file == nil {
+		return ExpansionFileInfo{}
+	}
+	return ExpansionFileInfo{
+		FileSize:          file.FileSize,
+		ReferencesVersion: file.ReferencesVersion,
 	}
 }
 

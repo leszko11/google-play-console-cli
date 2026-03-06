@@ -16,9 +16,9 @@ make generate-openapi-coverage
 | Metric | Count |
 | --- | ---: |
 | Total discovery endpoints | 136 |
-| Implemented endpoints | 105 |
-| Missing endpoints | 31 |
-| Detected service method IDs | 105 |
+| Implemented endpoints | 109 |
+| Missing endpoints | 27 |
+| Detected service method IDs | 109 |
 | Unmatched service method IDs | 0 |
 
 ## Family Summary
@@ -34,7 +34,7 @@ make generate-openapi-coverage
 | `edits.countryavailability` | 1 | 0 | 1 |
 | `edits.deobfuscationfiles` | 1 | 0 | 1 |
 | `edits.details` | 2 | 1 | 3 |
-| `edits.expansionfiles` | 0 | 4 | 4 |
+| `edits.expansionfiles` | 4 | 0 | 4 |
 | `edits.images` | 4 | 0 | 4 |
 | `edits.listings` | 5 | 1 | 6 |
 | `edits.testers` | 2 | 1 | 3 |
@@ -78,13 +78,6 @@ make generate-openapi-coverage
 ### `edits.details`
 
 - `androidpublisher.edits.details.update` | `PUT` `androidpublisher/v3/applications/{packageName}/edits/{editId}/details`
-
-### `edits.expansionfiles`
-
-- `androidpublisher.edits.expansionfiles.get` | `GET` `androidpublisher/v3/applications/{packageName}/edits/{editId}/apks/{apkVersionCode}/expansionFiles/{expansionFileType}`
-- `androidpublisher.edits.expansionfiles.patch` | `PATCH` `androidpublisher/v3/applications/{packageName}/edits/{editId}/apks/{apkVersionCode}/expansionFiles/{expansionFileType}`
-- `androidpublisher.edits.expansionfiles.upload` | `POST` `androidpublisher/v3/applications/{packageName}/edits/{editId}/apks/{apkVersionCode}/expansionFiles/{expansionFileType}`
-- `androidpublisher.edits.expansionfiles.update` | `PUT` `androidpublisher/v3/applications/{packageName}/edits/{editId}/apks/{apkVersionCode}/expansionFiles/{expansionFileType}`
 
 ### `edits.listings`
 

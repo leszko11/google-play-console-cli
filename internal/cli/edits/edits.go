@@ -41,6 +41,10 @@ type Client interface {
 	UploadImage(ctx context.Context, packageName, editID, language, imageType, imagePath string) (gpc.ImageInfo, error)
 	DeleteImage(ctx context.Context, packageName, editID, language, imageType, imageID string) error
 	DeleteAllImages(ctx context.Context, packageName, editID, language, imageType string) ([]gpc.ImageInfo, error)
+	GetExpansionFile(ctx context.Context, packageName, editID string, apkVersionCode int64, expansionFileType string) (gpc.ExpansionFileInfo, error)
+	PatchExpansionFile(ctx context.Context, packageName, editID string, apkVersionCode int64, expansionFileType string, referencesVersion int64) (gpc.ExpansionFileInfo, error)
+	UpdateExpansionFile(ctx context.Context, packageName, editID string, apkVersionCode int64, expansionFileType string, referencesVersion int64) (gpc.ExpansionFileInfo, error)
+	UploadExpansionFile(ctx context.Context, packageName, editID string, apkVersionCode int64, expansionFileType, filePath string) (gpc.ExpansionFileInfo, error)
 }
 
 type Deps struct {
@@ -68,6 +72,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newCountryAvailabilityCommand(deps),
 			newListingsCommand(deps),
 			newImagesCommand(deps),
+			newExpansionFilesCommand(deps),
 		},
 	}
 }
@@ -299,6 +304,20 @@ func newImagesCommand(deps Deps) *ffcli.Command {
 	}
 }
 
+func newExpansionFilesCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "expansion-files",
+		ShortHelp: "Manage APK expansion files inside an edit",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newExpansionFilesGetCommand(deps),
+			newExpansionFilesPatchCommand(deps),
+			newExpansionFilesUpdateCommand(deps),
+			newExpansionFilesUploadCommand(deps),
+		},
+	}
+}
+
 func newImagesListCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
@@ -503,6 +522,210 @@ func addImageSharedFlags(fs *flag.FlagSet, packageName, editID, locale, imageTyp
 	fs.StringVar(editID, "edit-id", "", "Edit ID")
 	fs.StringVar(locale, "locale", "", "Listing locale (BCP-47, e.g. en-US)")
 	fs.StringVar(imageType, "image-type", "", "Image type (icon, featureGraphic, phoneScreenshots, ...)")
+}
+
+func newExpansionFilesGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, expansionFileType string
+	var apkVersionCode int64
+	addExpansionFileSharedFlags(fs, &packageName, &editID, &apkVersionCode, &expansionFileType)
+
+	return &ffcli.Command{
+		Name:      "get",
+		ShortHelp: "Get expansion file configuration for one APK inside an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			editID, expansionFileType, err = validateExpansionFileArgs(editID, apkVersionCode, expansionFileType)
+			if err != nil {
+				return err
+			}
+
+			file, err := client.GetExpansionFile(requestCtx, pkg, editID, apkVersionCode, expansionFileType)
+			if err != nil {
+				return fmt.Errorf("failed to get expansion file: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":       pkg,
+				"editId":            editID,
+				"apkVersionCode":    apkVersionCode,
+				"expansionFileType": expansionFileType,
+				"expansionFile":     file,
+			})
+		},
+	}
+}
+
+func newExpansionFilesPatchCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("patch", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, expansionFileType string
+	var apkVersionCode, referencesVersion int64
+	addExpansionFileSharedFlags(fs, &packageName, &editID, &apkVersionCode, &expansionFileType)
+	fs.Int64Var(&referencesVersion, "references-version", 0, "APK version code whose expansion file should be referenced")
+
+	return &ffcli.Command{
+		Name:      "patch",
+		ShortHelp: "Patch expansion file reference for one APK inside an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			editID, expansionFileType, err = validateExpansionFileArgs(editID, apkVersionCode, expansionFileType)
+			if err != nil {
+				return err
+			}
+			if referencesVersion <= 0 {
+				return shared.UsageErrorf("--references-version must be greater than zero")
+			}
+
+			file, err := client.PatchExpansionFile(requestCtx, pkg, editID, apkVersionCode, expansionFileType, referencesVersion)
+			if err != nil {
+				return fmt.Errorf("failed to patch expansion file: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":       pkg,
+				"editId":            editID,
+				"apkVersionCode":    apkVersionCode,
+				"expansionFileType": expansionFileType,
+				"expansionFile":     file,
+				"status":            "patched",
+			})
+		},
+	}
+}
+
+func newExpansionFilesUpdateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("update", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, expansionFileType string
+	var apkVersionCode, referencesVersion int64
+	addExpansionFileSharedFlags(fs, &packageName, &editID, &apkVersionCode, &expansionFileType)
+	fs.Int64Var(&referencesVersion, "references-version", 0, "APK version code whose expansion file should be referenced")
+
+	return &ffcli.Command{
+		Name:      "update",
+		ShortHelp: "Update expansion file reference for one APK inside an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			editID, expansionFileType, err = validateExpansionFileArgs(editID, apkVersionCode, expansionFileType)
+			if err != nil {
+				return err
+			}
+			if referencesVersion <= 0 {
+				return shared.UsageErrorf("--references-version must be greater than zero")
+			}
+
+			file, err := client.UpdateExpansionFile(requestCtx, pkg, editID, apkVersionCode, expansionFileType, referencesVersion)
+			if err != nil {
+				return fmt.Errorf("failed to update expansion file: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":       pkg,
+				"editId":            editID,
+				"apkVersionCode":    apkVersionCode,
+				"expansionFileType": expansionFileType,
+				"expansionFile":     file,
+				"status":            "updated",
+			})
+		},
+	}
+}
+
+func newExpansionFilesUploadCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("upload", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, expansionFileType, filePath string
+	var apkVersionCode int64
+	addExpansionFileSharedFlags(fs, &packageName, &editID, &apkVersionCode, &expansionFileType)
+	fs.StringVar(&filePath, "file", "", "Path to expansion file to upload")
+
+	return &ffcli.Command{
+		Name:      "upload",
+		ShortHelp: "Upload an expansion file for one APK inside an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, true)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			editID, expansionFileType, err = validateExpansionFileArgs(editID, apkVersionCode, expansionFileType)
+			if err != nil {
+				return err
+			}
+			filePath = strings.TrimSpace(filePath)
+			if filePath == "" {
+				return shared.UsageErrorf("--file is required")
+			}
+
+			file, err := client.UploadExpansionFile(requestCtx, pkg, editID, apkVersionCode, expansionFileType, filePath)
+			if err != nil {
+				return fmt.Errorf("failed to upload expansion file: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":       pkg,
+				"editId":            editID,
+				"apkVersionCode":    apkVersionCode,
+				"expansionFileType": expansionFileType,
+				"expansionFile":     file,
+				"status":            "uploaded",
+			})
+		},
+	}
+}
+
+func addExpansionFileSharedFlags(fs *flag.FlagSet, packageName, editID *string, apkVersionCode *int64, expansionFileType *string) {
+	fs.StringVar(packageName, "package-name", "", "Package name")
+	fs.StringVar(editID, "edit-id", "", "Edit ID")
+	fs.Int64Var(apkVersionCode, "apk-version-code", 0, "APK version code")
+	fs.StringVar(expansionFileType, "expansion-file-type", "", "Expansion file type: main or patch")
+}
+
+func validateExpansionFileArgs(editID string, apkVersionCode int64, expansionFileType string) (string, string, error) {
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return "", "", shared.UsageErrorf("--edit-id is required")
+	}
+	if apkVersionCode <= 0 {
+		return "", "", shared.UsageErrorf("--apk-version-code must be greater than zero")
+	}
+	expansionFileType, err := validateExpansionFileType(expansionFileType)
+	if err != nil {
+		return "", "", err
+	}
+	return editID, expansionFileType, nil
+}
+
+func validateExpansionFileType(expansionFileType string) (string, error) {
+	expansionFileType = strings.ToLower(strings.TrimSpace(expansionFileType))
+	switch expansionFileType {
+	case "main", "patch":
+		return expansionFileType, nil
+	default:
+		return "", shared.UsageErrorf("--expansion-file-type must be one of: main, patch")
+	}
 }
 
 func newDetailsCommand(deps Deps) *ffcli.Command {
