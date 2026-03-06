@@ -287,6 +287,12 @@ type TrackUpdate struct {
 	ReleaseNotes   []LocalizedText
 }
 
+type TrackCreate struct {
+	Track      string
+	FormFactor string
+	Type       string
+}
+
 type LocalizedText struct {
 	Language string `json:"language,omitempty"`
 	Text     string `json:"text,omitempty"`

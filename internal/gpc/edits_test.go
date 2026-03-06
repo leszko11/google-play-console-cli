@@ -42,11 +42,17 @@ func TestEditMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.UpdateAppDetails(context.Background(), "com.example.app", "edit-1", AppDetailsUpdate{ContactEmail: "help@example.com"}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from UpdateAppDetails, got %v", err)
 	}
+	if _, err := c.ReplaceAppDetails(context.Background(), "com.example.app", "edit-1", AppDetailsUpdate{ContactEmail: "help@example.com"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from ReplaceAppDetails, got %v", err)
+	}
 	if _, err := c.GetTesters(context.Background(), "com.example.app", "edit-1", "internal"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from GetTesters, got %v", err)
 	}
 	if _, err := c.UpdateTesters(context.Background(), "com.example.app", "edit-1", "internal", []string{"qa@example.com"}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from UpdateTesters, got %v", err)
+	}
+	if _, err := c.ReplaceTesters(context.Background(), "com.example.app", "edit-1", "internal", []string{"qa@example.com"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from ReplaceTesters, got %v", err)
 	}
 	if _, err := c.GetCountryAvailability(context.Background(), "com.example.app", "edit-1", "production"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from GetCountryAvailability, got %v", err)
@@ -119,6 +125,9 @@ func TestListingMethods_ValidateArgs(t *testing.T) {
 	if _, err := c.UpdateListing(context.Background(), "com.example.app", "edit-1", "en-US", ListingUpdate{}); err == nil || !strings.Contains(err.Error(), "at least one listing field must be provided") {
 		t.Fatalf("unexpected UpdateListing error: %v", err)
 	}
+	if _, err := c.ReplaceListing(context.Background(), "com.example.app", "edit-1", "en-US", ListingUpdate{}); err == nil || !strings.Contains(err.Error(), "at least one listing field must be provided") {
+		t.Fatalf("unexpected ReplaceListing error: %v", err)
+	}
 	if _, err := c.ListListings(context.Background(), "", "edit-1"); err == nil || !strings.Contains(err.Error(), "package name is required") {
 		t.Fatalf("unexpected ListListings package error: %v", err)
 	}
@@ -140,11 +149,17 @@ func TestListingMethods_ValidateArgs(t *testing.T) {
 	if _, err := c.UpdateAppDetails(context.Background(), "com.example.app", "edit-1", AppDetailsUpdate{}); err == nil || !strings.Contains(err.Error(), "at least one app detail field must be provided") {
 		t.Fatalf("unexpected UpdateAppDetails empty update error: %v", err)
 	}
+	if _, err := c.ReplaceAppDetails(context.Background(), "com.example.app", "edit-1", AppDetailsUpdate{}); err == nil || !strings.Contains(err.Error(), "at least one app detail field must be provided") {
+		t.Fatalf("unexpected ReplaceAppDetails empty update error: %v", err)
+	}
 	if _, err := c.GetTesters(context.Background(), "com.example.app", "edit-1", ""); err == nil || !strings.Contains(err.Error(), "track is required") {
 		t.Fatalf("unexpected GetTesters track error: %v", err)
 	}
 	if _, err := c.UpdateTesters(context.Background(), "com.example.app", "edit-1", "internal", nil); err == nil || !strings.Contains(err.Error(), "at least one google group is required") {
 		t.Fatalf("unexpected UpdateTesters groups error: %v", err)
+	}
+	if _, err := c.ReplaceTesters(context.Background(), "com.example.app", "edit-1", "internal", nil); err == nil || !strings.Contains(err.Error(), "at least one google group is required") {
+		t.Fatalf("unexpected ReplaceTesters groups error: %v", err)
 	}
 	if _, err := c.GetCountryAvailability(context.Background(), "com.example.app", "edit-1", ""); err == nil || !strings.Contains(err.Error(), "track is required") {
 		t.Fatalf("unexpected GetCountryAvailability track error: %v", err)

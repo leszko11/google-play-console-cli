@@ -24,6 +24,15 @@ func TestTrackMethods_RejectMissingClient(t *testing.T) {
 	}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from UpdateTrack, got %v", err)
 	}
+	if _, err := c.PatchTrack(context.Background(), "com.example.app", "edit-1", "production", TrackUpdate{
+		Status:       "completed",
+		VersionCodes: []int64{1},
+	}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from PatchTrack, got %v", err)
+	}
+	if _, err := c.CreateTrack(context.Background(), "com.example.app", "edit-1", TrackCreate{Track: "production"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from CreateTrack, got %v", err)
+	}
 }
 
 func TestTrackMethods_ValidateArgs(t *testing.T) {
@@ -41,8 +50,20 @@ func TestTrackMethods_ValidateArgs(t *testing.T) {
 	if _, err := c.UpdateTrack(context.Background(), "com.example.app", "edit-1", "production", TrackUpdate{}); err == nil || !strings.Contains(err.Error(), "status is required") {
 		t.Fatalf("unexpected UpdateTrack error: %v", err)
 	}
+	if _, err := c.PatchTrack(context.Background(), "com.example.app", "edit-1", "production", TrackUpdate{}); err == nil || !strings.Contains(err.Error(), "status is required") {
+		t.Fatalf("unexpected PatchTrack error: %v", err)
+	}
+	if _, err := c.CreateTrack(context.Background(), "com.example.app", "edit-1", TrackCreate{}); err == nil || !strings.Contains(err.Error(), "track is required") {
+		t.Fatalf("unexpected CreateTrack error: %v", err)
+	}
 	if _, err := c.UpdateTrack(context.Background(), "com.example.app", "edit-1", "production", TrackUpdate{Status: "completed"}); err == nil || !strings.Contains(err.Error(), "at least one version code is required") {
 		t.Fatalf("unexpected UpdateTrack error: %v", err)
+	}
+	if _, err := c.PatchTrack(context.Background(), "com.example.app", "edit-1", "production", TrackUpdate{Status: "completed"}); err == nil || !strings.Contains(err.Error(), "at least one version code is required") {
+		t.Fatalf("unexpected PatchTrack error: %v", err)
+	}
+	if _, err := c.CreateTrack(context.Background(), "com.example.app", "edit-1", TrackCreate{Track: "production", FormFactor: "fridge"}); err == nil || !strings.Contains(err.Error(), "form factor must be one of") {
+		t.Fatalf("unexpected CreateTrack form factor error: %v", err)
 	}
 	if _, err := c.UpdateTrack(context.Background(), "com.example.app", "edit-1", "production", TrackUpdate{
 		Status:       "completed",
@@ -50,6 +71,16 @@ func TestTrackMethods_ValidateArgs(t *testing.T) {
 		ReleaseNotes: []LocalizedText{{Language: "en-US", Text: "   "}},
 	}); err == nil || !strings.Contains(err.Error(), "release note text is required") {
 		t.Fatalf("unexpected UpdateTrack error: %v", err)
+	}
+	if _, err := c.PatchTrack(context.Background(), "com.example.app", "edit-1", "production", TrackUpdate{
+		Status:       "completed",
+		VersionCodes: []int64{1},
+		ReleaseNotes: []LocalizedText{{Language: "en-US", Text: "   "}},
+	}); err == nil || !strings.Contains(err.Error(), "release note text is required") {
+		t.Fatalf("unexpected PatchTrack error: %v", err)
+	}
+	if _, err := c.CreateTrack(context.Background(), "com.example.app", "edit-1", TrackCreate{Track: "production", Type: "open"}); err == nil || !strings.Contains(err.Error(), "track type must be one of") {
+		t.Fatalf("unexpected CreateTrack type error: %v", err)
 	}
 }
 

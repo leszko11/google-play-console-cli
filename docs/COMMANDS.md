@@ -70,6 +70,8 @@ make generate-command-docs
 - `gpc tracks`
 - `gpc tracks list`
 - `gpc tracks get`
+- `gpc tracks create`
+- `gpc tracks patch`
 - `gpc tracks update`
 - `gpc tracks promote`
 - `gpc apks`
@@ -657,6 +659,7 @@ FLAGS
   -contact-website string   Contact website URL
   -default-language string  Default listing language (BCP-47, e.g. en-US)
   -edit-id string           Edit ID
+  -method patch             Update method: patch or update
   -package-name string      Package name
 ```
 
@@ -701,6 +704,7 @@ USAGE
 FLAGS
   -edit-id string        Edit ID
   -google-groups string  Comma-separated Google Group email addresses
+  -method patch          Update method: patch or update
   -package-name string   Package name
   -track string          Track name (e.g. internal, closed)
 ```
@@ -793,6 +797,7 @@ FLAGS
   -edit-id string            Edit ID
   -full-description string   Localized full description
   -locale string             Listing locale (BCP-47, e.g. en-US)
+  -method patch              Update method: patch or update
   -package-name string       Package name
   -short-description string  Localized short description
   -title string              Localized app title
@@ -1022,6 +1027,8 @@ USAGE
 SUBCOMMANDS
   list     List tracks in an edit
   get      Get a single track in an edit
+  create   Create a new track in an edit
+  patch    Patch a track release in an edit
   update   Update a track release in an edit
   promote  Promote a release from one track to another in an edit
 ```
@@ -1053,6 +1060,46 @@ FLAGS
   -edit-id string       Edit ID
   -package-name string  Package name
   -track string         Track name (e.g. production, internal)
+```
+
+## `gpc tracks create --help`
+
+```text
+DESCRIPTION
+  Create a new track in an edit
+
+USAGE
+  create
+
+FLAGS
+  -edit-id string       Edit ID
+  -form-factor default  Track form factor (default, wear, automotive)
+  -package-name string  Package name
+  -track string         Track name (e.g. production, internal)
+  -type closed-testing  Track type (currently only closed-testing)
+```
+
+## `gpc tracks patch --help`
+
+```text
+DESCRIPTION
+  Patch a track release in an edit
+
+USAGE
+  patch
+
+FLAGS
+  -edit-id string              Edit ID
+  -package-name string         Package name
+  -release-name string         Release name
+  -release-notes-file string   Path to release notes file (JSON object/array, tagged blocks, or plain text)
+  -release-notes-locale en-US  Release notes locale (BCP-47)
+  -release-notes-text string   Release notes text
+  -status string               Release status (draft, inProgress, halted, completed)
+  -track string                Track name (e.g. production, internal)
+  -update-priority 0           In-app update priority (0-5)
+  -user-fraction -1            Rollout user fraction (0-1)
+  -version-codes string        Comma-separated version codes
 ```
 
 ## `gpc tracks update --help`

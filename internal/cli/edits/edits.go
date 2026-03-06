@@ -29,12 +29,15 @@ type Client interface {
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	GetAppDetails(ctx context.Context, packageName, editID string) (gpc.AppDetailsInfo, error)
 	UpdateAppDetails(ctx context.Context, packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
+	ReplaceAppDetails(ctx context.Context, packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
 	GetTesters(ctx context.Context, packageName, editID, track string) (gpc.TestersInfo, error)
 	UpdateTesters(ctx context.Context, packageName, editID, track string, googleGroups []string) (gpc.TestersInfo, error)
+	ReplaceTesters(ctx context.Context, packageName, editID, track string, googleGroups []string) (gpc.TestersInfo, error)
 	GetCountryAvailability(ctx context.Context, packageName, editID, track string) (gpc.CountryAvailabilityInfo, error)
 	GetListing(ctx context.Context, packageName, editID, language string) (gpc.ListingInfo, error)
 	ListListings(ctx context.Context, packageName, editID string) ([]gpc.ListingInfo, error)
 	UpdateListing(ctx context.Context, packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
+	ReplaceListing(ctx context.Context, packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
 	DeleteListing(ctx context.Context, packageName, editID, language string) error
 	DeleteAllListings(ctx context.Context, packageName, editID string) error
 	ListImages(ctx context.Context, packageName, editID, language, imageType string) ([]gpc.ImageInfo, error)
@@ -778,10 +781,11 @@ func newDetailsGetCommand(deps Deps) *ffcli.Command {
 func newDetailsUpdateCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var packageName, editID string
+	var packageName, editID, method string
 	var defaultLanguage, contactEmail, contactPhone, contactWebsite string
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&method, "method", "patch", "Update method: patch or update")
 	fs.StringVar(&defaultLanguage, "default-language", "", "Default listing language (BCP-47, e.g. en-US)")
 	fs.StringVar(&contactEmail, "contact-email", "", "Contact email address")
 	fs.StringVar(&contactPhone, "contact-phone", "", "Contact phone number")
@@ -802,18 +806,30 @@ func newDetailsUpdateCommand(deps Deps) *ffcli.Command {
 			if editID == "" {
 				return shared.UsageErrorf("--edit-id is required")
 			}
-			details, err := client.UpdateAppDetails(requestCtx, pkg, editID, gpc.AppDetailsUpdate{
+			method, err = parseEditMutationMethod(method)
+			if err != nil {
+				return err
+			}
+			update := gpc.AppDetailsUpdate{
 				DefaultLanguage: defaultLanguage,
 				ContactEmail:    contactEmail,
 				ContactPhone:    contactPhone,
 				ContactWebsite:  contactWebsite,
-			})
+			}
+			var details gpc.AppDetailsInfo
+			switch method {
+			case "patch":
+				details, err = client.UpdateAppDetails(requestCtx, pkg, editID, update)
+			case "update":
+				details, err = client.ReplaceAppDetails(requestCtx, pkg, editID, update)
+			}
 			if err != nil {
 				return fmt.Errorf("failed to update app details: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      editID,
+				"method":      method,
 				"details":     details,
 				"status":      "updated",
 			})
@@ -876,11 +892,12 @@ func newTestersGetCommand(deps Deps) *ffcli.Command {
 func newTestersUpdateCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var packageName, editID, track, groupsCSV string
+	var packageName, editID, track, groupsCSV, method string
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
 	fs.StringVar(&track, "track", "", "Track name (e.g. internal, closed)")
 	fs.StringVar(&groupsCSV, "google-groups", "", "Comma-separated Google Group email addresses")
+	fs.StringVar(&method, "method", "patch", "Update method: patch or update")
 
 	return &ffcli.Command{
 		Name:      "update",
@@ -905,13 +922,24 @@ func newTestersUpdateCommand(deps Deps) *ffcli.Command {
 			if len(googleGroups) == 0 {
 				return shared.UsageErrorf("--google-groups is required")
 			}
-			testers, err := client.UpdateTesters(requestCtx, pkg, editID, track, googleGroups)
+			method, err = parseEditMutationMethod(method)
+			if err != nil {
+				return err
+			}
+			var testers gpc.TestersInfo
+			switch method {
+			case "patch":
+				testers, err = client.UpdateTesters(requestCtx, pkg, editID, track, googleGroups)
+			case "update":
+				testers, err = client.ReplaceTesters(requestCtx, pkg, editID, track, googleGroups)
+			}
 			if err != nil {
 				return fmt.Errorf("failed to update testers: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      editID,
+				"method":      method,
 				"testers":     testers,
 				"status":      "updated",
 			})
@@ -1016,6 +1044,17 @@ func parseCommaSeparated(raw string) []string {
 		out = append(out, value)
 	}
 	return out
+}
+
+func parseEditMutationMethod(raw string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "patch":
+		return "patch", nil
+	case "update":
+		return "update", nil
+	default:
+		return "", shared.UsageErrorf("--method must be one of: patch, update")
+	}
 }
 
 var validImageTypes = map[string]struct{}{
@@ -1150,10 +1189,11 @@ func newListingsGetCommand(deps Deps) *ffcli.Command {
 func newListingsUpdateCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var packageName, editID, locale, title, shortDescription, fullDescription string
+	var packageName, editID, locale, title, shortDescription, fullDescription, method string
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
 	fs.StringVar(&locale, "locale", "", "Listing locale (BCP-47, e.g. en-US)")
+	fs.StringVar(&method, "method", "patch", "Update method: patch or update")
 	fs.StringVar(&title, "title", "", "Localized app title")
 	fs.StringVar(&shortDescription, "short-description", "", "Localized short description")
 	fs.StringVar(&fullDescription, "full-description", "", "Localized full description")
@@ -1177,17 +1217,29 @@ func newListingsUpdateCommand(deps Deps) *ffcli.Command {
 			if locale == "" {
 				return shared.UsageErrorf("--locale is required")
 			}
-			listing, err := client.UpdateListing(requestCtx, pkg, editID, locale, gpc.ListingUpdate{
+			method, err = parseEditMutationMethod(method)
+			if err != nil {
+				return err
+			}
+			update := gpc.ListingUpdate{
 				Title:            title,
 				ShortDescription: shortDescription,
 				FullDescription:  fullDescription,
-			})
+			}
+			var listing gpc.ListingInfo
+			switch method {
+			case "patch":
+				listing, err = client.UpdateListing(requestCtx, pkg, editID, locale, update)
+			case "update":
+				listing, err = client.ReplaceListing(requestCtx, pkg, editID, locale, update)
+			}
 			if err != nil {
 				return fmt.Errorf("failed to update listing: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      editID,
+				"method":      method,
 				"listing":     listing,
 				"status":      "updated",
 			})

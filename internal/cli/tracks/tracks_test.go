@@ -26,6 +26,12 @@ type fakeClient struct {
 	updateByName map[string]gpc.TrackInfo
 	updateErrMap map[string]error
 	updateFn     func(packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error)
+	patch        gpc.TrackInfo
+	patchErr     error
+	patchFn      func(packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error)
+	create       gpc.TrackInfo
+	createErr    error
+	createFn     func(packageName, editID string, create gpc.TrackCreate) (gpc.TrackInfo, error)
 }
 
 func (f fakeClient) ListTracks(_ context.Context, _, _ string) ([]gpc.TrackInfo, error) {
@@ -56,6 +62,26 @@ func (f fakeClient) UpdateTrack(_ context.Context, packageName, editID, trackNam
 		return gpc.TrackInfo{}, f.updateErr
 	}
 	return f.update, nil
+}
+
+func (f fakeClient) PatchTrack(_ context.Context, packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error) {
+	if f.patchFn != nil {
+		return f.patchFn(packageName, editID, trackName, update)
+	}
+	if f.patchErr != nil {
+		return gpc.TrackInfo{}, f.patchErr
+	}
+	return f.patch, nil
+}
+
+func (f fakeClient) CreateTrack(_ context.Context, packageName, editID string, create gpc.TrackCreate) (gpc.TrackInfo, error) {
+	if f.createFn != nil {
+		return f.createFn(packageName, editID, create)
+	}
+	if f.createErr != nil {
+		return gpc.TrackInfo{}, f.createErr
+	}
+	return f.create, nil
 }
 
 func runTracks(t *testing.T, deps Deps, args ...string) (string, error) {
@@ -235,6 +261,81 @@ func TestTracksUpdate_ReturnsAPIError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "failed to update track") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestTracksPatch_ReturnsPatchedStatus(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				patchFn: func(_, _, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error) {
+					if trackName != "internal" {
+						t.Fatalf("unexpected track name: %q", trackName)
+					}
+					if update.Status != "completed" {
+						t.Fatalf("unexpected status: %q", update.Status)
+					}
+					return gpc.TrackInfo{Name: trackName}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runTracks(
+		t,
+		deps,
+		"patch",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--track", "internal",
+		"--status", "completed",
+		"--version-codes", "1002003",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"patched"`) || !strings.Contains(out, `"name":"internal"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestTracksCreate_ReturnsCreatedStatus(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				createFn: func(_, _ string, create gpc.TrackCreate) (gpc.TrackInfo, error) {
+					if create.Track != "beta-testers" {
+						t.Fatalf("unexpected track name: %q", create.Track)
+					}
+					if create.FormFactor != "wear" {
+						t.Fatalf("unexpected form factor: %q", create.FormFactor)
+					}
+					if create.Type != "closed-testing" {
+						t.Fatalf("unexpected track type: %q", create.Type)
+					}
+					return gpc.TrackInfo{Name: create.Track}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runTracks(
+		t,
+		deps,
+		"create",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--track", "beta-testers",
+		"--form-factor", "wear",
+		"--type", "closed-testing",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"created"`) || !strings.Contains(out, `"name":"beta-testers"`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
 

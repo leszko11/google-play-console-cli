@@ -29,10 +29,14 @@ type fakeClient struct {
 	appDetailsErr      error
 	updateDetailsErr   error
 	updateDetailsFn    func(packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
+	replaceDetailsErr  error
+	replaceDetailsFn   func(packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
 	testers            gpc.TestersInfo
 	testersErr         error
 	updateTestersErr   error
 	updateTestersFn    func(packageName, editID, track string, googleGroups []string) (gpc.TestersInfo, error)
+	replaceTestersErr  error
+	replaceTestersFn   func(packageName, editID, track string, googleGroups []string) (gpc.TestersInfo, error)
 	countryAvail       gpc.CountryAvailabilityInfo
 	countryAvailErr    error
 	listing            gpc.ListingInfo
@@ -40,6 +44,8 @@ type fakeClient struct {
 	listErr            error
 	updateErr          error
 	updateListingFn    func(packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
+	replaceErr         error
+	replaceListingFn   func(packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
 	delListErr         error
 	delAllErr          error
 	images             []gpc.ImageInfo
@@ -80,6 +86,12 @@ func (f fakeClient) UpdateAppDetails(_ context.Context, packageName, editID stri
 	}
 	return f.appDetails, f.updateDetailsErr
 }
+func (f fakeClient) ReplaceAppDetails(_ context.Context, packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error) {
+	if f.replaceDetailsFn != nil {
+		return f.replaceDetailsFn(packageName, editID, update)
+	}
+	return f.appDetails, f.replaceDetailsErr
+}
 func (f fakeClient) GetTesters(_ context.Context, _, _, _ string) (gpc.TestersInfo, error) {
 	return f.testers, f.testersErr
 }
@@ -88,6 +100,12 @@ func (f fakeClient) UpdateTesters(_ context.Context, packageName, editID, track 
 		return f.updateTestersFn(packageName, editID, track, googleGroups)
 	}
 	return f.testers, f.updateTestersErr
+}
+func (f fakeClient) ReplaceTesters(_ context.Context, packageName, editID, track string, googleGroups []string) (gpc.TestersInfo, error) {
+	if f.replaceTestersFn != nil {
+		return f.replaceTestersFn(packageName, editID, track, googleGroups)
+	}
+	return f.testers, f.replaceTestersErr
 }
 func (f fakeClient) GetCountryAvailability(_ context.Context, _, _, _ string) (gpc.CountryAvailabilityInfo, error) {
 	return f.countryAvail, f.countryAvailErr
@@ -103,6 +121,12 @@ func (f fakeClient) UpdateListing(_ context.Context, packageName, editID, langua
 		return f.updateListingFn(packageName, editID, language, update)
 	}
 	return f.listing, f.updateErr
+}
+func (f fakeClient) ReplaceListing(_ context.Context, packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error) {
+	if f.replaceListingFn != nil {
+		return f.replaceListingFn(packageName, editID, language, update)
+	}
+	return f.listing, f.replaceErr
 }
 func (f fakeClient) DeleteListing(_ context.Context, _, _, _ string) error  { return f.delListErr }
 func (f fakeClient) DeleteAllListings(_ context.Context, _, _ string) error { return f.delAllErr }
@@ -341,6 +365,43 @@ func TestEditsDetailsUpdate_ReturnsStatusUpdated(t *testing.T) {
 	}
 }
 
+func TestEditsDetailsUpdate_MethodUpdateUsesReplaceEndpoint(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				replaceDetailsFn: func(_, _ string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error) {
+					if update.ContactEmail != "support@example.com" {
+						t.Fatalf("unexpected contact email: %q", update.ContactEmail)
+					}
+					return gpc.AppDetailsInfo{ContactEmail: update.ContactEmail}, nil
+				},
+				updateDetailsFn: func(_, _ string, _ gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error) {
+					t.Fatal("expected replace details method, got patch update")
+					return gpc.AppDetailsInfo{}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"details",
+		"update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--contact-email", "support@example.com",
+		"--method", "update",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"method":"update"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
 func TestEditsDetailsUpdate_ReturnsAPIError(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
@@ -420,6 +481,44 @@ func TestEditsTestersUpdate_ReturnsStatusUpdated(t *testing.T) {
 		t.Fatalf("command failed: %v", err)
 	}
 	if !strings.Contains(out, `"status":"updated"`) || !strings.Contains(out, `"qa-team@example.com"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsTestersUpdate_MethodUpdateUsesReplaceEndpoint(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				replaceTestersFn: func(_, _, track string, googleGroups []string) (gpc.TestersInfo, error) {
+					if track != "internal" {
+						t.Fatalf("unexpected track: %q", track)
+					}
+					return gpc.TestersInfo{Track: track, GoogleGroups: googleGroups}, nil
+				},
+				updateTestersFn: func(_, _, _ string, _ []string) (gpc.TestersInfo, error) {
+					t.Fatal("expected replace testers method, got patch update")
+					return gpc.TestersInfo{}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"testers",
+		"update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--track", "internal",
+		"--google-groups", "qa-team@example.com",
+		"--method", "update",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"method":"update"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
@@ -523,6 +622,71 @@ func TestEditsListingsUpdate_ReturnsStatusUpdated(t *testing.T) {
 	}
 	if !strings.Contains(out, `"status":"updated"`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsListingsUpdate_MethodUpdateUsesReplaceEndpoint(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				replaceListingFn: func(_, _, locale string, update gpc.ListingUpdate) (gpc.ListingInfo, error) {
+					if locale != "en-US" {
+						t.Fatalf("unexpected locale: %q", locale)
+					}
+					return gpc.ListingInfo{Language: locale, Title: update.Title}, nil
+				},
+				updateListingFn: func(_, _, _ string, _ gpc.ListingUpdate) (gpc.ListingInfo, error) {
+					t.Fatal("expected replace listing method, got patch update")
+					return gpc.ListingInfo{}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"listings",
+		"update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+		"--title", "Example App Test",
+		"--method", "update",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"method":"update"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsListingsUpdate_RejectsInvalidMethod(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(
+		t,
+		deps,
+		"listings",
+		"update",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+		"--title", "Example App Test",
+		"--method", "replace",
+	)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--method must be one of: patch, update") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

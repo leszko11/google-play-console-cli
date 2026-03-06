@@ -155,35 +155,31 @@ func (c *Client) ListListings(ctx context.Context, packageName, editID string) (
 }
 
 func (c *Client) UpdateListing(ctx context.Context, packageName, editID, language string, update ListingUpdate) (ListingInfo, error) {
-	packageName = strings.TrimSpace(packageName)
-	if packageName == "" {
-		return ListingInfo{}, fmt.Errorf("package name is required")
-	}
-	editID = strings.TrimSpace(editID)
-	if editID == "" {
-		return ListingInfo{}, fmt.Errorf("edit id is required")
-	}
-	language = strings.TrimSpace(language)
-	if language == "" {
-		return ListingInfo{}, fmt.Errorf("language is required")
-	}
-	update.Title = strings.TrimSpace(update.Title)
-	update.ShortDescription = strings.TrimSpace(update.ShortDescription)
-	update.FullDescription = strings.TrimSpace(update.FullDescription)
-	if update.Title == "" && update.ShortDescription == "" && update.FullDescription == "" {
-		return ListingInfo{}, fmt.Errorf("at least one listing field must be provided")
+	packageName, editID, language, req, err := normalizeListingUpdateRequest(packageName, editID, language, update)
+	if err != nil {
+		return ListingInfo{}, err
 	}
 	if c == nil || c.service == nil {
 		return ListingInfo{}, ErrInvalidCredentials
 	}
 
-	req := &androidpublisher.Listing{
-		Language:         language,
-		Title:            update.Title,
-		ShortDescription: update.ShortDescription,
-		FullDescription:  update.FullDescription,
-	}
 	listing, err := c.service.Edits.Listings.Patch(packageName, editID, language, req).Context(ctx).Do()
+	if err != nil {
+		return ListingInfo{}, mapGoogleAPIError(err)
+	}
+	return listingInfoFromListing(listing), nil
+}
+
+func (c *Client) ReplaceListing(ctx context.Context, packageName, editID, language string, update ListingUpdate) (ListingInfo, error) {
+	packageName, editID, language, req, err := normalizeListingUpdateRequest(packageName, editID, language, update)
+	if err != nil {
+		return ListingInfo{}, err
+	}
+	if c == nil || c.service == nil {
+		return ListingInfo{}, ErrInvalidCredentials
+	}
+
+	listing, err := c.service.Edits.Listings.Update(packageName, editID, language, req).Context(ctx).Do()
 	if err != nil {
 		return ListingInfo{}, mapGoogleAPIError(err)
 	}
@@ -211,32 +207,31 @@ func (c *Client) GetAppDetails(ctx context.Context, packageName, editID string) 
 }
 
 func (c *Client) UpdateAppDetails(ctx context.Context, packageName, editID string, update AppDetailsUpdate) (AppDetailsInfo, error) {
-	packageName = strings.TrimSpace(packageName)
-	if packageName == "" {
-		return AppDetailsInfo{}, fmt.Errorf("package name is required")
-	}
-	editID = strings.TrimSpace(editID)
-	if editID == "" {
-		return AppDetailsInfo{}, fmt.Errorf("edit id is required")
-	}
-	update.DefaultLanguage = strings.TrimSpace(update.DefaultLanguage)
-	update.ContactEmail = strings.TrimSpace(update.ContactEmail)
-	update.ContactPhone = strings.TrimSpace(update.ContactPhone)
-	update.ContactWebsite = strings.TrimSpace(update.ContactWebsite)
-	if update.DefaultLanguage == "" && update.ContactEmail == "" && update.ContactPhone == "" && update.ContactWebsite == "" {
-		return AppDetailsInfo{}, fmt.Errorf("at least one app detail field must be provided")
+	packageName, editID, req, err := normalizeAppDetailsUpdateRequest(packageName, editID, update)
+	if err != nil {
+		return AppDetailsInfo{}, err
 	}
 	if c == nil || c.service == nil {
 		return AppDetailsInfo{}, ErrInvalidCredentials
 	}
 
-	req := &androidpublisher.AppDetails{
-		DefaultLanguage: update.DefaultLanguage,
-		ContactEmail:    update.ContactEmail,
-		ContactPhone:    update.ContactPhone,
-		ContactWebsite:  update.ContactWebsite,
-	}
 	details, err := c.service.Edits.Details.Patch(packageName, editID, req).Context(ctx).Do()
+	if err != nil {
+		return AppDetailsInfo{}, mapGoogleAPIError(err)
+	}
+	return appDetailsInfoFromDetails(details), nil
+}
+
+func (c *Client) ReplaceAppDetails(ctx context.Context, packageName, editID string, update AppDetailsUpdate) (AppDetailsInfo, error) {
+	packageName, editID, req, err := normalizeAppDetailsUpdateRequest(packageName, editID, update)
+	if err != nil {
+		return AppDetailsInfo{}, err
+	}
+	if c == nil || c.service == nil {
+		return AppDetailsInfo{}, ErrInvalidCredentials
+	}
+
+	details, err := c.service.Edits.Details.Update(packageName, editID, req).Context(ctx).Do()
 	if err != nil {
 		return AppDetailsInfo{}, mapGoogleAPIError(err)
 	}
@@ -268,17 +263,102 @@ func (c *Client) GetTesters(ctx context.Context, packageName, editID, track stri
 }
 
 func (c *Client) UpdateTesters(ctx context.Context, packageName, editID, track string, googleGroups []string) (TestersInfo, error) {
+	packageName, editID, track, req, err := normalizeTestersUpdateRequest(packageName, editID, track, googleGroups)
+	if err != nil {
+		return TestersInfo{}, err
+	}
+	if c == nil || c.service == nil {
+		return TestersInfo{}, ErrInvalidCredentials
+	}
+
+	testers, err := c.service.Edits.Testers.Patch(packageName, editID, track, req).Context(ctx).Do()
+	if err != nil {
+		return TestersInfo{}, mapGoogleAPIError(err)
+	}
+	return testersInfoFromTesters(track, testers), nil
+}
+
+func (c *Client) ReplaceTesters(ctx context.Context, packageName, editID, track string, googleGroups []string) (TestersInfo, error) {
+	packageName, editID, track, req, err := normalizeTestersUpdateRequest(packageName, editID, track, googleGroups)
+	if err != nil {
+		return TestersInfo{}, err
+	}
+	if c == nil || c.service == nil {
+		return TestersInfo{}, ErrInvalidCredentials
+	}
+
+	testers, err := c.service.Edits.Testers.Update(packageName, editID, track, req).Context(ctx).Do()
+	if err != nil {
+		return TestersInfo{}, mapGoogleAPIError(err)
+	}
+	return testersInfoFromTesters(track, testers), nil
+}
+
+func normalizeListingUpdateRequest(packageName, editID, language string, update ListingUpdate) (string, string, string, *androidpublisher.Listing, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
-		return TestersInfo{}, fmt.Errorf("package name is required")
+		return "", "", "", nil, fmt.Errorf("package name is required")
 	}
 	editID = strings.TrimSpace(editID)
 	if editID == "" {
-		return TestersInfo{}, fmt.Errorf("edit id is required")
+		return "", "", "", nil, fmt.Errorf("edit id is required")
+	}
+	language = strings.TrimSpace(language)
+	if language == "" {
+		return "", "", "", nil, fmt.Errorf("language is required")
+	}
+	update.Title = strings.TrimSpace(update.Title)
+	update.ShortDescription = strings.TrimSpace(update.ShortDescription)
+	update.FullDescription = strings.TrimSpace(update.FullDescription)
+	if update.Title == "" && update.ShortDescription == "" && update.FullDescription == "" {
+		return "", "", "", nil, fmt.Errorf("at least one listing field must be provided")
+	}
+
+	return packageName, editID, language, &androidpublisher.Listing{
+		Language:         language,
+		Title:            update.Title,
+		ShortDescription: update.ShortDescription,
+		FullDescription:  update.FullDescription,
+	}, nil
+}
+
+func normalizeAppDetailsUpdateRequest(packageName, editID string, update AppDetailsUpdate) (string, string, *androidpublisher.AppDetails, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return "", "", nil, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return "", "", nil, fmt.Errorf("edit id is required")
+	}
+	update.DefaultLanguage = strings.TrimSpace(update.DefaultLanguage)
+	update.ContactEmail = strings.TrimSpace(update.ContactEmail)
+	update.ContactPhone = strings.TrimSpace(update.ContactPhone)
+	update.ContactWebsite = strings.TrimSpace(update.ContactWebsite)
+	if update.DefaultLanguage == "" && update.ContactEmail == "" && update.ContactPhone == "" && update.ContactWebsite == "" {
+		return "", "", nil, fmt.Errorf("at least one app detail field must be provided")
+	}
+
+	return packageName, editID, &androidpublisher.AppDetails{
+		DefaultLanguage: update.DefaultLanguage,
+		ContactEmail:    update.ContactEmail,
+		ContactPhone:    update.ContactPhone,
+		ContactWebsite:  update.ContactWebsite,
+	}, nil
+}
+
+func normalizeTestersUpdateRequest(packageName, editID, track string, googleGroups []string) (string, string, string, *androidpublisher.Testers, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return "", "", "", nil, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return "", "", "", nil, fmt.Errorf("edit id is required")
 	}
 	track = strings.TrimSpace(track)
 	if track == "" {
-		return TestersInfo{}, fmt.Errorf("track is required")
+		return "", "", "", nil, fmt.Errorf("track is required")
 	}
 
 	sanitizedGroups := make([]string, 0, len(googleGroups))
@@ -290,18 +370,10 @@ func (c *Client) UpdateTesters(ctx context.Context, packageName, editID, track s
 		sanitizedGroups = append(sanitizedGroups, group)
 	}
 	if len(sanitizedGroups) == 0 {
-		return TestersInfo{}, fmt.Errorf("at least one google group is required")
-	}
-	if c == nil || c.service == nil {
-		return TestersInfo{}, ErrInvalidCredentials
+		return "", "", "", nil, fmt.Errorf("at least one google group is required")
 	}
 
-	req := &androidpublisher.Testers{GoogleGroups: sanitizedGroups}
-	testers, err := c.service.Edits.Testers.Patch(packageName, editID, track, req).Context(ctx).Do()
-	if err != nil {
-		return TestersInfo{}, mapGoogleAPIError(err)
-	}
-	return testersInfoFromTesters(track, testers), nil
+	return packageName, editID, track, &androidpublisher.Testers{GoogleGroups: sanitizedGroups}, nil
 }
 
 func (c *Client) GetCountryAvailability(ctx context.Context, packageName, editID, track string) (CountryAvailabilityInfo, error) {

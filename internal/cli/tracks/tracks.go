@@ -20,6 +20,8 @@ type Client interface {
 	ListTracks(ctx context.Context, packageName, editID string) ([]gpc.TrackInfo, error)
 	GetTrack(ctx context.Context, packageName, editID, trackName string) (gpc.TrackInfo, error)
 	UpdateTrack(ctx context.Context, packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error)
+	PatchTrack(ctx context.Context, packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error)
+	CreateTrack(ctx context.Context, packageName, editID string, create gpc.TrackCreate) (gpc.TrackInfo, error)
 }
 
 type Deps struct {
@@ -39,6 +41,8 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newListCommand(deps),
 			newGetCommand(deps),
+			newCreateCommand(deps),
+			newPatchCommand(deps),
 			newUpdateCommand(deps),
 			newPromoteCommand(deps),
 		},
@@ -134,8 +138,84 @@ func newGetCommand(deps Deps) *ffcli.Command {
 	}
 }
 
+func newCreateCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("create", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, trackName, formFactor, trackType string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&trackName, "track", "", "Track name (e.g. production, internal)")
+	fs.StringVar(&formFactor, "form-factor", "default", "Track form factor (default, wear, automotive)")
+	fs.StringVar(&trackType, "type", "closed-testing", "Track type (currently only closed-testing)")
+
+	return &ffcli.Command{
+		Name:      "create",
+		ShortHelp: "Create a new track in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, eid, requestCtx, cancel, err := buildClient(ctx, deps, packageName, editID, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			trackName = strings.TrimSpace(trackName)
+			if trackName == "" {
+				return shared.UsageErrorf("--track is required")
+			}
+			track, err := client.CreateTrack(requestCtx, pkg, eid, gpc.TrackCreate{
+				Track:      trackName,
+				FormFactor: formFactor,
+				Type:       trackType,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to create track: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      eid,
+				"track":       track,
+				"formFactor":  formFactor,
+				"type":        trackType,
+				"status":      "created",
+			})
+		},
+	}
+}
+
+func newPatchCommand(deps Deps) *ffcli.Command {
+	return newTrackMutationCommand(
+		deps,
+		"patch",
+		"Patch a track release in an edit",
+		"patched",
+		func(client Client, ctx context.Context, packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error) {
+			return client.PatchTrack(ctx, packageName, editID, trackName, update)
+		},
+	)
+}
+
 func newUpdateCommand(deps Deps) *ffcli.Command {
-	fs := flag.NewFlagSet("update", flag.ContinueOnError)
+	return newTrackMutationCommand(
+		deps,
+		"update",
+		"Update a track release in an edit",
+		"updated",
+		func(client Client, ctx context.Context, packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error) {
+			return client.UpdateTrack(ctx, packageName, editID, trackName, update)
+		},
+	)
+}
+
+func newTrackMutationCommand(
+	deps Deps,
+	name string,
+	shortHelp string,
+	statusLabel string,
+	mutate func(Client, context.Context, string, string, string, gpc.TrackUpdate) (gpc.TrackInfo, error),
+) *ffcli.Command {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, editID, trackName, status, releaseName, versionCodesCSV string
 	var userFraction float64
@@ -154,8 +234,8 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&releaseNotesText, "release-notes-text", "", "Release notes text")
 
 	return &ffcli.Command{
-		Name:      "update",
-		ShortHelp: "Update a track release in an edit",
+		Name:      name,
+		ShortHelp: shortHelp,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
@@ -194,7 +274,7 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 
-			track, err := client.UpdateTrack(requestCtx, pkg, eid, trackName, gpc.TrackUpdate{
+			track, err := mutate(client, requestCtx, pkg, eid, trackName, gpc.TrackUpdate{
 				Status:         status,
 				ReleaseName:    releaseName,
 				UserFraction:   userFraction,
@@ -203,13 +283,13 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 				ReleaseNotes:   releaseNotes,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to update track: %w", err)
+				return fmt.Errorf("failed to %s track: %w", name, err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      eid,
 				"track":       track,
-				"status":      "updated",
+				"status":      statusLabel,
 			})
 		},
 	}
