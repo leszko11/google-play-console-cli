@@ -16,16 +16,16 @@ make generate-openapi-coverage
 | Metric | Count |
 | --- | ---: |
 | Total discovery endpoints | 136 |
-| Implemented endpoints | 120 |
-| Missing endpoints | 16 |
-| Detected service method IDs | 120 |
+| Implemented endpoints | 121 |
+| Missing endpoints | 15 |
+| Detected service method IDs | 121 |
 | Unmatched service method IDs | 0 |
 
 ## Family Summary
 
 | Family | Implemented | Missing | Total |
 | --- | ---: | ---: | ---: |
-| `applications.dataSafety` | 0 | 1 | 1 |
+| `applications.dataSafety` | 1 | 0 | 1 |
 | `applications.deviceTierConfigs` | 3 | 0 | 3 |
 | `apprecovery` | 5 | 0 | 5 |
 | `edits` | 5 | 0 | 5 |
@@ -58,10 +58,6 @@ make generate-openapi-coverage
 | `users` | 4 | 0 | 4 |
 
 ## Missing Endpoints
-
-### `applications.dataSafety`
-
-- `androidpublisher.applications.dataSafety` | `POST` `androidpublisher/v3/applications/{packageName}/dataSafety`
 
 ### `edits.apks`
 

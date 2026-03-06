@@ -27,6 +27,7 @@ make generate-command-docs
 - `gpc apps`
 - `gpc apps list`
 - `gpc apps get`
+- `gpc apps data-safety`
 - `gpc apps add-package`
 - `gpc apps remove-package`
 - `gpc app-recoveries`
@@ -356,6 +357,7 @@ USAGE
 SUBCOMMANDS
   list            List configured packages
   get             Get app details for a package
+  data-safety     Write the Data Safety CSV declaration for an app
   add-package     Add package to local app list
   remove-package  Remove package from local app list
 ```
@@ -385,6 +387,20 @@ USAGE
 
 FLAGS
   -output string        Output format: json, table, markdown
+  -package-name string  Package name
+```
+
+## `gpc apps data-safety --help`
+
+```text
+DESCRIPTION
+  Write the Data Safety CSV declaration for an app
+
+USAGE
+  data-safety
+
+FLAGS
+  -input string         Path to Data Safety CSV payload (use - for stdin)
   -package-name string  Package name
 ```
 

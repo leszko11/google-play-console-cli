@@ -7,7 +7,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 ## Current Scope
 
 - Authentication bootstrap with Google service account credentials
-- Basic app visibility commands (`apps list`, `apps get`)
+- Basic app visibility and metadata commands (`apps list`, `apps get`, `apps data-safety`)
 - Edit transactions and listing updates (`edits`)
 - Testers and country availability inside edits
 - Track management inside edits (`tracks list/get/update/promote`)
@@ -95,6 +95,9 @@ gpc apps list --output json
 
 # Fetch app details for one package
 gpc apps get --package-name com.example.app --output json
+
+# Write the app's Data Safety declaration from the exported Play CSV template
+gpc apps data-safety --package-name com.example.app --input /path/to/data-safety.csv
 
 # Start an edit transaction
 gpc edits create --package-name com.example.app
