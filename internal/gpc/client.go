@@ -64,24 +64,43 @@ func mapAPIError(statusCode int, msg string) error {
 		return fmt.Errorf("androidpublisher api error (%d): %s\nhint: this app accepts Android App Bundles only. Use `gpc bundles upload ...` or `gpc deploy --aab ...`.", statusCode, msg)
 	}
 
+	return mapAPIErrorWithService("androidpublisher", statusCode, msg, true)
+}
+
+func mapGoogleAPIErrorWithService(serviceName string, err error, bootstrapHint bool) error {
+	if err == nil {
+		return nil
+	}
+
+	var gerr *googleapi.Error
+	if errors.As(err, &gerr) {
+		return mapAPIErrorWithService(serviceName, gerr.Code, gerr.Message, bootstrapHint)
+	}
+
+	return err
+}
+
+func mapAPIErrorWithService(serviceName string, statusCode int, msg string, bootstrapHint bool) error {
+	prefix := fmt.Sprintf("%s api error (%d): %s", serviceName, statusCode, msg)
+
 	switch statusCode {
 	case 401:
-		return fmt.Errorf("androidpublisher api error (%d): %s\n%s", statusCode, msg, permissionSetupHint())
+		return fmt.Errorf("%s\n%s", prefix, permissionSetupHint())
 	case 403:
 		if isPermissionErrorMessage(msg) {
 			return fmt.Errorf("%w: %s\n%s", ErrAccessDenied, msg, permissionSetupHint())
 		}
-		return fmt.Errorf("androidpublisher api error (%d): %s", statusCode, msg)
+		return errors.New(prefix)
 	case 404:
-		if isPackageBootstrapNotReady(msg) {
+		if bootstrapHint && isPackageBootstrapNotReady(msg) {
 			return fmt.Errorf("%w: %s\nhint: this package is not initialized in Google Play yet. Upload the first APK or AAB once in Play Console, then retry. Also verify the service account has access to this app.", ErrPackageNotFound, msg)
 		}
 		return fmt.Errorf("%w: %s", ErrPackageNotFound, msg)
 	default:
 		if isPermissionErrorMessage(msg) {
-			return fmt.Errorf("androidpublisher api error (%d): %s\n%s", statusCode, msg, permissionSetupHint())
+			return fmt.Errorf("%s\n%s", prefix, permissionSetupHint())
 		}
-		return fmt.Errorf("androidpublisher api error (%d): %s", statusCode, msg)
+		return errors.New(prefix)
 	}
 }
 
