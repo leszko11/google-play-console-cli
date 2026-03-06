@@ -16,9 +16,9 @@ make generate-openapi-coverage
 | Metric | Count |
 | --- | ---: |
 | Total discovery endpoints | 136 |
-| Implemented endpoints | 115 |
-| Missing endpoints | 21 |
-| Detected service method IDs | 115 |
+| Implemented endpoints | 120 |
+| Missing endpoints | 16 |
+| Detected service method IDs | 120 |
 | Unmatched service method IDs | 0 |
 
 ## Family Summary
@@ -27,7 +27,7 @@ make generate-openapi-coverage
 | --- | ---: | ---: | ---: |
 | `applications.dataSafety` | 0 | 1 | 1 |
 | `applications.deviceTierConfigs` | 3 | 0 | 3 |
-| `apprecovery` | 0 | 5 | 5 |
+| `apprecovery` | 5 | 0 | 5 |
 | `edits` | 5 | 0 | 5 |
 | `edits.apks` | 2 | 1 | 3 |
 | `edits.bundles` | 2 | 0 | 2 |
@@ -62,14 +62,6 @@ make generate-openapi-coverage
 ### `applications.dataSafety`
 
 - `androidpublisher.applications.dataSafety` | `POST` `androidpublisher/v3/applications/{packageName}/dataSafety`
-
-### `apprecovery`
-
-- `androidpublisher.apprecovery.list` | `GET` `androidpublisher/v3/applications/{packageName}/appRecoveries`
-- `androidpublisher.apprecovery.create` | `POST` `androidpublisher/v3/applications/{packageName}/appRecoveries`
-- `androidpublisher.apprecovery.addTargeting` | `POST` `androidpublisher/v3/applications/{packageName}/appRecoveries/{appRecoveryId}:addTargeting`
-- `androidpublisher.apprecovery.cancel` | `POST` `androidpublisher/v3/applications/{packageName}/appRecoveries/{appRecoveryId}:cancel`
-- `androidpublisher.apprecovery.deploy` | `POST` `androidpublisher/v3/applications/{packageName}/appRecoveries/{appRecoveryId}:deploy`
 
 ### `edits.apks`
 

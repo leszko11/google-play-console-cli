@@ -23,6 +23,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Device tier config support (`device-tier-configs list/get/create`)
 - System APK variant support (`system-apks list/get/create/download`)
 - Generated APK metadata support (`generated-apks list/download`)
+- App recovery action support (`app-recoveries list/create/add-targeting/cancel/deploy`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Monetization one-time product commands (`products ...`)
 - Legacy in-app product commands (`iap ...`)
@@ -178,6 +179,13 @@ gpc system-apks download --package-name com.example.app --version-code 123 --var
 # Inspect generated APK download IDs and fetch one artifact
 gpc generated-apks list --package-name com.example.app --version-code 123
 gpc generated-apks download --package-name com.example.app --version-code 123 --download-id download-1 --output /tmp/generated.apk
+
+# Manage app recovery actions for a bundle version
+gpc app-recoveries list --package-name com.example.app --version-code 123
+gpc app-recoveries create --package-name com.example.app --input /path/to/app-recovery.json
+gpc app-recoveries add-targeting --package-name com.example.app --app-recovery-id 7 --input /path/to/app-recovery-targeting.json
+gpc app-recoveries cancel --package-name com.example.app --app-recovery-id 7 --confirm
+gpc app-recoveries deploy --package-name com.example.app --app-recovery-id 7 --confirm
 
 # List/get subscription products
 gpc subscriptions list --package-name com.example.app --page-size 100
@@ -462,6 +470,7 @@ gpc external-transactions --help
 gpc device-tier-configs --help
 gpc system-apks --help
 gpc generated-apks --help
+gpc app-recoveries --help
 gpc subscriptions --help
 gpc products --help
 gpc iap --help
