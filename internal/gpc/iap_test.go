@@ -31,6 +31,9 @@ func TestIAPMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.UpdateIAP(context.Background(), "com.example.app", "coins_100", payload); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from UpdateIAP, got %v", err)
 	}
+	if _, err := c.PatchIAP(context.Background(), "com.example.app", "coins_100", payload); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from PatchIAP, got %v", err)
+	}
 	if err := c.BatchDeleteIAPs(context.Background(), "com.example.app", []*androidpublisher.InappproductsDeleteRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from BatchDeleteIAPs, got %v", err)
 	}
@@ -72,6 +75,12 @@ func TestIAPMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.UpdateIAP(context.Background(), "com.example.app", "coins_100", nil); err == nil || !strings.Contains(err.Error(), "in-app product payload is required") {
 		t.Fatalf("unexpected UpdateIAP payload error: %v", err)
+	}
+	if _, err := c.PatchIAP(context.Background(), "com.example.app", "", &androidpublisher.InAppProduct{}); err == nil || !strings.Contains(err.Error(), "sku is required") {
+		t.Fatalf("unexpected PatchIAP sku error: %v", err)
+	}
+	if _, err := c.PatchIAP(context.Background(), "com.example.app", "coins_100", nil); err == nil || !strings.Contains(err.Error(), "in-app product payload is required") {
+		t.Fatalf("unexpected PatchIAP payload error: %v", err)
 	}
 	if err := c.BatchDeleteIAPs(context.Background(), "com.example.app", nil); err == nil || !strings.Contains(err.Error(), "at least one batch delete request is required") {
 		t.Fatalf("unexpected BatchDeleteIAPs empty request error: %v", err)

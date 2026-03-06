@@ -2,6 +2,7 @@ package apks
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -12,11 +13,13 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
+	"google.golang.org/api/androidpublisher/v3"
 )
 
 type Client interface {
 	ListAPKs(ctx context.Context, packageName, editID string) ([]gpc.APKInfo, error)
 	UploadAPK(ctx context.Context, packageName, editID, apkPath string) (gpc.APKInfo, error)
+	AddExternallyHostedAPK(ctx context.Context, packageName, editID string, apk *androidpublisher.ExternallyHostedApk) (gpc.ExternallyHostedAPKInfo, error)
 }
 
 type Deps struct {
@@ -36,6 +39,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newListCommand(deps),
 			newUploadCommand(deps),
+			newAddExternallyHostedCommand(deps),
 		},
 	}
 }
@@ -127,6 +131,70 @@ func newUploadCommand(deps Deps) *ffcli.Command {
 			})
 		},
 	}
+}
+
+func newAddExternallyHostedCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("add-externally-hosted", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, inputPath string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&inputPath, "input", "", "Path to externally hosted APK JSON payload (use - for stdin)")
+
+	return &ffcli.Command{
+		Name:      "add-externally-hosted",
+		ShortHelp: "Register an externally hosted APK in an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, eid, requestCtx, cancel, err := buildClient(ctx, deps, packageName, editID, false)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			apk, err := readExternallyHostedAPKPayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			result, err := client.AddExternallyHostedAPK(requestCtx, pkg, eid, apk)
+			if err != nil {
+				return fmt.Errorf("failed to add externally hosted apk: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      eid,
+				"apk":         result,
+				"status":      "added",
+			})
+		},
+	}
+}
+
+func readExternallyHostedAPKPayload(path string, stdin io.Reader) (*androidpublisher.ExternallyHostedApk, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+
+	var (
+		raw []byte
+		err error
+	)
+	if path == "-" {
+		raw, err = io.ReadAll(stdin)
+	} else {
+		raw, err = os.ReadFile(path)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read externally hosted apk payload: %w", err)
+	}
+
+	var payload androidpublisher.ExternallyHostedApk
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("failed to decode externally hosted apk payload: %w", err)
+	}
+	return &payload, nil
 }
 
 func buildClient(ctx context.Context, deps Deps, packageName, editID string, upload bool) (Client, string, string, context.Context, context.CancelFunc, error) {

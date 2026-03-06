@@ -162,6 +162,29 @@ func (c *Client) UpdateIAP(ctx context.Context, packageName, sku string, product
 		return IAPInfo{}, ErrInvalidCredentials
 	}
 
+	updated, err := c.service.Inappproducts.Update(packageName, sku, product).Context(ctx).Do()
+	if err != nil {
+		return IAPInfo{}, mapGoogleAPIError(err)
+	}
+	return iapInfoFromProduct(updated), nil
+}
+
+func (c *Client) PatchIAP(ctx context.Context, packageName, sku string, product *androidpublisher.InAppProduct) (IAPInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return IAPInfo{}, fmt.Errorf("package name is required")
+	}
+	sku = strings.TrimSpace(sku)
+	if sku == "" {
+		return IAPInfo{}, fmt.Errorf("sku is required")
+	}
+	if product == nil {
+		return IAPInfo{}, fmt.Errorf("in-app product payload is required")
+	}
+	if c == nil || c.service == nil {
+		return IAPInfo{}, ErrInvalidCredentials
+	}
+
 	updated, err := c.service.Inappproducts.Patch(packageName, sku, product).Context(ctx).Do()
 	if err != nil {
 		return IAPInfo{}, mapGoogleAPIError(err)

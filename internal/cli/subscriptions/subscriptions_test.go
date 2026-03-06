@@ -53,10 +53,12 @@ type fakeClient struct {
 	basePlanUpdates            []gpc.SubscriptionInfo
 	basePlanActErr             error
 	basePlanDeactErr           error
+	basePlanBatchStateErr      error
 	basePlanDeleteErr          error
 	basePlanMigrateErr         error
 	basePlanBatchMigrateErr    error
 	basePlanMigrateInput       *androidpublisher.MigrateBasePlanPricesRequest
+	basePlanBatchStateInput    []*androidpublisher.UpdateBasePlanStateRequest
 	basePlanBatchMigrateInput  []*androidpublisher.MigrateBasePlanPricesRequest
 	basePlanBatchMigrateCount  int
 	capturedInput              *androidpublisher.Subscription
@@ -130,6 +132,12 @@ func (f *fakeClient) DeactivateSubscriptionBasePlan(_ context.Context, _ string,
 	f.productID = productID
 	f.basePlanID = basePlanID
 	return f.basePlanUpdates, f.basePlanDeactErr
+}
+
+func (f *fakeClient) BatchUpdateSubscriptionBasePlanStates(_ context.Context, _ string, productID string, requests []*androidpublisher.UpdateBasePlanStateRequest) ([]gpc.SubscriptionInfo, error) {
+	f.productID = productID
+	f.basePlanBatchStateInput = append([]*androidpublisher.UpdateBasePlanStateRequest(nil), requests...)
+	return f.basePlanUpdates, f.basePlanBatchStateErr
 }
 
 func (f *fakeClient) DeleteSubscriptionBasePlan(_ context.Context, _ string, productID, basePlanID string) error {
@@ -250,6 +258,15 @@ func bindGlobalPaginate(t *testing.T, paginate bool) {
 	cfg := &shared.GlobalFlags{}
 	shared.BindGlobalFlags(fs, cfg)
 	cfg.Paginate = paginate
+}
+
+func writeJSON(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "payload.json")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	return path
 }
 
 func writeSubscriptionPayload(t *testing.T) string {

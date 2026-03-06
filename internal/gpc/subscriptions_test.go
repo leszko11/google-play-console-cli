@@ -42,6 +42,9 @@ func TestSubscriptionMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.DeactivateSubscriptionBasePlan(context.Background(), "com.example.app", "premium_monthly", "monthly"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from DeactivateSubscriptionBasePlan, got %v", err)
 	}
+	if _, err := c.BatchUpdateSubscriptionBasePlanStates(context.Background(), "com.example.app", "premium_monthly", []*androidpublisher.UpdateBasePlanStateRequest{{}}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from BatchUpdateSubscriptionBasePlanStates, got %v", err)
+	}
 	if err := c.DeleteSubscriptionBasePlan(context.Background(), "com.example.app", "premium_monthly", "monthly"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from DeleteSubscriptionBasePlan, got %v", err)
 	}
@@ -144,6 +147,16 @@ func TestSubscriptionMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.DeactivateSubscriptionBasePlan(context.Background(), "com.example.app", "", "monthly"); err == nil || !strings.Contains(err.Error(), "product id is required") {
 		t.Fatalf("unexpected DeactivateSubscriptionBasePlan product id error: %v", err)
+	}
+	if _, err := c.BatchUpdateSubscriptionBasePlanStates(context.Background(), "com.example.app", "premium_monthly", nil); err == nil || !strings.Contains(err.Error(), "at least one base plan state update request is required") {
+		t.Fatalf("unexpected BatchUpdateSubscriptionBasePlanStates empty request error: %v", err)
+	}
+	tooManyBasePlanStateRequests := make([]*androidpublisher.UpdateBasePlanStateRequest, 101)
+	for i := range tooManyBasePlanStateRequests {
+		tooManyBasePlanStateRequests[i] = &androidpublisher.UpdateBasePlanStateRequest{}
+	}
+	if _, err := c.BatchUpdateSubscriptionBasePlanStates(context.Background(), "com.example.app", "premium_monthly", tooManyBasePlanStateRequests); err == nil || !strings.Contains(err.Error(), "base plan state update request count must be less than or equal to 100") {
+		t.Fatalf("unexpected BatchUpdateSubscriptionBasePlanStates count error: %v", err)
 	}
 	if err := c.DeleteSubscriptionBasePlan(context.Background(), "com.example.app", "premium_monthly", ""); err == nil || !strings.Contains(err.Error(), "base plan id is required") {
 		t.Fatalf("unexpected DeleteSubscriptionBasePlan base plan id error: %v", err)

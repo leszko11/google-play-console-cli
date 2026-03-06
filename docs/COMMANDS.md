@@ -77,6 +77,7 @@ make generate-command-docs
 - `gpc apks`
 - `gpc apks list`
 - `gpc apks upload`
+- `gpc apks add-externally-hosted`
 - `gpc bundles`
 - `gpc bundles list`
 - `gpc bundles upload`
@@ -122,6 +123,7 @@ make generate-command-docs
 - `gpc subscriptions base-plans`
 - `gpc subscriptions base-plans activate`
 - `gpc subscriptions base-plans deactivate`
+- `gpc subscriptions base-plans batch-update-states`
 - `gpc subscriptions base-plans delete`
 - `gpc subscriptions base-plans migrate-prices`
 - `gpc subscriptions base-plans batch-migrate-prices`
@@ -164,6 +166,7 @@ make generate-command-docs
 - `gpc iap batch-get`
 - `gpc iap create`
 - `gpc iap update`
+- `gpc iap replace`
 - `gpc iap batch-update`
 - `gpc iap batch-delete`
 - `gpc iap delete`
@@ -1160,8 +1163,9 @@ USAGE
   apks
 
 SUBCOMMANDS
-  list    List APKs in an edit
-  upload  Upload an APK to an edit
+  list                   List APKs in an edit
+  upload                 Upload an APK to an edit
+  add-externally-hosted  Register an externally hosted APK in an edit
 ```
 
 ## `gpc apks list --help`
@@ -1190,6 +1194,21 @@ USAGE
 FLAGS
   -edit-id string       Edit ID
   -file string          Path to .apk file
+  -package-name string  Package name
+```
+
+## `gpc apks add-externally-hosted --help`
+
+```text
+DESCRIPTION
+  Register an externally hosted APK in an edit
+
+USAGE
+  add-externally-hosted
+
+FLAGS
+  -edit-id string       Edit ID
+  -input string         Path to externally hosted APK JSON payload (use - for stdin)
   -package-name string  Package name
 ```
 
@@ -1871,6 +1890,7 @@ USAGE
 SUBCOMMANDS
   activate              Activate a subscription base plan
   deactivate            Deactivate a subscription base plan
+  batch-update-states   Batch update subscription base plan states
   delete                Delete a subscription base plan
   migrate-prices        Migrate legacy cohorts to current prices for one base plan
   batch-migrate-prices  Batch migrate legacy cohorts to current prices across base plans
@@ -1903,6 +1923,22 @@ USAGE
 FLAGS
   -base-plan-id string  Base plan ID
   -confirm=false        Confirm deactivating the base plan (required)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions base-plans batch-update-states --help`
+
+```text
+DESCRIPTION
+  Batch update subscription base plan states
+
+USAGE
+  batch-update-states
+
+FLAGS
+  -confirm=false        Confirm batch-updating base plan states (required)
+  -input string         Path to base plan state update JSON payload (use - for stdin)
   -package-name string  Package name
   -product-id string    Subscription product ID
 ```
@@ -2514,6 +2550,7 @@ SUBCOMMANDS
   batch-get     Get multiple legacy in-app products by SKU
   create        Create a legacy in-app product
   update        Update a legacy in-app product
+  replace       Replace a legacy in-app product
   batch-update  Create or update multiple legacy in-app products
   batch-delete  Delete multiple legacy in-app products
   delete        Delete a legacy in-app product
@@ -2584,6 +2621,21 @@ DESCRIPTION
 
 USAGE
   update
+
+FLAGS
+  -input string         Path to in-app product JSON payload (use - for stdin)
+  -package-name string  Package name
+  -sku string           In-app product SKU
+```
+
+## `gpc iap replace --help`
+
+```text
+DESCRIPTION
+  Replace a legacy in-app product
+
+USAGE
+  replace
 
 FLAGS
   -input string         Path to in-app product JSON payload (use - for stdin)

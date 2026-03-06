@@ -280,25 +280,16 @@ func (c *Client) ActivateSubscriptionBasePlan(ctx context.Context, packageName, 
 		return nil, ErrInvalidCredentials
 	}
 
-	resp, err := c.service.Monetization.Subscriptions.BasePlans.BatchUpdateStates(
+	resp, err := c.service.Monetization.Subscriptions.BasePlans.Activate(
 		packageName,
 		productID,
-		&androidpublisher.BatchUpdateBasePlanStatesRequest{
-			Requests: []*androidpublisher.UpdateBasePlanStateRequest{
-				{
-					ActivateBasePlanRequest: &androidpublisher.ActivateBasePlanRequest{
-						PackageName: packageName,
-						ProductId:   productID,
-						BasePlanId:  basePlanID,
-					},
-				},
-			},
-		},
+		basePlanID,
+		&androidpublisher.ActivateBasePlanRequest{},
 	).Context(ctx).Do()
 	if err != nil {
 		return nil, mapGoogleAPIError(err)
 	}
-	return subscriptionInfosFromSlice(resp.Subscriptions), nil
+	return []SubscriptionInfo{subscriptionInfoFromSubscription(resp)}, nil
 }
 
 func (c *Client) DeactivateSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) ([]SubscriptionInfo, error) {
@@ -318,20 +309,48 @@ func (c *Client) DeactivateSubscriptionBasePlan(ctx context.Context, packageName
 		return nil, ErrInvalidCredentials
 	}
 
+	resp, err := c.service.Monetization.Subscriptions.BasePlans.Deactivate(
+		packageName,
+		productID,
+		basePlanID,
+		&androidpublisher.DeactivateBasePlanRequest{},
+	).Context(ctx).Do()
+	if err != nil {
+		return nil, mapGoogleAPIError(err)
+	}
+	return []SubscriptionInfo{subscriptionInfoFromSubscription(resp)}, nil
+}
+
+func (c *Client) BatchUpdateSubscriptionBasePlanStates(ctx context.Context, packageName, productID string, requests []*androidpublisher.UpdateBasePlanStateRequest) ([]SubscriptionInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return nil, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return nil, fmt.Errorf("product id is required")
+	}
+	filteredRequests := make([]*androidpublisher.UpdateBasePlanStateRequest, 0, len(requests))
+	for _, request := range requests {
+		if request == nil {
+			continue
+		}
+		filteredRequests = append(filteredRequests, request)
+	}
+	if len(filteredRequests) == 0 {
+		return nil, fmt.Errorf("at least one base plan state update request is required")
+	}
+	if len(filteredRequests) > 100 {
+		return nil, fmt.Errorf("base plan state update request count must be less than or equal to 100")
+	}
+	if c == nil || c.service == nil {
+		return nil, ErrInvalidCredentials
+	}
+
 	resp, err := c.service.Monetization.Subscriptions.BasePlans.BatchUpdateStates(
 		packageName,
 		productID,
-		&androidpublisher.BatchUpdateBasePlanStatesRequest{
-			Requests: []*androidpublisher.UpdateBasePlanStateRequest{
-				{
-					DeactivateBasePlanRequest: &androidpublisher.DeactivateBasePlanRequest{
-						PackageName: packageName,
-						ProductId:   productID,
-						BasePlanId:  basePlanID,
-					},
-				},
-			},
-		},
+		&androidpublisher.BatchUpdateBasePlanStatesRequest{Requests: filteredRequests},
 	).Context(ctx).Do()
 	if err != nil {
 		return nil, mapGoogleAPIError(err)

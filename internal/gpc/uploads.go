@@ -126,6 +126,34 @@ func (c *Client) UploadAPK(ctx context.Context, packageName, editID, apkPath str
 	return apkInfoFromAPK(apk), nil
 }
 
+func (c *Client) AddExternallyHostedAPK(ctx context.Context, packageName, editID string, apk *androidpublisher.ExternallyHostedApk) (ExternallyHostedAPKInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return ExternallyHostedAPKInfo{}, fmt.Errorf("package name is required")
+	}
+	editID = strings.TrimSpace(editID)
+	if editID == "" {
+		return ExternallyHostedAPKInfo{}, fmt.Errorf("edit id is required")
+	}
+	if apk == nil {
+		return ExternallyHostedAPKInfo{}, fmt.Errorf("externally hosted apk payload is required")
+	}
+	if strings.TrimSpace(apk.ExternallyHostedUrl) == "" {
+		return ExternallyHostedAPKInfo{}, fmt.Errorf("externally hosted apk url is required")
+	}
+	if c == nil || c.service == nil {
+		return ExternallyHostedAPKInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Edits.Apks.Addexternallyhosted(packageName, editID, &androidpublisher.ApksAddExternallyHostedRequest{
+		ExternallyHostedApk: apk,
+	}).Context(ctx).Do()
+	if err != nil {
+		return ExternallyHostedAPKInfo{}, mapGoogleAPIError(err)
+	}
+	return externallyHostedAPKInfoFromAPK(resp.ExternallyHostedApk), nil
+}
+
 func (c *Client) UploadDeobfuscationFile(ctx context.Context, packageName, editID string, versionCode int64, fileType, filePath string) (DeobfuscationFileInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -194,6 +222,22 @@ func apkInfoFromAPK(apk *androidpublisher.Apk) APKInfo {
 		VersionCode: apk.VersionCode,
 		SHA1:        sha1,
 		SHA256:      sha256,
+	}
+}
+
+func externallyHostedAPKInfoFromAPK(apk *androidpublisher.ExternallyHostedApk) ExternallyHostedAPKInfo {
+	if apk == nil {
+		return ExternallyHostedAPKInfo{}
+	}
+	return ExternallyHostedAPKInfo{
+		ApplicationLabel:    apk.ApplicationLabel,
+		ExternallyHostedURL: apk.ExternallyHostedUrl,
+		FileSize:            apk.FileSize,
+		MinimumSDK:          apk.MinimumSdk,
+		MaximumSDK:          apk.MaximumSdk,
+		PackageName:         apk.PackageName,
+		VersionCode:         apk.VersionCode,
+		VersionName:         apk.VersionName,
 	}
 }
 
