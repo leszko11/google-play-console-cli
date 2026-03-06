@@ -16,9 +16,9 @@ make generate-openapi-coverage
 | Metric | Count |
 | --- | ---: |
 | Total discovery endpoints | 136 |
-| Implemented endpoints | 126 |
-| Missing endpoints | 10 |
-| Detected service method IDs | 126 |
+| Implemented endpoints | 132 |
+| Missing endpoints | 4 |
+| Detected service method IDs | 132 |
 | Unmatched service method IDs | 0 |
 
 ## Family Summary
@@ -50,7 +50,7 @@ make generate-openapi-coverage
 | `orders` | 3 | 0 | 3 |
 | `purchases.products` | 3 | 0 | 3 |
 | `purchases.productsv2` | 1 | 0 | 1 |
-| `purchases.subscriptions` | 0 | 6 | 6 |
+| `purchases.subscriptions` | 6 | 0 | 6 |
 | `purchases.subscriptionsv2` | 4 | 0 | 4 |
 | `purchases.voidedpurchases` | 1 | 0 | 1 |
 | `reviews` | 3 | 0 | 3 |
@@ -71,15 +71,6 @@ make generate-openapi-coverage
 
 - `androidpublisher.monetization.subscriptions.basePlans.activate` | `POST` `androidpublisher/v3/applications/{packageName}/subscriptions/{productId}/basePlans/{basePlanId}:activate`
 - `androidpublisher.monetization.subscriptions.basePlans.deactivate` | `POST` `androidpublisher/v3/applications/{packageName}/subscriptions/{productId}/basePlans/{basePlanId}:deactivate`
-
-### `purchases.subscriptions`
-
-- `androidpublisher.purchases.subscriptions.get` | `GET` `androidpublisher/v3/applications/{packageName}/purchases/subscriptions/{subscriptionId}/tokens/{token}`
-- `androidpublisher.purchases.subscriptions.acknowledge` | `POST` `androidpublisher/v3/applications/{packageName}/purchases/subscriptions/{subscriptionId}/tokens/{token}:acknowledge`
-- `androidpublisher.purchases.subscriptions.cancel` | `POST` `androidpublisher/v3/applications/{packageName}/purchases/subscriptions/{subscriptionId}/tokens/{token}:cancel`
-- `androidpublisher.purchases.subscriptions.defer` | `POST` `androidpublisher/v3/applications/{packageName}/purchases/subscriptions/{subscriptionId}/tokens/{token}:defer`
-- `androidpublisher.purchases.subscriptions.refund` | `POST` `androidpublisher/v3/applications/{packageName}/purchases/subscriptions/{subscriptionId}/tokens/{token}:refund`
-- `androidpublisher.purchases.subscriptions.revoke` | `POST` `androidpublisher/v3/applications/{packageName}/purchases/subscriptions/{subscriptionId}/tokens/{token}:revoke`
 
 ## Unmatched Service Method IDs
 

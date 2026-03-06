@@ -132,6 +132,40 @@ func (c *Client) GetSubscriptionPurchase(ctx context.Context, packageName, token
 	return subscriptionPurchaseInfoFromSubscriptionPurchaseV2(purchase), nil
 }
 
+func (c *Client) GetLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token string) (SubscriptionPurchaseInfo, error) {
+	packageName, subscriptionID, token, err := normalizeLegacySubscriptionTarget(packageName, subscriptionID, token)
+	if err != nil {
+		return SubscriptionPurchaseInfo{}, err
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionPurchaseInfo{}, ErrInvalidCredentials
+	}
+
+	purchase, err := c.service.Purchases.Subscriptions.Get(packageName, subscriptionID, token).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionPurchaseInfo{}, mapGoogleAPIError(err)
+	}
+	return subscriptionPurchaseInfoFromLegacySubscriptionPurchase(purchase), nil
+}
+
+func (c *Client) AcknowledgeLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token, developerPayload string) error {
+	packageName, subscriptionID, token, err := normalizeLegacySubscriptionTarget(packageName, subscriptionID, token)
+	if err != nil {
+		return err
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	req := &androidpublisher.SubscriptionPurchasesAcknowledgeRequest{
+		DeveloperPayload: strings.TrimSpace(developerPayload),
+	}
+	if err := c.service.Purchases.Subscriptions.Acknowledge(packageName, subscriptionID, token, req).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
 func (c *Client) CancelSubscriptionPurchase(ctx context.Context, packageName, token, cancellationType string) error {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -158,6 +192,21 @@ func (c *Client) CancelSubscriptionPurchase(ctx context.Context, packageName, to
 		},
 	}
 	if _, err := c.service.Purchases.Subscriptionsv2.Cancel(packageName, token, req).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
+func (c *Client) CancelLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token string) error {
+	packageName, subscriptionID, token, err := normalizeLegacySubscriptionTarget(packageName, subscriptionID, token)
+	if err != nil {
+		return err
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := c.service.Purchases.Subscriptions.Cancel(packageName, subscriptionID, token).Context(ctx).Do(); err != nil {
 		return mapGoogleAPIError(err)
 	}
 	return nil
@@ -199,6 +248,36 @@ func (c *Client) RevokeSubscriptionPurchase(ctx context.Context, packageName, to
 	return nil
 }
 
+func (c *Client) RefundLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token string) error {
+	packageName, subscriptionID, token, err := normalizeLegacySubscriptionTarget(packageName, subscriptionID, token)
+	if err != nil {
+		return err
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := c.service.Purchases.Subscriptions.Refund(packageName, subscriptionID, token).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
+func (c *Client) RevokeLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token string) error {
+	packageName, subscriptionID, token, err := normalizeLegacySubscriptionTarget(packageName, subscriptionID, token)
+	if err != nil {
+		return err
+	}
+	if c == nil || c.service == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := c.service.Purchases.Subscriptions.Revoke(packageName, subscriptionID, token).Context(ctx).Do(); err != nil {
+		return mapGoogleAPIError(err)
+	}
+	return nil
+}
+
 func (c *Client) DeferSubscriptionPurchase(ctx context.Context, packageName, token, etag, deferDuration string, validateOnly bool) (SubscriptionDeferInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -235,6 +314,37 @@ func (c *Client) DeferSubscriptionPurchase(ctx context.Context, packageName, tok
 	}
 
 	return subscriptionDeferInfoFromResponse(resp), nil
+}
+
+func (c *Client) DeferLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token string, expectedExpiryTimeMillis, desiredExpiryTimeMillis int64) (SubscriptionDeferInfo, error) {
+	packageName, subscriptionID, token, err := normalizeLegacySubscriptionTarget(packageName, subscriptionID, token)
+	if err != nil {
+		return SubscriptionDeferInfo{}, err
+	}
+	if expectedExpiryTimeMillis <= 0 {
+		return SubscriptionDeferInfo{}, fmt.Errorf("expected expiry time millis must be greater than zero")
+	}
+	if desiredExpiryTimeMillis <= 0 {
+		return SubscriptionDeferInfo{}, fmt.Errorf("desired expiry time millis must be greater than zero")
+	}
+	if desiredExpiryTimeMillis <= expectedExpiryTimeMillis {
+		return SubscriptionDeferInfo{}, fmt.Errorf("desired expiry time millis must be greater than expected expiry time millis")
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionDeferInfo{}, ErrInvalidCredentials
+	}
+
+	resp, err := c.service.Purchases.Subscriptions.Defer(packageName, subscriptionID, token, &androidpublisher.SubscriptionPurchasesDeferRequest{
+		DeferralInfo: &androidpublisher.SubscriptionDeferralInfo{
+			ExpectedExpiryTimeMillis: expectedExpiryTimeMillis,
+			DesiredExpiryTimeMillis:  desiredExpiryTimeMillis,
+		},
+	}).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionDeferInfo{}, mapGoogleAPIError(err)
+	}
+
+	return subscriptionDeferInfoFromLegacyResponse(resp), nil
 }
 
 func (c *Client) ListVoidedPurchases(ctx context.Context, packageName string, query VoidedPurchasesQuery) (VoidedPurchasesListInfo, error) {
@@ -367,6 +477,28 @@ func subscriptionPurchaseInfoFromSubscriptionPurchaseV2(purchase *androidpublish
 	}
 }
 
+func subscriptionPurchaseInfoFromLegacySubscriptionPurchase(purchase *androidpublisher.SubscriptionPurchase) SubscriptionPurchaseInfo {
+	if purchase == nil {
+		return SubscriptionPurchaseInfo{}
+	}
+
+	var paymentState int64
+	if purchase.PaymentState != nil {
+		paymentState = *purchase.PaymentState
+	}
+
+	return SubscriptionPurchaseInfo{
+		Kind:                 purchase.Kind,
+		LatestOrderID:        purchase.OrderId,
+		AcknowledgementState: legacySubscriptionAcknowledgementState(purchase.AcknowledgementState),
+		RegionCode:           purchase.CountryCode,
+		AutoRenewing:         purchase.AutoRenewing,
+		ExpiryTimeMillis:     purchase.ExpiryTimeMillis,
+		CancelReason:         purchase.CancelReason,
+		PaymentState:         paymentState,
+	}
+}
+
 func subscriptionDeferInfoFromResponse(resp *androidpublisher.DeferSubscriptionPurchaseResponse) SubscriptionDeferInfo {
 	if resp == nil {
 		return SubscriptionDeferInfo{}
@@ -385,6 +517,42 @@ func subscriptionDeferInfoFromResponse(resp *androidpublisher.DeferSubscriptionP
 		})
 	}
 	return result
+}
+
+func subscriptionDeferInfoFromLegacyResponse(resp *androidpublisher.SubscriptionPurchasesDeferResponse) SubscriptionDeferInfo {
+	if resp == nil {
+		return SubscriptionDeferInfo{}
+	}
+	return SubscriptionDeferInfo{
+		NewExpiryTimeMillis: resp.NewExpiryTimeMillis,
+	}
+}
+
+func normalizeLegacySubscriptionTarget(packageName, subscriptionID, token string) (string, string, string, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return "", "", "", fmt.Errorf("package name is required")
+	}
+	subscriptionID = strings.TrimSpace(subscriptionID)
+	if subscriptionID == "" {
+		return "", "", "", fmt.Errorf("subscription id is required")
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", "", "", fmt.Errorf("purchase token is required")
+	}
+	return packageName, subscriptionID, token, nil
+}
+
+func legacySubscriptionAcknowledgementState(state int64) string {
+	switch state {
+	case 1:
+		return "ACKNOWLEDGED"
+	case 0:
+		return "PENDING"
+	default:
+		return fmt.Sprintf("%d", state)
+	}
 }
 
 func voidedPurchasesListInfoFromResponse(resp *androidpublisher.VoidedPurchasesListResponse) VoidedPurchasesListInfo {
