@@ -24,6 +24,11 @@ func TestUploadMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.UploadAPK(context.Background(), "com.example.app", "edit-1", "/tmp/app.apk"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from UploadAPK, got %v", err)
 	}
+	if _, err := c.AddExternallyHostedAPK(context.Background(), "com.example.app", "edit-1", &androidpublisher.ExternallyHostedApk{
+		ExternallyHostedUrl: "https://example.com/app.apk",
+	}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from AddExternallyHostedAPK, got %v", err)
+	}
 	if _, err := c.UploadDeobfuscationFile(context.Background(), "com.example.app", "edit-1", 1, "proguard", "/tmp/mapping.txt"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from UploadDeobfuscationFile, got %v", err)
 	}
@@ -49,6 +54,12 @@ func TestUploadMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.UploadAPK(context.Background(), "com.example.app", "edit-1", ""); err == nil || !strings.Contains(err.Error(), "apk path is required") {
 		t.Fatalf("unexpected UploadAPK error: %v", err)
+	}
+	if _, err := c.AddExternallyHostedAPK(context.Background(), "com.example.app", "edit-1", nil); err == nil || !strings.Contains(err.Error(), "externally hosted apk payload is required") {
+		t.Fatalf("unexpected AddExternallyHostedAPK payload error: %v", err)
+	}
+	if _, err := c.AddExternallyHostedAPK(context.Background(), "com.example.app", "edit-1", &androidpublisher.ExternallyHostedApk{}); err == nil || !strings.Contains(err.Error(), "externally hosted apk url is required") {
+		t.Fatalf("unexpected AddExternallyHostedAPK url error: %v", err)
 	}
 	if _, err := c.UploadDeobfuscationFile(context.Background(), "com.example.app", "edit-1", 0, "proguard", "/tmp/mapping.txt"); err == nil || !strings.Contains(err.Error(), "version code must be greater than zero") {
 		t.Fatalf("unexpected UploadDeobfuscationFile version code error: %v", err)
@@ -105,6 +116,22 @@ func TestAPKInfoFromAPK_NilBinary(t *testing.T) {
 	})
 	if got.VersionCode != 11 || got.SHA1 != "" || got.SHA256 != "" {
 		t.Fatalf("unexpected apk map for nil binary: %+v", got)
+	}
+}
+
+func TestExternallyHostedAPKInfoFromAPK(t *testing.T) {
+	got := externallyHostedAPKInfoFromAPK(&androidpublisher.ExternallyHostedApk{
+		ApplicationLabel:    "Example App",
+		ExternallyHostedUrl: "https://example.com/app.apk",
+		FileSize:            12345,
+		MinimumSdk:          24,
+		MaximumSdk:          34,
+		PackageName:         "com.example.app",
+		VersionCode:         77,
+		VersionName:         "1.2.3",
+	})
+	if got.VersionCode != 77 || got.PackageName != "com.example.app" || got.ExternallyHostedURL != "https://example.com/app.apk" {
+		t.Fatalf("unexpected externally hosted apk mapping: %+v", got)
 	}
 }
 

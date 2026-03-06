@@ -27,6 +27,7 @@ type Client interface {
 	ArchiveSubscription(ctx context.Context, packageName, productID string) error
 	ActivateSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) ([]gpc.SubscriptionInfo, error)
 	DeactivateSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) ([]gpc.SubscriptionInfo, error)
+	BatchUpdateSubscriptionBasePlanStates(ctx context.Context, packageName, productID string, requests []*androidpublisher.UpdateBasePlanStateRequest) ([]gpc.SubscriptionInfo, error)
 	DeleteSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) error
 	MigrateSubscriptionBasePlanPrices(ctx context.Context, packageName, productID, basePlanID string, request *androidpublisher.MigrateBasePlanPricesRequest) error
 	BatchMigrateSubscriptionBasePlanPrices(ctx context.Context, packageName, productID string, requests []*androidpublisher.MigrateBasePlanPricesRequest) (int, error)
@@ -396,6 +397,7 @@ func newBasePlansCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newBasePlansActivateCommand(deps),
 			newBasePlansDeactivateCommand(deps),
+			newBasePlansBatchUpdateStatesCommand(deps),
 			newBasePlansDeleteCommand(deps),
 			newBasePlansMigratePricesCommand(deps),
 			newBasePlansBatchMigratePricesCommand(deps),
@@ -489,6 +491,54 @@ func newBasePlansDeactivateCommand(deps Deps) *ffcli.Command {
 				"basePlanId":    basePlanID,
 				"subscriptions": subscriptions,
 				"status":        "deactivated",
+			})
+		},
+	}
+}
+
+func newBasePlansBatchUpdateStatesCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("batch-update-states", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, productID, inputPath string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.StringVar(&inputPath, "input", "", "Path to base plan state update JSON payload (use - for stdin)")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm batch-updating base plan states (required)")
+
+	return &ffcli.Command{
+		Name:      "batch-update-states",
+		ShortHelp: "Batch update subscription base plan states",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			productID = strings.TrimSpace(productID)
+			if productID == "" {
+				return fmt.Errorf("--product-id is required")
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to batch-update subscription base plan states")
+			}
+			payload, err := readSubscriptionBasePlansBatchUpdateStatesPayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			subscriptions, err := client.BatchUpdateSubscriptionBasePlanStates(requestCtx, pkg, productID, payload.Requests)
+			if err != nil {
+				return fmt.Errorf("failed to batch-update subscription base plan states: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":   pkg,
+				"productId":     productID,
+				"subscriptions": subscriptions,
+				"updatedCount":  len(subscriptions),
+				"status":        "updated",
 			})
 		},
 	}
@@ -1285,6 +1335,31 @@ func readSubscriptionOffersBatchUpdateStatesPayload(inputPath string, stdin io.R
 	var payload androidpublisher.BatchUpdateSubscriptionOfferStatesRequest
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return nil, fmt.Errorf("invalid subscription offers batch state update JSON payload: %w", err)
+	}
+	return &payload, nil
+}
+
+func readSubscriptionBasePlansBatchUpdateStatesPayload(inputPath string, stdin io.Reader) (*androidpublisher.BatchUpdateBasePlanStatesRequest, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return nil, fmt.Errorf("--input is required")
+	}
+	var data []byte
+	var err error
+	if inputPath == "-" {
+		data, err = io.ReadAll(stdin)
+	} else {
+		data, err = os.ReadFile(inputPath)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read base plan state update payload: %w", err)
+	}
+	var payload androidpublisher.BatchUpdateBasePlanStatesRequest
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, fmt.Errorf("failed to decode base plan state update payload: %w", err)
+	}
+	if len(payload.Requests) == 0 {
+		return nil, fmt.Errorf("base plan state update payload must contain at least one request")
 	}
 	return &payload, nil
 }

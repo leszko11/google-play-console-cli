@@ -23,6 +23,7 @@ type Client interface {
 	CreateIAP(ctx context.Context, packageName string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
 	BatchUpdateIAPs(ctx context.Context, packageName string, requests []*androidpublisher.InappproductsUpdateRequest) (gpc.IAPsListInfo, error)
 	UpdateIAP(ctx context.Context, packageName, sku string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
+	PatchIAP(ctx context.Context, packageName, sku string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
 	BatchDeleteIAPs(ctx context.Context, packageName string, requests []*androidpublisher.InappproductsDeleteRequest) error
 	DeleteIAP(ctx context.Context, packageName, sku string) error
 }
@@ -47,6 +48,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newBatchGetCommand(deps),
 			newCreateCommand(deps),
 			newUpdateCommand(deps),
+			newReplaceCommand(deps),
 			newBatchUpdateCommand(deps),
 			newBatchDeleteCommand(deps),
 			newDeleteCommand(deps),
@@ -245,7 +247,7 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 			if err != nil {
 				return err
 			}
-			updated, err := client.UpdateIAP(requestCtx, pkg, sku, product)
+			updated, err := client.PatchIAP(requestCtx, pkg, sku, product)
 			if err != nil {
 				return fmt.Errorf("failed to update in-app product: %w", err)
 			}
@@ -253,6 +255,47 @@ func newUpdateCommand(deps Deps) *ffcli.Command {
 				"packageName": pkg,
 				"product":     updated,
 				"status":      "updated",
+			})
+		},
+	}
+}
+
+func newReplaceCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("replace", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, sku, inputPath string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&sku, "sku", "", "In-app product SKU")
+	fs.StringVar(&inputPath, "input", "", "Path to in-app product JSON payload (use - for stdin)")
+
+	return &ffcli.Command{
+		Name:      "replace",
+		ShortHelp: "Replace a legacy in-app product",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			sku = strings.TrimSpace(sku)
+			if sku == "" {
+				return fmt.Errorf("--sku is required")
+			}
+			product, err := readIAPPayload(inputPath, os.Stdin)
+			if err != nil {
+				return err
+			}
+			updated, err := client.UpdateIAP(requestCtx, pkg, sku, product)
+			if err != nil {
+				return fmt.Errorf("failed to replace in-app product: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"product":     updated,
+				"status":      "replaced",
 			})
 		},
 	}

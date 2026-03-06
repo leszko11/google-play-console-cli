@@ -27,6 +27,8 @@ type fakeClient struct {
 	createErr      error
 	batchUpdate    gpc.IAPsListInfo
 	batchUpdateErr error
+	patch          gpc.IAPInfo
+	patchErr       error
 	update         gpc.IAPInfo
 	updateErr      error
 	batchDeleteErr error
@@ -35,6 +37,7 @@ type fakeClient struct {
 	createFn      func(packageName string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
 	batchGetFn    func(packageName string, skus []string) (gpc.IAPsListInfo, error)
 	batchUpdateFn func(packageName string, requests []*androidpublisher.InappproductsUpdateRequest) (gpc.IAPsListInfo, error)
+	patchFn       func(packageName, sku string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
 	updateFn      func(packageName, sku string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error)
 	batchDeleteFn func(packageName string, requests []*androidpublisher.InappproductsDeleteRequest) error
 	capture       *iapListCapture
@@ -79,6 +82,13 @@ func (f fakeClient) UpdateIAP(_ context.Context, packageName, sku string, produc
 		return f.updateFn(packageName, sku, product)
 	}
 	return f.update, f.updateErr
+}
+
+func (f fakeClient) PatchIAP(_ context.Context, packageName, sku string, product *androidpublisher.InAppProduct) (gpc.IAPInfo, error) {
+	if f.patchFn != nil {
+		return f.patchFn(packageName, sku, product)
+	}
+	return f.patch, f.patchErr
 }
 
 func (f fakeClient) BatchDeleteIAPs(_ context.Context, packageName string, requests []*androidpublisher.InappproductsDeleteRequest) error {
@@ -263,7 +273,7 @@ func TestIAPUpdate_ReturnsUpdated(t *testing.T) {
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return fakeClient{
-				updateFn: func(packageName, sku string, _ *androidpublisher.InAppProduct) (gpc.IAPInfo, error) {
+				patchFn: func(packageName, sku string, _ *androidpublisher.InAppProduct) (gpc.IAPInfo, error) {
 					if packageName != "com.example.app" || sku != "coins_100" {
 						t.Fatalf("unexpected args: package=%q sku=%q", packageName, sku)
 					}
@@ -285,6 +295,38 @@ func TestIAPUpdate_ReturnsUpdated(t *testing.T) {
 		t.Fatalf("command failed: %v", err)
 	}
 	if !strings.Contains(out, `"status":"updated"`) || !strings.Contains(out, `"sku":"coins_100"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestIAPReplace_ReturnsReplaced(t *testing.T) {
+	inputPath := writeJSON(t, `{"status":"active"}`)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				updateFn: func(packageName, sku string, _ *androidpublisher.InAppProduct) (gpc.IAPInfo, error) {
+					if packageName != "com.example.app" || sku != "coins_100" {
+						t.Fatalf("unexpected args: package=%q sku=%q", packageName, sku)
+					}
+					return gpc.IAPInfo{PackageName: packageName, SKU: sku, Status: "active"}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runIAP(
+		t,
+		deps,
+		"replace",
+		"--package-name", "com.example.app",
+		"--sku", "coins_100",
+		"--input", inputPath,
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"replaced"`) || !strings.Contains(out, `"sku":"coins_100"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }

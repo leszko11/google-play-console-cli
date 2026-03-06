@@ -318,6 +318,17 @@ type APKInfo struct {
 	SHA256      string `json:"sha256,omitempty"`
 }
 
+type ExternallyHostedAPKInfo struct {
+	ApplicationLabel    string `json:"applicationLabel,omitempty"`
+	ExternallyHostedURL string `json:"externallyHostedUrl,omitempty"`
+	FileSize            int64  `json:"fileSize,omitempty"`
+	MinimumSDK          int64  `json:"minimumSdk,omitempty"`
+	MaximumSDK          int64  `json:"maximumSdk,omitempty"`
+	PackageName         string `json:"packageName,omitempty"`
+	VersionCode         int64  `json:"versionCode,omitempty"`
+	VersionName         string `json:"versionName,omitempty"`
+}
+
 type InternalSharingArtifactInfo struct {
 	DownloadURL            string `json:"downloadUrl,omitempty"`
 	CertificateFingerprint string `json:"certificateFingerprint,omitempty"`
