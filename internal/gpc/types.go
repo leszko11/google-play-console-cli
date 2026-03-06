@@ -227,6 +227,10 @@ type SubscriptionPurchaseInfo struct {
 	RegionCode           string `json:"regionCode,omitempty"`
 	StartTime            string `json:"startTime,omitempty"`
 	LineItemCount        int    `json:"lineItemCount,omitempty"`
+	AutoRenewing         bool   `json:"autoRenewing,omitempty"`
+	ExpiryTimeMillis     int64  `json:"expiryTimeMillis,omitempty"`
+	CancelReason         int64  `json:"cancelReason,omitempty"`
+	PaymentState         int64  `json:"paymentState,omitempty"`
 }
 
 type SubscriptionItemExpiryInfo struct {
@@ -236,6 +240,7 @@ type SubscriptionItemExpiryInfo struct {
 
 type SubscriptionDeferInfo struct {
 	ItemExpiryTimeDetails []SubscriptionItemExpiryInfo `json:"itemExpiryTimeDetails,omitempty"`
+	NewExpiryTimeMillis   int64                        `json:"newExpiryTimeMillis,omitempty"`
 }
 
 type VoidedPurchaseInfo struct {

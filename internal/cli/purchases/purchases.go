@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
@@ -25,6 +26,12 @@ type Client interface {
 	CancelSubscriptionPurchase(ctx context.Context, packageName, token, cancellationType string) error
 	DeferSubscriptionPurchase(ctx context.Context, packageName, token, etag, deferDuration string, validateOnly bool) (gpc.SubscriptionDeferInfo, error)
 	RevokeSubscriptionPurchase(ctx context.Context, packageName, token, refundType string) error
+	GetLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token string) (gpc.SubscriptionPurchaseInfo, error)
+	AcknowledgeLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token, developerPayload string) error
+	CancelLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token string) error
+	DeferLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token string, expectedExpiryTimeMillis, desiredExpiryTimeMillis int64) (gpc.SubscriptionDeferInfo, error)
+	RefundLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token string) error
+	RevokeLegacySubscriptionPurchase(ctx context.Context, packageName, subscriptionID, token string) error
 
 	ListVoidedPurchases(ctx context.Context, packageName string, query gpc.VoidedPurchasesQuery) (gpc.VoidedPurchasesListInfo, error)
 }
@@ -47,6 +54,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newProductsCommand(deps),
 			newProductsV2Command(deps),
 			newSubscriptionsCommand(deps),
+			newSubscriptionsLegacyCommand(deps),
 			newVoidedCommand(deps),
 		},
 	}
@@ -282,6 +290,22 @@ func newSubscriptionsCommand(deps Deps) *ffcli.Command {
 	}
 }
 
+func newSubscriptionsLegacyCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "subscriptions-legacy",
+		ShortHelp: "Inspect and mutate legacy subscription purchases",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newSubscriptionsLegacyGetCommand(deps),
+			newSubscriptionsLegacyAcknowledgeCommand(deps),
+			newSubscriptionsLegacyCancelCommand(deps),
+			newSubscriptionsLegacyDeferCommand(deps),
+			newSubscriptionsLegacyRefundCommand(deps),
+			newSubscriptionsLegacyRevokeCommand(deps),
+		},
+	}
+}
+
 func newSubscriptionsGetCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
@@ -469,6 +493,282 @@ func newSubscriptionsDeferCommand(deps Deps) *ffcli.Command {
 	}
 }
 
+func newSubscriptionsLegacyGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, subscriptionID, token string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&subscriptionID, "subscription-id", "", "Legacy subscription product ID")
+	fs.StringVar(&token, "token", "", "Purchase token")
+
+	return &ffcli.Command{
+		Name:      "get",
+		ShortHelp: "Get legacy subscription purchase details",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			subscriptionID, token, err = requireSubscriptionLegacyTarget(subscriptionID, token)
+			if err != nil {
+				return err
+			}
+
+			purchase, err := client.GetLegacySubscriptionPurchase(requestCtx, pkg, subscriptionID, token)
+			if err != nil {
+				return wrapPurchaseEndpointError("failed to get legacy subscription purchase", err)
+			}
+
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"api":            "legacy",
+				"packageName":    pkg,
+				"subscriptionId": subscriptionID,
+				"purchase":       purchase,
+			})
+		},
+	}
+}
+
+func newSubscriptionsLegacyAcknowledgeCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("acknowledge", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, subscriptionID, token, developerPayload string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&subscriptionID, "subscription-id", "", "Legacy subscription product ID")
+	fs.StringVar(&token, "token", "", "Purchase token")
+	fs.StringVar(&developerPayload, "developer-payload", "", "Optional developer payload")
+
+	return &ffcli.Command{
+		Name:      "acknowledge",
+		ShortHelp: "Acknowledge a legacy subscription purchase",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			subscriptionID, token, err = requireSubscriptionLegacyTarget(subscriptionID, token)
+			if err != nil {
+				return err
+			}
+
+			if err := client.AcknowledgeLegacySubscriptionPurchase(requestCtx, pkg, subscriptionID, token, developerPayload); err != nil {
+				return wrapPurchaseEndpointError("failed to acknowledge legacy subscription purchase", err)
+			}
+
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"api":            "legacy",
+				"packageName":    pkg,
+				"subscriptionId": subscriptionID,
+				"token":          token,
+				"status":         "acknowledged",
+			})
+		},
+	}
+}
+
+func newSubscriptionsLegacyCancelCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("cancel", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, subscriptionID, token string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&subscriptionID, "subscription-id", "", "Legacy subscription product ID")
+	fs.StringVar(&token, "token", "", "Purchase token")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm canceling the legacy subscription purchase (required)")
+
+	return &ffcli.Command{
+		Name:      "cancel",
+		ShortHelp: "Cancel a legacy subscription purchase",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			subscriptionID, token, err = requireSubscriptionLegacyTarget(subscriptionID, token)
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to cancel legacy subscription purchase %q", token)
+			}
+
+			if err := client.CancelLegacySubscriptionPurchase(requestCtx, pkg, subscriptionID, token); err != nil {
+				return wrapPurchaseEndpointError("failed to cancel legacy subscription purchase", err)
+			}
+
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"api":            "legacy",
+				"packageName":    pkg,
+				"subscriptionId": subscriptionID,
+				"token":          token,
+				"status":         "canceled",
+			})
+		},
+	}
+}
+
+func newSubscriptionsLegacyDeferCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("defer", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, subscriptionID, token string
+	var expectedExpiryTimeMillis, desiredExpiryTimeMillis string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&subscriptionID, "subscription-id", "", "Legacy subscription product ID")
+	fs.StringVar(&token, "token", "", "Purchase token")
+	fs.StringVar(&expectedExpiryTimeMillis, "expected-expiry-time-millis", "", "Current expiry time in milliseconds since epoch")
+	fs.StringVar(&desiredExpiryTimeMillis, "desired-expiry-time-millis", "", "Desired next expiry time in milliseconds since epoch")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deferring the legacy subscription purchase (required)")
+
+	return &ffcli.Command{
+		Name:      "defer",
+		ShortHelp: "Defer a legacy subscription renewal",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			subscriptionID, token, err = requireSubscriptionLegacyTarget(subscriptionID, token)
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to defer legacy subscription purchase %q", token)
+			}
+			expectedMillis, err := parsePositiveMillisFlag("--expected-expiry-time-millis", expectedExpiryTimeMillis)
+			if err != nil {
+				return err
+			}
+			desiredMillis, err := parsePositiveMillisFlag("--desired-expiry-time-millis", desiredExpiryTimeMillis)
+			if err != nil {
+				return err
+			}
+
+			result, err := client.DeferLegacySubscriptionPurchase(requestCtx, pkg, subscriptionID, token, expectedMillis, desiredMillis)
+			if err != nil {
+				return wrapPurchaseEndpointError("failed to defer legacy subscription purchase", err)
+			}
+
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"api":                      "legacy",
+				"packageName":              pkg,
+				"subscriptionId":           subscriptionID,
+				"token":                    token,
+				"expectedExpiryTimeMillis": expectedMillis,
+				"desiredExpiryTimeMillis":  desiredMillis,
+				"newExpiryTimeMillis":      result.NewExpiryTimeMillis,
+				"status":                   "deferred",
+			})
+		},
+	}
+}
+
+func newSubscriptionsLegacyRefundCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("refund", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, subscriptionID, token string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&subscriptionID, "subscription-id", "", "Legacy subscription product ID")
+	fs.StringVar(&token, "token", "", "Purchase token")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm refunding the legacy subscription purchase (required)")
+
+	return &ffcli.Command{
+		Name:      "refund",
+		ShortHelp: "Refund a legacy subscription purchase",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			subscriptionID, token, err = requireSubscriptionLegacyTarget(subscriptionID, token)
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to refund legacy subscription purchase %q", token)
+			}
+
+			if err := client.RefundLegacySubscriptionPurchase(requestCtx, pkg, subscriptionID, token); err != nil {
+				return wrapPurchaseEndpointError("failed to refund legacy subscription purchase", err)
+			}
+
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"api":            "legacy",
+				"packageName":    pkg,
+				"subscriptionId": subscriptionID,
+				"token":          token,
+				"status":         "refunded",
+			})
+		},
+	}
+}
+
+func newSubscriptionsLegacyRevokeCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("revoke", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, subscriptionID, token string
+	var confirm bool
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&subscriptionID, "subscription-id", "", "Legacy subscription product ID")
+	fs.StringVar(&token, "token", "", "Purchase token")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm revoking the legacy subscription purchase (required)")
+
+	return &ffcli.Command{
+		Name:      "revoke",
+		ShortHelp: "Revoke a legacy subscription purchase",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			subscriptionID, token, err = requireSubscriptionLegacyTarget(subscriptionID, token)
+			if err != nil {
+				return err
+			}
+			if !confirm {
+				return fmt.Errorf("--confirm is required to revoke legacy subscription purchase %q", token)
+			}
+
+			if err := client.RevokeLegacySubscriptionPurchase(requestCtx, pkg, subscriptionID, token); err != nil {
+				return wrapPurchaseEndpointError("failed to revoke legacy subscription purchase", err)
+			}
+
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"api":            "legacy",
+				"packageName":    pkg,
+				"subscriptionId": subscriptionID,
+				"token":          token,
+				"status":         "revoked",
+			})
+		},
+	}
+}
+
 func newVoidedCommand(deps Deps) *ffcli.Command {
 	return &ffcli.Command{
 		Name:      "voided",
@@ -528,6 +828,30 @@ func newVoidedListCommand(deps Deps) *ffcli.Command {
 			})
 		},
 	}
+}
+
+func requireSubscriptionLegacyTarget(subscriptionID, token string) (string, string, error) {
+	subscriptionID = strings.TrimSpace(subscriptionID)
+	if subscriptionID == "" {
+		return "", "", fmt.Errorf("--subscription-id is required")
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", "", fmt.Errorf("--token is required")
+	}
+	return subscriptionID, token, nil
+}
+
+func parsePositiveMillisFlag(flagName, raw string) (int64, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, fmt.Errorf("%s is required", flagName)
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value <= 0 {
+		return 0, fmt.Errorf("%s must be a positive integer", flagName)
+	}
+	return value, nil
 }
 
 func wrapPurchaseEndpointError(prefix string, err error) error {

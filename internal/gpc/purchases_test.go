@@ -27,14 +27,32 @@ func TestPurchaseMethods_RejectMissingClient(t *testing.T) {
 	if _, err := c.GetSubscriptionPurchase(context.Background(), "com.example.app", "token"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from GetSubscriptionPurchase, got %v", err)
 	}
+	if _, err := c.GetLegacySubscriptionPurchase(context.Background(), "com.example.app", "premium_monthly", "token"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from GetLegacySubscriptionPurchase, got %v", err)
+	}
 	if err := c.CancelSubscriptionPurchase(context.Background(), "com.example.app", "token", CancellationTypeUserRequestedStopRenewals); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from CancelSubscriptionPurchase, got %v", err)
+	}
+	if err := c.AcknowledgeLegacySubscriptionPurchase(context.Background(), "com.example.app", "premium_monthly", "token", "payload"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from AcknowledgeLegacySubscriptionPurchase, got %v", err)
+	}
+	if err := c.CancelLegacySubscriptionPurchase(context.Background(), "com.example.app", "premium_monthly", "token"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from CancelLegacySubscriptionPurchase, got %v", err)
 	}
 	if err := c.RevokeSubscriptionPurchase(context.Background(), "com.example.app", "token", RevocationRefundTypeFull); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from RevokeSubscriptionPurchase, got %v", err)
 	}
+	if err := c.RefundLegacySubscriptionPurchase(context.Background(), "com.example.app", "premium_monthly", "token"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from RefundLegacySubscriptionPurchase, got %v", err)
+	}
+	if err := c.RevokeLegacySubscriptionPurchase(context.Background(), "com.example.app", "premium_monthly", "token"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from RevokeLegacySubscriptionPurchase, got %v", err)
+	}
 	if _, err := c.DeferSubscriptionPurchase(context.Background(), "com.example.app", "token", "etag-1", "604800s", false); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from DeferSubscriptionPurchase, got %v", err)
+	}
+	if _, err := c.DeferLegacySubscriptionPurchase(context.Background(), "com.example.app", "premium_monthly", "token", 100, 200); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials from DeferLegacySubscriptionPurchase, got %v", err)
 	}
 	if _, err := c.ListVoidedPurchases(context.Background(), "com.example.app", VoidedPurchasesQuery{}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from ListVoidedPurchases, got %v", err)
@@ -62,11 +80,26 @@ func TestPurchaseMethods_ValidateArgs(t *testing.T) {
 	if _, err := c.GetSubscriptionPurchase(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "purchase token is required") {
 		t.Fatalf("unexpected GetSubscriptionPurchase token error: %v", err)
 	}
+	if _, err := c.GetLegacySubscriptionPurchase(context.Background(), "com.example.app", "", "token"); err == nil || !strings.Contains(err.Error(), "subscription id is required") {
+		t.Fatalf("unexpected GetLegacySubscriptionPurchase subscription id error: %v", err)
+	}
 	if err := c.CancelSubscriptionPurchase(context.Background(), "com.example.app", "token", "UNKNOWN"); err == nil || !strings.Contains(err.Error(), "unsupported cancellation type") {
 		t.Fatalf("unexpected CancelSubscriptionPurchase type error: %v", err)
 	}
+	if err := c.AcknowledgeLegacySubscriptionPurchase(context.Background(), "com.example.app", "", "token", "payload"); err == nil || !strings.Contains(err.Error(), "subscription id is required") {
+		t.Fatalf("unexpected AcknowledgeLegacySubscriptionPurchase subscription id error: %v", err)
+	}
+	if err := c.CancelLegacySubscriptionPurchase(context.Background(), "com.example.app", "", "token"); err == nil || !strings.Contains(err.Error(), "subscription id is required") {
+		t.Fatalf("unexpected CancelLegacySubscriptionPurchase subscription id error: %v", err)
+	}
 	if err := c.RevokeSubscriptionPurchase(context.Background(), "com.example.app", "token", "UNKNOWN"); err == nil || !strings.Contains(err.Error(), "unsupported refund type") {
 		t.Fatalf("unexpected RevokeSubscriptionPurchase refund type error: %v", err)
+	}
+	if err := c.RefundLegacySubscriptionPurchase(context.Background(), "com.example.app", "", "token"); err == nil || !strings.Contains(err.Error(), "subscription id is required") {
+		t.Fatalf("unexpected RefundLegacySubscriptionPurchase subscription id error: %v", err)
+	}
+	if err := c.RevokeLegacySubscriptionPurchase(context.Background(), "com.example.app", "", "token"); err == nil || !strings.Contains(err.Error(), "subscription id is required") {
+		t.Fatalf("unexpected RevokeLegacySubscriptionPurchase subscription id error: %v", err)
 	}
 	if _, err := c.DeferSubscriptionPurchase(context.Background(), "com.example.app", "token", "", "P7D", false); err == nil || !strings.Contains(err.Error(), "etag is required") {
 		t.Fatalf("unexpected DeferSubscriptionPurchase etag error: %v", err)
@@ -76,6 +109,12 @@ func TestPurchaseMethods_ValidateArgs(t *testing.T) {
 	}
 	if _, err := c.DeferSubscriptionPurchase(context.Background(), "com.example.app", "token", "etag-1", "P7D", false); err == nil || !strings.Contains(err.Error(), "invalid defer duration format") {
 		t.Fatalf("unexpected DeferSubscriptionPurchase format error: %v", err)
+	}
+	if _, err := c.DeferLegacySubscriptionPurchase(context.Background(), "com.example.app", "premium_monthly", "token", 0, 200); err == nil || !strings.Contains(err.Error(), "expected expiry time millis must be greater than zero") {
+		t.Fatalf("unexpected DeferLegacySubscriptionPurchase expected expiry error: %v", err)
+	}
+	if _, err := c.DeferLegacySubscriptionPurchase(context.Background(), "com.example.app", "premium_monthly", "token", 200, 100); err == nil || !strings.Contains(err.Error(), "desired expiry time millis must be greater than expected expiry time millis") {
+		t.Fatalf("unexpected DeferLegacySubscriptionPurchase desired expiry error: %v", err)
 	}
 	if _, err := c.ListVoidedPurchases(context.Background(), "com.example.app", VoidedPurchasesQuery{MaxResults: -1}); err == nil || !strings.Contains(err.Error(), "max results must be greater than or equal to zero") {
 		t.Fatalf("unexpected ListVoidedPurchases max results error: %v", err)
@@ -131,6 +170,25 @@ func TestSubscriptionPurchaseInfoFromSubscriptionPurchaseV2(t *testing.T) {
 	}
 }
 
+func TestSubscriptionPurchaseInfoFromLegacySubscriptionPurchase(t *testing.T) {
+	paymentState := int64(1)
+	got := subscriptionPurchaseInfoFromLegacySubscriptionPurchase(&androidpublisher.SubscriptionPurchase{
+		Kind:                 "androidpublisher#subscriptionPurchase",
+		OrderId:              "GPA.3",
+		AcknowledgementState: 1,
+		AutoRenewing:         true,
+		CountryCode:          "PL",
+		ExpiryTimeMillis:     123456789,
+		PaymentState:         &paymentState,
+	})
+	if got.LatestOrderID != "GPA.3" || !got.AutoRenewing || got.ExpiryTimeMillis != 123456789 {
+		t.Fatalf("unexpected legacy subscription purchase map: %+v", got)
+	}
+	if got.AcknowledgementState != "ACKNOWLEDGED" || got.RegionCode != "PL" {
+		t.Fatalf("unexpected legacy subscription purchase metadata: %+v", got)
+	}
+}
+
 func TestSubscriptionDeferInfoFromResponse(t *testing.T) {
 	got := subscriptionDeferInfoFromResponse(&androidpublisher.DeferSubscriptionPurchaseResponse{
 		ItemExpiryTimeDetails: []*androidpublisher.ItemExpiryTimeDetails{
@@ -146,6 +204,15 @@ func TestSubscriptionDeferInfoFromResponse(t *testing.T) {
 	}
 	if got.ItemExpiryTimeDetails[1] != (SubscriptionItemExpiryInfo{}) {
 		t.Fatalf("unexpected nil item mapping: %+v", got.ItemExpiryTimeDetails[1])
+	}
+}
+
+func TestLegacySubscriptionDeferInfoFromResponse(t *testing.T) {
+	got := subscriptionDeferInfoFromLegacyResponse(&androidpublisher.SubscriptionPurchasesDeferResponse{
+		NewExpiryTimeMillis: 987654321,
+	})
+	if got.NewExpiryTimeMillis != 987654321 {
+		t.Fatalf("unexpected legacy defer mapping: %+v", got)
 	}
 }
 

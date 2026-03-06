@@ -14,29 +14,40 @@ import (
 )
 
 type fakeClient struct {
-	productPurchase      gpc.ProductPurchaseInfo
-	productPurchaseErr   error
-	productPurchaseV2    gpc.ProductPurchaseV2Info
-	productPurchaseV2Err error
-	ackErr               error
-	consumeErr           error
-	subscriptionPurchase gpc.SubscriptionPurchaseInfo
-	subscriptionErr      error
-	cancelErr            error
-	deferResult          gpc.SubscriptionDeferInfo
-	deferErr             error
-	revokeErr            error
-	voided               gpc.VoidedPurchasesListInfo
-	voidedErr            error
-	capturedProductID    string
-	capturedToken        string
-	capturedPayload      string
-	capturedCancelType   string
-	capturedEtag         string
-	capturedDeferDur     string
-	capturedValidateOnly bool
-	capturedRefundType   string
-	capturedVoidedQuery  gpc.VoidedPurchasesQuery
+	productPurchase        gpc.ProductPurchaseInfo
+	productPurchaseErr     error
+	productPurchaseV2      gpc.ProductPurchaseV2Info
+	productPurchaseV2Err   error
+	ackErr                 error
+	consumeErr             error
+	subscriptionPurchase   gpc.SubscriptionPurchaseInfo
+	subscriptionErr        error
+	legacySubscription     gpc.SubscriptionPurchaseInfo
+	legacySubscriptionErr  error
+	cancelErr              error
+	legacyAckErr           error
+	legacyCancelErr        error
+	deferResult            gpc.SubscriptionDeferInfo
+	deferErr               error
+	legacyDeferResult      gpc.SubscriptionDeferInfo
+	legacyDeferErr         error
+	revokeErr              error
+	legacyRefundErr        error
+	legacyRevokeErr        error
+	voided                 gpc.VoidedPurchasesListInfo
+	voidedErr              error
+	capturedProductID      string
+	capturedSubscriptionID string
+	capturedToken          string
+	capturedPayload        string
+	capturedCancelType     string
+	capturedEtag           string
+	capturedDeferDur       string
+	capturedExpectedExpiry int64
+	capturedDesiredExpiry  int64
+	capturedValidateOnly   bool
+	capturedRefundType     string
+	capturedVoidedQuery    gpc.VoidedPurchasesQuery
 }
 
 func (f *fakeClient) GetProductPurchase(_ context.Context, _, productID, token string) (gpc.ProductPurchaseInfo, error) {
@@ -68,10 +79,29 @@ func (f *fakeClient) GetSubscriptionPurchase(_ context.Context, _, token string)
 	return f.subscriptionPurchase, f.subscriptionErr
 }
 
+func (f *fakeClient) GetLegacySubscriptionPurchase(_ context.Context, _, subscriptionID, token string) (gpc.SubscriptionPurchaseInfo, error) {
+	f.capturedSubscriptionID = subscriptionID
+	f.capturedToken = token
+	return f.legacySubscription, f.legacySubscriptionErr
+}
+
+func (f *fakeClient) AcknowledgeLegacySubscriptionPurchase(_ context.Context, _, subscriptionID, token, developerPayload string) error {
+	f.capturedSubscriptionID = subscriptionID
+	f.capturedToken = token
+	f.capturedPayload = developerPayload
+	return f.legacyAckErr
+}
+
 func (f *fakeClient) CancelSubscriptionPurchase(_ context.Context, _, token, cancellationType string) error {
 	f.capturedToken = token
 	f.capturedCancelType = cancellationType
 	return f.cancelErr
+}
+
+func (f *fakeClient) CancelLegacySubscriptionPurchase(_ context.Context, _, subscriptionID, token string) error {
+	f.capturedSubscriptionID = subscriptionID
+	f.capturedToken = token
+	return f.legacyCancelErr
 }
 
 func (f *fakeClient) DeferSubscriptionPurchase(_ context.Context, _, token, etag, deferDuration string, validateOnly bool) (gpc.SubscriptionDeferInfo, error) {
@@ -82,10 +112,30 @@ func (f *fakeClient) DeferSubscriptionPurchase(_ context.Context, _, token, etag
 	return f.deferResult, f.deferErr
 }
 
+func (f *fakeClient) DeferLegacySubscriptionPurchase(_ context.Context, _, subscriptionID, token string, expectedExpiryTimeMillis, desiredExpiryTimeMillis int64) (gpc.SubscriptionDeferInfo, error) {
+	f.capturedSubscriptionID = subscriptionID
+	f.capturedToken = token
+	f.capturedExpectedExpiry = expectedExpiryTimeMillis
+	f.capturedDesiredExpiry = desiredExpiryTimeMillis
+	return f.legacyDeferResult, f.legacyDeferErr
+}
+
 func (f *fakeClient) RevokeSubscriptionPurchase(_ context.Context, _, token, refundType string) error {
 	f.capturedToken = token
 	f.capturedRefundType = refundType
 	return f.revokeErr
+}
+
+func (f *fakeClient) RefundLegacySubscriptionPurchase(_ context.Context, _, subscriptionID, token string) error {
+	f.capturedSubscriptionID = subscriptionID
+	f.capturedToken = token
+	return f.legacyRefundErr
+}
+
+func (f *fakeClient) RevokeLegacySubscriptionPurchase(_ context.Context, _, subscriptionID, token string) error {
+	f.capturedSubscriptionID = subscriptionID
+	f.capturedToken = token
+	return f.legacyRevokeErr
 }
 
 func (f *fakeClient) ListVoidedPurchases(_ context.Context, _ string, query gpc.VoidedPurchasesQuery) (gpc.VoidedPurchasesListInfo, error) {
@@ -278,6 +328,119 @@ func TestPurchasesSubscriptionsDefer_ValidateOnly(t *testing.T) {
 	}
 	if !fc.capturedValidateOnly || fc.capturedEtag != "etag-1" || fc.capturedDeferDur != "604800s" {
 		t.Fatalf("unexpected defer args: validateOnly=%v etag=%s deferDuration=%s", fc.capturedValidateOnly, fc.capturedEtag, fc.capturedDeferDur)
+	}
+}
+
+func TestPurchasesSubscriptionsLegacyGet_ReturnsPurchase(t *testing.T) {
+	fc := &fakeClient{
+		legacySubscription: gpc.SubscriptionPurchaseInfo{LatestOrderID: "GPA.legacy.1", AutoRenewing: true},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runPurchases(
+		t,
+		deps,
+		"subscriptions-legacy", "get",
+		"--package-name", "com.example.app",
+		"--subscription-id", "premium_monthly",
+		"--token", "tok-legacy",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"latestOrderId":"GPA.legacy.1"`) || !strings.Contains(out, `"api":"legacy"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.capturedSubscriptionID != "premium_monthly" || fc.capturedToken != "tok-legacy" {
+		t.Fatalf("unexpected legacy get args: subscriptionId=%s token=%s", fc.capturedSubscriptionID, fc.capturedToken)
+	}
+}
+
+func TestPurchasesSubscriptionsLegacyAcknowledge_ReturnsStatus(t *testing.T) {
+	fc := &fakeClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runPurchases(
+		t,
+		deps,
+		"subscriptions-legacy", "acknowledge",
+		"--package-name", "com.example.app",
+		"--subscription-id", "premium_monthly",
+		"--token", "tok-legacy",
+		"--developer-payload", "payload-1",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"acknowledged"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.capturedPayload != "payload-1" {
+		t.Fatalf("unexpected payload: %s", fc.capturedPayload)
+	}
+}
+
+func TestPurchasesSubscriptionsLegacyRefund_RequiresConfirm(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runPurchases(
+		t,
+		deps,
+		"subscriptions-legacy", "refund",
+		"--package-name", "com.example.app",
+		"--subscription-id", "premium_monthly",
+		"--token", "tok-legacy",
+	)
+	if err == nil || !strings.Contains(err.Error(), "--confirm is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPurchasesSubscriptionsLegacyDefer_ReturnsStatus(t *testing.T) {
+	fc := &fakeClient{
+		legacyDeferResult: gpc.SubscriptionDeferInfo{NewExpiryTimeMillis: 987654321},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runPurchases(
+		t,
+		deps,
+		"subscriptions-legacy", "defer",
+		"--package-name", "com.example.app",
+		"--subscription-id", "premium_monthly",
+		"--token", "tok-legacy",
+		"--expected-expiry-time-millis", "1700000000000",
+		"--desired-expiry-time-millis", "1700600000000",
+		"--confirm",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"deferred"`) || !strings.Contains(out, `"newExpiryTimeMillis":987654321`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.capturedExpectedExpiry != 1700000000000 || fc.capturedDesiredExpiry != 1700600000000 {
+		t.Fatalf("unexpected legacy defer args: expected=%d desired=%d", fc.capturedExpectedExpiry, fc.capturedDesiredExpiry)
 	}
 }
 

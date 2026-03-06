@@ -179,6 +179,13 @@ make generate-command-docs
 - `gpc purchases subscriptions cancel`
 - `gpc purchases subscriptions defer`
 - `gpc purchases subscriptions revoke`
+- `gpc purchases subscriptions-legacy`
+- `gpc purchases subscriptions-legacy get`
+- `gpc purchases subscriptions-legacy acknowledge`
+- `gpc purchases subscriptions-legacy cancel`
+- `gpc purchases subscriptions-legacy defer`
+- `gpc purchases subscriptions-legacy refund`
+- `gpc purchases subscriptions-legacy revoke`
 - `gpc purchases voided`
 - `gpc purchases voided list`
 - `gpc users`
@@ -2638,10 +2645,11 @@ USAGE
   purchases
 
 SUBCOMMANDS
-  products       Inspect and mutate one-time product purchases
-  products-v2    Inspect one-time product purchases via Purchases.Productsv2
-  subscriptions  Inspect and mutate subscription purchases
-  voided         Inspect voided purchases
+  products              Inspect and mutate one-time product purchases
+  products-v2           Inspect one-time product purchases via Purchases.Productsv2
+  subscriptions         Inspect and mutate subscription purchases
+  subscriptions-legacy  Inspect and mutate legacy subscription purchases
+  voided                Inspect voided purchases
 ```
 
 ## `gpc purchases products --help`
@@ -2811,6 +2819,121 @@ FLAGS
   -package-name string  Package name
   -refund-type full     Refund type: full or prorated
   -token string         Purchase token
+```
+
+## `gpc purchases subscriptions-legacy --help`
+
+```text
+DESCRIPTION
+  Inspect and mutate legacy subscription purchases
+
+USAGE
+  subscriptions-legacy
+
+SUBCOMMANDS
+  get          Get legacy subscription purchase details
+  acknowledge  Acknowledge a legacy subscription purchase
+  cancel       Cancel a legacy subscription purchase
+  defer        Defer a legacy subscription renewal
+  refund       Refund a legacy subscription purchase
+  revoke       Revoke a legacy subscription purchase
+```
+
+## `gpc purchases subscriptions-legacy get --help`
+
+```text
+DESCRIPTION
+  Get legacy subscription purchase details
+
+USAGE
+  get
+
+FLAGS
+  -package-name string     Package name
+  -subscription-id string  Legacy subscription product ID
+  -token string            Purchase token
+```
+
+## `gpc purchases subscriptions-legacy acknowledge --help`
+
+```text
+DESCRIPTION
+  Acknowledge a legacy subscription purchase
+
+USAGE
+  acknowledge
+
+FLAGS
+  -developer-payload string  Optional developer payload
+  -package-name string       Package name
+  -subscription-id string    Legacy subscription product ID
+  -token string              Purchase token
+```
+
+## `gpc purchases subscriptions-legacy cancel --help`
+
+```text
+DESCRIPTION
+  Cancel a legacy subscription purchase
+
+USAGE
+  cancel
+
+FLAGS
+  -confirm=false           Confirm canceling the legacy subscription purchase (required)
+  -package-name string     Package name
+  -subscription-id string  Legacy subscription product ID
+  -token string            Purchase token
+```
+
+## `gpc purchases subscriptions-legacy defer --help`
+
+```text
+DESCRIPTION
+  Defer a legacy subscription renewal
+
+USAGE
+  defer
+
+FLAGS
+  -confirm=false                       Confirm deferring the legacy subscription purchase (required)
+  -desired-expiry-time-millis string   Desired next expiry time in milliseconds since epoch
+  -expected-expiry-time-millis string  Current expiry time in milliseconds since epoch
+  -package-name string                 Package name
+  -subscription-id string              Legacy subscription product ID
+  -token string                        Purchase token
+```
+
+## `gpc purchases subscriptions-legacy refund --help`
+
+```text
+DESCRIPTION
+  Refund a legacy subscription purchase
+
+USAGE
+  refund
+
+FLAGS
+  -confirm=false           Confirm refunding the legacy subscription purchase (required)
+  -package-name string     Package name
+  -subscription-id string  Legacy subscription product ID
+  -token string            Purchase token
+```
+
+## `gpc purchases subscriptions-legacy revoke --help`
+
+```text
+DESCRIPTION
+  Revoke a legacy subscription purchase
+
+USAGE
+  revoke
+
+FLAGS
+  -confirm=false           Confirm revoking the legacy subscription purchase (required)
+  -package-name string     Package name
+  -subscription-id string  Legacy subscription product ID
+  -token string            Purchase token
 ```
 
 ## `gpc purchases voided --help`
