@@ -98,6 +98,9 @@ make generate-command-docs
 - `gpc system-apks get`
 - `gpc system-apks create`
 - `gpc system-apks download`
+- `gpc generated-apks`
+- `gpc generated-apks list`
+- `gpc generated-apks download`
 - `gpc subscriptions`
 - `gpc subscriptions list`
 - `gpc subscriptions get`
@@ -209,6 +212,7 @@ SUBCOMMANDS
   external-transactions  Report and refund external transactions
   device-tier-configs    Manage application device tier configs
   system-apks            Manage generated system APK variants
+  generated-apks         List and download APKs generated from bundles
   subscriptions          Manage monetization subscriptions
   products               Manage monetization one-time products
   iap                    Manage legacy in-app products
@@ -1503,6 +1507,50 @@ FLAGS
   -output string        Path to write the downloaded APK
   -package-name string  Package name
   -variant-id 0         System APK variant ID
+  -version-code 0       Version code of the App Bundle
+```
+
+## `gpc generated-apks --help`
+
+```text
+DESCRIPTION
+  List and download APKs generated from bundles
+
+USAGE
+  generated-apks
+
+SUBCOMMANDS
+  list      List generated APK download metadata
+  download  Download one generated APK by download ID
+```
+
+## `gpc generated-apks list --help`
+
+```text
+DESCRIPTION
+  List generated APK download metadata
+
+USAGE
+  list
+
+FLAGS
+  -package-name string  Package name
+  -version-code 0       Version code of the App Bundle
+```
+
+## `gpc generated-apks download --help`
+
+```text
+DESCRIPTION
+  Download one generated APK by download ID
+
+USAGE
+  download
+
+FLAGS
+  -download-id string   Generated APK download ID
+  -output string        Path to write the downloaded APK
+  -package-name string  Package name
   -version-code 0       Version code of the App Bundle
 ```
 
