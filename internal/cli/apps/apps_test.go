@@ -12,9 +12,10 @@ import (
 )
 
 type fakeClient struct {
-	verify map[string]error
-	get    map[string]gpc.AppInfo
-	getErr map[string]error
+	verify          map[string]error
+	get             map[string]gpc.AppInfo
+	getErr          map[string]error
+	setDataSafetyFn func(context.Context, string, string) error
 }
 
 func (f fakeClient) VerifyPackageAccess(_ context.Context, packageName string) error {
@@ -32,6 +33,13 @@ func (f fakeClient) GetApp(_ context.Context, packageName string) (gpc.AppInfo, 
 		return app, nil
 	}
 	return gpc.AppInfo{PackageName: packageName}, nil
+}
+
+func (f fakeClient) SetDataSafety(ctx context.Context, packageName, safetyLabelsCSV string) error {
+	if f.setDataSafetyFn != nil {
+		return f.setDataSafetyFn(ctx, packageName, safetyLabelsCSV)
+	}
+	return nil
 }
 
 func runApps(t *testing.T, deps Deps, args ...string) (string, error) {

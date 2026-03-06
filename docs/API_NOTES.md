@@ -10,6 +10,12 @@ Play API calls fail for packages that were never initialized in Play Console UI.
 - Required first step: upload first APK/AAB once in Play Console UI
 - After bootstrap, API flows (`edits`, `deploy`, `tracks`, etc.) become available
 
+## Data Safety API
+
+- `apps data-safety` writes the Data Safety declaration using the raw CSV contents expected by Play
+- Export the latest template from Play Console before uploading; the endpoint expects the CSV body, not a JSON transform
+- The CLI reads the CSV from `--input` or stdin and sends it as the `safetyLabels` field to Android Publisher
+
 ## Permission Model
 
 Service account credentials are not enough without Play Console permissions.

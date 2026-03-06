@@ -14,6 +14,7 @@ import (
 type Client interface {
 	VerifyPackageAccess(ctx context.Context, packageName string) error
 	GetApp(ctx context.Context, packageName string) (gpc.AppInfo, error)
+	SetDataSafety(ctx context.Context, packageName, safetyLabelsCSV string) error
 }
 
 type Deps struct {
@@ -21,6 +22,7 @@ type Deps struct {
 	SaveConfig func(config.Config) error
 	NewClient  func(context.Context, gpc.CredentialInput) (Client, error)
 	LookupEnv  func(string) string
+	Stdin      io.Reader
 	Stdout     io.Writer
 	Stderr     io.Writer
 }
@@ -35,6 +37,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			NewListCommand(deps),
 			NewGetCommand(deps),
+			NewDataSafetyCommand(deps),
 			NewAddPackageCommand(deps),
 			NewRemovePackageCommand(deps),
 		},
@@ -55,6 +58,9 @@ func withDefaults(deps Deps) Deps {
 	}
 	if deps.LookupEnv == nil {
 		deps.LookupEnv = os.Getenv
+	}
+	if deps.Stdin == nil {
+		deps.Stdin = os.Stdin
 	}
 	if deps.Stdout == nil {
 		deps.Stdout = os.Stdout

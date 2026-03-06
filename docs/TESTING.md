@@ -107,6 +107,7 @@ gpc apps add-package --package-name com.example.app
 gpc apps list --output json
 gpc apps list --verify
 gpc apps get --package-name com.example.app --output json
+gpc apps data-safety --package-name com.example.app --input /path/to/data-safety.csv
 gpc apps remove-package --package-name com.example.app
 gpc edits create --package-name com.example.app
 gpc edits get --package-name com.example.app --edit-id <edit-id>
