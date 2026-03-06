@@ -16,9 +16,9 @@ make generate-openapi-coverage
 | Metric | Count |
 | --- | ---: |
 | Total discovery endpoints | 136 |
-| Implemented endpoints | 121 |
-| Missing endpoints | 15 |
-| Detected service method IDs | 121 |
+| Implemented endpoints | 126 |
+| Missing endpoints | 10 |
+| Detected service method IDs | 126 |
 | Unmatched service method IDs | 0 |
 
 ## Family Summary
@@ -33,12 +33,12 @@ make generate-openapi-coverage
 | `edits.bundles` | 2 | 0 | 2 |
 | `edits.countryavailability` | 1 | 0 | 1 |
 | `edits.deobfuscationfiles` | 1 | 0 | 1 |
-| `edits.details` | 2 | 1 | 3 |
+| `edits.details` | 3 | 0 | 3 |
 | `edits.expansionfiles` | 4 | 0 | 4 |
 | `edits.images` | 4 | 0 | 4 |
-| `edits.listings` | 5 | 1 | 6 |
-| `edits.testers` | 2 | 1 | 3 |
-| `edits.tracks` | 3 | 2 | 5 |
+| `edits.listings` | 6 | 0 | 6 |
+| `edits.testers` | 3 | 0 | 3 |
+| `edits.tracks` | 5 | 0 | 5 |
 | `externaltransactions` | 3 | 0 | 3 |
 | `generatedapks` | 2 | 0 | 2 |
 | `grants` | 3 | 0 | 3 |
@@ -62,23 +62,6 @@ make generate-openapi-coverage
 ### `edits.apks`
 
 - `androidpublisher.edits.apks.addexternallyhosted` | `POST` `androidpublisher/v3/applications/{packageName}/edits/{editId}/apks/externallyHosted`
-
-### `edits.details`
-
-- `androidpublisher.edits.details.update` | `PUT` `androidpublisher/v3/applications/{packageName}/edits/{editId}/details`
-
-### `edits.listings`
-
-- `androidpublisher.edits.listings.update` | `PUT` `androidpublisher/v3/applications/{packageName}/edits/{editId}/listings/{language}`
-
-### `edits.testers`
-
-- `androidpublisher.edits.testers.update` | `PUT` `androidpublisher/v3/applications/{packageName}/edits/{editId}/testers/{track}`
-
-### `edits.tracks`
-
-- `androidpublisher.edits.tracks.patch` | `PATCH` `androidpublisher/v3/applications/{packageName}/edits/{editId}/tracks/{track}`
-- `androidpublisher.edits.tracks.create` | `POST` `androidpublisher/v3/applications/{packageName}/edits/{editId}/tracks`
 
 ### `inappproducts`
 
