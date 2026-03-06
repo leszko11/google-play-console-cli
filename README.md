@@ -21,6 +21,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Orders API support (`orders get/batch-get/refund`)
 - External transactions API support (`external-transactions get/create/refund`)
 - Device tier config support (`device-tier-configs list/get/create`)
+- System APK variant support (`system-apks list/get/create/download`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Monetization one-time product commands (`products ...`)
 - Legacy in-app product commands (`iap ...`)
@@ -166,6 +167,12 @@ gpc device-tier-configs list --package-name com.example.app --page-size 100
 gpc device-tier-configs get --package-name com.example.app --device-tier-config-id 123
 gpc device-tier-configs create --package-name com.example.app --input /path/to/device-tier-config.json
 gpc device-tier-configs create --package-name com.example.app --input /path/to/device-tier-config.json --allow-unknown-devices
+
+# Manage generated system APK variants for one bundle version
+gpc system-apks list --package-name com.example.app --version-code 123
+gpc system-apks get --package-name com.example.app --version-code 123 --variant-id 7
+gpc system-apks create --package-name com.example.app --version-code 123 --input /path/to/system-apk-variant.json
+gpc system-apks download --package-name com.example.app --version-code 123 --variant-id 7 --output /tmp/system.apk
 
 # List/get subscription products
 gpc subscriptions list --package-name com.example.app --page-size 100
@@ -448,6 +455,7 @@ gpc reviews --help
 gpc orders --help
 gpc external-transactions --help
 gpc device-tier-configs --help
+gpc system-apks --help
 gpc subscriptions --help
 gpc products --help
 gpc iap --help
