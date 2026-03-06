@@ -18,6 +18,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - End-to-end deploy orchestration (`deploy`)
 - Staging release workflows (`release verify`, `release alpha`)
 - Reviews management (`reviews list/get/reply`)
+- Google Play Developer Reporting vitals queries (`reports vitals get/query`)
 - Orders API support (`orders get/batch-get/refund`)
 - External transactions API support (`external-transactions get/create/refund`)
 - Device tier config support (`device-tier-configs list/get/create`)
@@ -35,7 +36,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 
 ## Not Yet Implemented
 
-- Reporting surfaces
+- Reporting anomalies, accessible-app discovery, and error issue/report search surfaces
 
 ## Build
 
@@ -95,6 +96,12 @@ gpc apps list --output json
 
 # Fetch app details for one package
 gpc apps get --package-name com.example.app --output json
+
+# Inspect reporting freshness for a vitals metric set
+gpc reports vitals get --package-name com.example.app --metric-set crash-rate
+
+# Query reporting vitals rows from a JSON payload
+gpc reports vitals query --package-name com.example.app --metric-set crash-rate --input /path/to/crash-rate-query.json
 
 # Write the app's Data Safety declaration from the exported Play CSV template
 gpc apps data-safety --package-name com.example.app --input /path/to/data-safety.csv
@@ -468,6 +475,7 @@ gpc deobfuscation --help
 gpc deploy --help
 gpc release --help
 gpc reviews --help
+gpc reports --help
 gpc orders --help
 gpc external-transactions --help
 gpc device-tier-configs --help

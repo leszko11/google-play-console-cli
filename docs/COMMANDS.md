@@ -91,6 +91,10 @@ make generate-command-docs
 - `gpc reviews list`
 - `gpc reviews get`
 - `gpc reviews reply`
+- `gpc reports`
+- `gpc reports vitals`
+- `gpc reports vitals get`
+- `gpc reports vitals query`
 - `gpc orders`
 - `gpc orders get`
 - `gpc orders batch-get`
@@ -228,6 +232,7 @@ SUBCOMMANDS
   deploy                 Upload artifact and publish to a track in one flow
   release                Release workflows for staged Google Play deploys
   reviews                Read and reply to Play Store reviews
+  reports                Google Play Developer Reporting commands
   orders                 Inspect and refund Play orders
   external-transactions  Report and refund external transactions
   device-tier-configs    Manage application device tier configs
@@ -1440,6 +1445,62 @@ FLAGS
   -package-name string  Package name
   -reply-text string    Reply text
   -review-id string     Review ID
+```
+
+## `gpc reports --help`
+
+```text
+DESCRIPTION
+  Google Play Developer Reporting commands
+
+USAGE
+  reports
+
+SUBCOMMANDS
+  vitals  Vitals metric set reporting commands
+```
+
+## `gpc reports vitals --help`
+
+```text
+DESCRIPTION
+  Vitals metric set reporting commands
+
+USAGE
+  vitals
+
+SUBCOMMANDS
+  get    Get vitals metric set freshness metadata
+  query  Query vitals metric set rows
+```
+
+## `gpc reports vitals get --help`
+
+```text
+DESCRIPTION
+  Get vitals metric set freshness metadata
+
+USAGE
+  get
+
+FLAGS
+  -metric-set string    Vitals metric set
+  -package-name string  Package name
+```
+
+## `gpc reports vitals query --help`
+
+```text
+DESCRIPTION
+  Query vitals metric set rows
+
+USAGE
+  query
+
+FLAGS
+  -input string         Path to vitals query JSON payload (use - for stdin)
+  -metric-set string    Vitals metric set
+  -package-name string  Package name
 ```
 
 ## `gpc orders --help`

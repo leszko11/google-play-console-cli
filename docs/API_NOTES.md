@@ -1,6 +1,6 @@
 # Google Play API Notes
 
-Operational caveats and behavior notes for Android Publisher API v3.
+Operational caveats and behavior notes for Android Publisher API v3 and Google Play Developer Reporting API.
 
 ## Package Bootstrap Constraint
 
@@ -115,6 +115,15 @@ For monetization create/update flows:
 - `app-recoveries create` accepts raw Android Publisher `CreateDraftAppRecoveryRequest` JSON and produces a draft recovery action
 - `app-recoveries add-targeting` accepts raw `AddTargetingRequest` JSON and can only expand criteria that were selected at creation time
 - `app-recoveries cancel` and `app-recoveries deploy` are state transitions and require explicit confirmation flags in the CLI
+
+## Developer Reporting API
+
+- `reports vitals get` returns freshness metadata for a single metric set; it does not return rows.
+- `reports vitals query` accepts raw JSON matching the shared vitals query shape: `dimensions`, `filter`, `metrics`, `pageSize`, `pageToken`, `timelineSpec`, and `userCohort`.
+- Daily reporting timelines typically use the metric set's default timezone, which is often `America/Los_Angeles`; hourly reporting uses `UTC`.
+- `slow-start-rate` queries require a `startType` dimension in the payload.
+- `slow-rendering-rate` is only available for games.
+- Reporting access still depends on Play Console app permissions. The generated API requires the app-level `View app information (read-only)` permission for vitals metric sets.
 
 ## Timeouts
 
