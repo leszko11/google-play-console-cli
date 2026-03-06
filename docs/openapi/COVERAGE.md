@@ -16,9 +16,9 @@ make generate-openapi-coverage
 | Metric | Count |
 | --- | ---: |
 | Total discovery endpoints | 136 |
-| Implemented endpoints | 113 |
-| Missing endpoints | 23 |
-| Detected service method IDs | 113 |
+| Implemented endpoints | 115 |
+| Missing endpoints | 21 |
+| Detected service method IDs | 115 |
 | Unmatched service method IDs | 0 |
 
 ## Family Summary
@@ -40,7 +40,7 @@ make generate-openapi-coverage
 | `edits.testers` | 2 | 1 | 3 |
 | `edits.tracks` | 3 | 2 | 5 |
 | `externaltransactions` | 3 | 0 | 3 |
-| `generatedapks` | 0 | 2 | 2 |
+| `generatedapks` | 2 | 0 | 2 |
 | `grants` | 3 | 0 | 3 |
 | `inappproducts` | 8 | 1 | 9 |
 | `internalappsharingartifacts` | 2 | 0 | 2 |
@@ -91,11 +91,6 @@ make generate-openapi-coverage
 
 - `androidpublisher.edits.tracks.patch` | `PATCH` `androidpublisher/v3/applications/{packageName}/edits/{editId}/tracks/{track}`
 - `androidpublisher.edits.tracks.create` | `POST` `androidpublisher/v3/applications/{packageName}/edits/{editId}/tracks`
-
-### `generatedapks`
-
-- `androidpublisher.generatedapks.list` | `GET` `androidpublisher/v3/applications/{packageName}/generatedApks/{versionCode}`
-- `androidpublisher.generatedapks.download` | `GET` `androidpublisher/v3/applications/{packageName}/generatedApks/{versionCode}/downloads/{downloadId}:download`
 
 ### `inappproducts`
 

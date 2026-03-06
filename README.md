@@ -22,6 +22,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - External transactions API support (`external-transactions get/create/refund`)
 - Device tier config support (`device-tier-configs list/get/create`)
 - System APK variant support (`system-apks list/get/create/download`)
+- Generated APK metadata support (`generated-apks list/download`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Monetization one-time product commands (`products ...`)
 - Legacy in-app product commands (`iap ...`)
@@ -173,6 +174,10 @@ gpc system-apks list --package-name com.example.app --version-code 123
 gpc system-apks get --package-name com.example.app --version-code 123 --variant-id 7
 gpc system-apks create --package-name com.example.app --version-code 123 --input /path/to/system-apk-variant.json
 gpc system-apks download --package-name com.example.app --version-code 123 --variant-id 7 --output /tmp/system.apk
+
+# Inspect generated APK download IDs and fetch one artifact
+gpc generated-apks list --package-name com.example.app --version-code 123
+gpc generated-apks download --package-name com.example.app --version-code 123 --download-id download-1 --output /tmp/generated.apk
 
 # List/get subscription products
 gpc subscriptions list --package-name com.example.app --page-size 100
@@ -456,6 +461,7 @@ gpc orders --help
 gpc external-transactions --help
 gpc device-tier-configs --help
 gpc system-apks --help
+gpc generated-apks --help
 gpc subscriptions --help
 gpc products --help
 gpc iap --help

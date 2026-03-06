@@ -11,6 +11,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/devicetierconfigs"
 	"github.com/leszko11/google-play-console-cli/internal/cli/edits"
 	"github.com/leszko11/google-play-console-cli/internal/cli/externaltransactions"
+	"github.com/leszko11/google-play-console-cli/internal/cli/generatedapks"
 	"github.com/leszko11/google-play-console-cli/internal/cli/grants"
 	"github.com/leszko11/google-play-console-cli/internal/cli/iap"
 	"github.com/leszko11/google-play-console-cli/internal/cli/internalsharing"
@@ -49,6 +50,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		externaltransactions.NewCommand(externaltransactions.Deps{}),
 		devicetierconfigs.NewCommand(devicetierconfigs.Deps{}),
 		systemapks.NewCommand(systemapks.Deps{}),
+		generatedapks.NewCommand(generatedapks.Deps{}),
 		subscriptions.NewCommand(subscriptions.Deps{}),
 		products.NewCommand(products.Deps{}),
 		iap.NewCommand(iap.Deps{}),

@@ -97,6 +97,12 @@ For monetization create/update flows:
 - `system-apks download` writes the APK to a local path and refuses to overwrite an existing file
 - System APK variants are scoped to a specific App Bundle `versionCode`, so every command in this surface requires `--version-code`
 
+## Generated APKs API
+
+- `generated-apks list` returns nested metadata grouped by signing key; extract a `downloadId` from one of the generated APK entries before downloading
+- `generated-apks download` writes the APK to a local path and refuses to overwrite an existing file
+- Generated APK metadata is bundle-version specific, so both commands require `--version-code`
+
 ## Timeouts
 
 - `--timeout` controls standard API request deadline
