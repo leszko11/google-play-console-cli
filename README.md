@@ -18,7 +18,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - End-to-end deploy orchestration (`deploy`)
 - Staging release workflows (`release verify`, `release alpha`)
 - Reviews management (`reviews list/get/reply`)
-- Google Play Developer Reporting vitals queries (`reports vitals get/query`)
+- Google Play Developer Reporting app discovery, anomalies, and vitals queries (`reports apps list`, `reports anomalies list`, `reports vitals get/query`)
 - Orders API support (`orders get/batch-get/refund`)
 - External transactions API support (`external-transactions get/create/refund`)
 - Device tier config support (`device-tier-configs list/get/create`)
@@ -36,7 +36,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 
 ## Not Yet Implemented
 
-- Reporting anomalies, accessible-app discovery, and error issue/report search surfaces
+- Reporting error issue and error report search surfaces
 
 ## Build
 
@@ -102,6 +102,12 @@ gpc reports vitals get --package-name com.example.app --metric-set crash-rate
 
 # Query reporting vitals rows from a JSON payload
 gpc reports vitals query --package-name com.example.app --metric-set crash-rate --input /path/to/crash-rate-query.json
+
+# List reporting-accessible apps
+gpc reports apps list --page-size 100
+
+# List anomalies for one app
+gpc reports anomalies list --package-name com.example.app --filter 'activeBetween("2026-03-01T00:00:00Z", UNBOUNDED)'
 
 # Write the app's Data Safety declaration from the exported Play CSV template
 gpc apps data-safety --package-name com.example.app --input /path/to/data-safety.csv

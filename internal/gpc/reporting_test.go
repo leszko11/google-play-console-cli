@@ -60,9 +60,35 @@ func TestReportingVitalsMetricSetResourceName(t *testing.T) {
 	}
 }
 
+func TestReportingAppParent(t *testing.T) {
+	got, err := reportingAppParent("com.example.app")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "apps/com.example.app" {
+		t.Fatalf("unexpected parent: %q", got)
+	}
+}
+
 func TestReportingClientGetVitalsMetricSet_RequiresService(t *testing.T) {
 	client := &ReportingClient{}
 	_, err := client.GetVitalsMetricSet(context.Background(), "com.example.app", ReportingVitalsMetricSetCrashRate)
+	if err == nil || !strings.Contains(err.Error(), "service is not configured") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReportingClientSearchApps_RequiresService(t *testing.T) {
+	client := &ReportingClient{}
+	_, err := client.SearchApps(context.Background(), 10, "", false)
+	if err == nil || !strings.Contains(err.Error(), "service is not configured") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReportingClientListAnomalies_RequiresService(t *testing.T) {
+	client := &ReportingClient{}
+	_, err := client.ListAnomalies(context.Background(), "com.example.app", "", 10, "", false)
 	if err == nil || !strings.Contains(err.Error(), "service is not configured") {
 		t.Fatalf("unexpected error: %v", err)
 	}
