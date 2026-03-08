@@ -13,6 +13,10 @@ import (
 )
 
 type fakeClient struct {
+	appsResult        gpc.ReportingAppsListInfo
+	appsErr           error
+	anomaliesResult   gpc.ReportingAnomaliesListInfo
+	anomaliesErr      error
 	getResult         gpc.ReportingVitalsMetricSetInfo
 	getErr            error
 	queryResult       gpc.ReportingVitalsQueryResult
@@ -20,6 +24,26 @@ type fakeClient struct {
 	capturedPackage   string
 	capturedMetricSet gpc.ReportingVitalsMetricSet
 	capturedQuery     *gpc.ReportingVitalsQueryRequest
+	capturedFilter    string
+	capturedPageSize  int64
+	capturedPageToken string
+	capturedPaginate  bool
+}
+
+func (f *fakeClient) SearchApps(_ context.Context, pageSize int64, pageToken string, paginate bool) (gpc.ReportingAppsListInfo, error) {
+	f.capturedPageSize = pageSize
+	f.capturedPageToken = pageToken
+	f.capturedPaginate = paginate
+	return f.appsResult, f.appsErr
+}
+
+func (f *fakeClient) ListAnomalies(_ context.Context, packageName, filter string, pageSize int64, pageToken string, paginate bool) (gpc.ReportingAnomaliesListInfo, error) {
+	f.capturedPackage = packageName
+	f.capturedFilter = filter
+	f.capturedPageSize = pageSize
+	f.capturedPageToken = pageToken
+	f.capturedPaginate = paginate
+	return f.anomaliesResult, f.anomaliesErr
 }
 
 func (f *fakeClient) GetVitalsMetricSet(_ context.Context, packageName string, metricSet gpc.ReportingVitalsMetricSet) (gpc.ReportingVitalsMetricSetInfo, error) {
@@ -83,6 +107,57 @@ func TestReportsVitalsGet_ReturnsMetricSet(t *testing.T) {
 	}
 	if fc.capturedPackage != "com.example.app" || fc.capturedMetricSet != gpc.ReportingVitalsMetricSetCrashRate {
 		t.Fatalf("unexpected captured call: package=%q metricSet=%q", fc.capturedPackage, fc.capturedMetricSet)
+	}
+}
+
+func TestReportsAppsList_ReturnsApps(t *testing.T) {
+	fc := &fakeClient{
+		appsResult: gpc.ReportingAppsListInfo{
+			Apps: []*gpc.ReportingApp{
+				{Name: "apps/com.example.app", PackageName: "com.example.app", DisplayName: "Example App"},
+			},
+			NextPageToken: "tok-2",
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+	}
+
+	out, err := runReports(t, deps, "apps", "list", "--page-size", "50", "--page-token", "tok-1")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"count":1`) || !strings.Contains(out, `"packageName":"com.example.app"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.capturedPageSize != 50 || fc.capturedPageToken != "tok-1" || fc.capturedPaginate {
+		t.Fatalf("unexpected captured pagination: size=%d token=%q paginate=%t", fc.capturedPageSize, fc.capturedPageToken, fc.capturedPaginate)
+	}
+}
+
+func TestReportsAnomaliesList_ReturnsAnomalies(t *testing.T) {
+	fc := &fakeClient{
+		anomaliesResult: gpc.ReportingAnomaliesListInfo{
+			Anomalies: []*gpc.ReportingAnomaly{
+				{Name: "apps/com.example.app/anomalies/a1", MetricSet: "apps/com.example.app/crashRateMetricSet"},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+	}
+
+	out, err := runReports(t, deps, "anomalies", "list", "--package-name", "com.example.app", "--filter", `activeBetween("2026-03-01T00:00:00Z", UNBOUNDED)`, "--page-size", "10")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"count":1`) || !strings.Contains(out, `"metricSet":"apps/com.example.app/crashRateMetricSet"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.capturedPackage != "com.example.app" || !strings.Contains(fc.capturedFilter, "activeBetween") {
+		t.Fatalf("unexpected captured anomalies call: package=%q filter=%q", fc.capturedPackage, fc.capturedFilter)
 	}
 }
 
@@ -156,4 +231,28 @@ func TestReportsVitalsGet_UsesGlobalPackageName(t *testing.T) {
 	if fc.capturedPackage != "com.example.global" {
 		t.Fatalf("expected global package name, got %q", fc.capturedPackage)
 	}
+}
+
+func TestReportsAppsList_UsesGlobalPaginate(t *testing.T) {
+	bindGlobalPaginate(t, true)
+	fc := &fakeClient{appsResult: gpc.ReportingAppsListInfo{}}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+	}
+
+	if _, err := runReports(t, deps, "apps", "list"); err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !fc.capturedPaginate {
+		t.Fatal("expected paginate=true from global flags")
+	}
+}
+
+func bindGlobalPaginate(t *testing.T, paginate bool) {
+	t.Helper()
+	fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
+	cfg := &shared.GlobalFlags{}
+	shared.BindGlobalFlags(fs, cfg)
+	cfg.Paginate = paginate
 }

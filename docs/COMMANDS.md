@@ -92,6 +92,10 @@ make generate-command-docs
 - `gpc reviews get`
 - `gpc reviews reply`
 - `gpc reports`
+- `gpc reports apps`
+- `gpc reports apps list`
+- `gpc reports anomalies`
+- `gpc reports anomalies list`
 - `gpc reports vitals`
 - `gpc reports vitals get`
 - `gpc reports vitals query`
@@ -1457,7 +1461,65 @@ USAGE
   reports
 
 SUBCOMMANDS
-  vitals  Vitals metric set reporting commands
+  apps       Reporting app discovery commands
+  anomalies  Reporting anomaly commands
+  vitals     Vitals metric set reporting commands
+```
+
+## `gpc reports apps --help`
+
+```text
+DESCRIPTION
+  Reporting app discovery commands
+
+USAGE
+  apps
+
+SUBCOMMANDS
+  list  List reporting-accessible apps
+```
+
+## `gpc reports apps list --help`
+
+```text
+DESCRIPTION
+  List reporting-accessible apps
+
+USAGE
+  list
+
+FLAGS
+  -page-size 0        Maximum apps per page
+  -page-token string  Page token for the next page
+```
+
+## `gpc reports anomalies --help`
+
+```text
+DESCRIPTION
+  Reporting anomaly commands
+
+USAGE
+  anomalies
+
+SUBCOMMANDS
+  list  List reporting anomalies for an app
+```
+
+## `gpc reports anomalies list --help`
+
+```text
+DESCRIPTION
+  List reporting anomalies for an app
+
+USAGE
+  list
+
+FLAGS
+  -filter string        Anomaly filter expression
+  -package-name string  Package name
+  -page-size 0          Maximum anomalies per page
+  -page-token string    Page token for the next page
 ```
 
 ## `gpc reports vitals --help`

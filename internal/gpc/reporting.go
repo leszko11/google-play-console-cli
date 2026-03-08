@@ -42,6 +42,18 @@ var reportingVitalsMetricSetResources = map[ReportingVitalsMetricSet]string{
 type ReportingFreshnessInfo = playdeveloperreporting.GooglePlayDeveloperReportingV1beta1FreshnessInfo
 type ReportingTimelineSpec = playdeveloperreporting.GooglePlayDeveloperReportingV1beta1TimelineSpec
 type ReportingMetricsRow = playdeveloperreporting.GooglePlayDeveloperReportingV1beta1MetricsRow
+type ReportingApp = playdeveloperreporting.GooglePlayDeveloperReportingV1beta1App
+type ReportingAnomaly = playdeveloperreporting.GooglePlayDeveloperReportingV1beta1Anomaly
+
+type ReportingAppsListInfo struct {
+	Apps          []*ReportingApp `json:"apps,omitempty"`
+	NextPageToken string          `json:"nextPageToken,omitempty"`
+}
+
+type ReportingAnomaliesListInfo struct {
+	Anomalies     []*ReportingAnomaly `json:"anomalies,omitempty"`
+	NextPageToken string              `json:"nextPageToken,omitempty"`
+}
 
 type ReportingVitalsMetricSetInfo struct {
 	MetricSet     string                  `json:"metricSet"`
@@ -103,6 +115,94 @@ func ParseReportingVitalsMetricSet(raw string) (ReportingVitalsMetricSet, error)
 		return metricSet, nil
 	}
 	return "", fmt.Errorf("unsupported metric set %q (expected one of: %s)", raw, strings.Join(SupportedReportingVitalsMetricSets(), ", "))
+}
+
+func (c *ReportingClient) SearchApps(ctx context.Context, pageSize int64, pageToken string, paginate bool) (ReportingAppsListInfo, error) {
+	if c == nil || c.reporting == nil {
+		return ReportingAppsListInfo{}, errors.New("playdeveloperreporting service is not configured")
+	}
+	if pageSize < 0 {
+		return ReportingAppsListInfo{}, fmt.Errorf("page size must be greater than or equal to zero")
+	}
+
+	pageToken = strings.TrimSpace(pageToken)
+	if !paginate {
+		resp, err := c.reporting.Apps.Search().PageSize(pageSize).PageToken(pageToken).Context(ctx).Do()
+		if err != nil {
+			return ReportingAppsListInfo{}, mapReportingGoogleAPIError(err)
+		}
+		return reportingAppsListInfoFromResponse(resp), nil
+	}
+
+	result := ReportingAppsListInfo{Apps: make([]*ReportingApp, 0)}
+	nextToken := pageToken
+	for {
+		resp, err := c.reporting.Apps.Search().PageSize(pageSize).PageToken(nextToken).Context(ctx).Do()
+		if err != nil {
+			return ReportingAppsListInfo{}, mapReportingGoogleAPIError(err)
+		}
+		page := reportingAppsListInfoFromResponse(resp)
+		result.Apps = append(result.Apps, page.Apps...)
+		if page.NextPageToken == "" {
+			result.NextPageToken = ""
+			return result, nil
+		}
+		if page.NextPageToken == nextToken {
+			return ReportingAppsListInfo{}, fmt.Errorf("pagination token did not advance")
+		}
+		nextToken = page.NextPageToken
+	}
+}
+
+func (c *ReportingClient) ListAnomalies(ctx context.Context, packageName, filter string, pageSize int64, pageToken string, paginate bool) (ReportingAnomaliesListInfo, error) {
+	if c == nil || c.reporting == nil {
+		return ReportingAnomaliesListInfo{}, errors.New("playdeveloperreporting service is not configured")
+	}
+	if pageSize < 0 {
+		return ReportingAnomaliesListInfo{}, fmt.Errorf("page size must be greater than or equal to zero")
+	}
+
+	parent, err := reportingAppParent(packageName)
+	if err != nil {
+		return ReportingAnomaliesListInfo{}, err
+	}
+	filter = strings.TrimSpace(filter)
+	pageToken = strings.TrimSpace(pageToken)
+
+	if !paginate {
+		call := c.reporting.Anomalies.List(parent).PageSize(pageSize).PageToken(pageToken).Context(ctx)
+		if filter != "" {
+			call.Filter(filter)
+		}
+		resp, err := call.Do()
+		if err != nil {
+			return ReportingAnomaliesListInfo{}, mapReportingGoogleAPIError(err)
+		}
+		return reportingAnomaliesListInfoFromResponse(resp), nil
+	}
+
+	result := ReportingAnomaliesListInfo{Anomalies: make([]*ReportingAnomaly, 0)}
+	nextToken := pageToken
+	for {
+		call := c.reporting.Anomalies.List(parent).PageSize(pageSize).PageToken(nextToken).Context(ctx)
+		if filter != "" {
+			call.Filter(filter)
+		}
+		resp, err := call.Do()
+		if err != nil {
+			return ReportingAnomaliesListInfo{}, mapReportingGoogleAPIError(err)
+		}
+		page := reportingAnomaliesListInfoFromResponse(resp)
+		result.Anomalies = append(result.Anomalies, page.Anomalies...)
+		if page.NextPageToken == "" {
+			result.NextPageToken = ""
+			return result, nil
+		}
+		if page.NextPageToken == nextToken {
+			return ReportingAnomaliesListInfo{}, fmt.Errorf("pagination token did not advance")
+		}
+		nextToken = page.NextPageToken
+	}
 }
 
 func (c *ReportingClient) GetVitalsMetricSet(ctx context.Context, packageName string, metricSet ReportingVitalsMetricSet) (ReportingVitalsMetricSetInfo, error) {
@@ -343,4 +443,32 @@ func reportingVitalsQueryRequestOrDefault(request *ReportingVitalsQueryRequest) 
 
 func mapReportingGoogleAPIError(err error) error {
 	return mapGoogleAPIErrorWithService("playdeveloperreporting", err, false)
+}
+
+func reportingAppParent(packageName string) (string, error) {
+	trimmed := strings.TrimSpace(packageName)
+	if trimmed == "" {
+		return "", fmt.Errorf("package name is required")
+	}
+	return "apps/" + trimmed, nil
+}
+
+func reportingAppsListInfoFromResponse(resp *playdeveloperreporting.GooglePlayDeveloperReportingV1beta1SearchAccessibleAppsResponse) ReportingAppsListInfo {
+	if resp == nil {
+		return ReportingAppsListInfo{}
+	}
+	return ReportingAppsListInfo{
+		Apps:          resp.Apps,
+		NextPageToken: resp.NextPageToken,
+	}
+}
+
+func reportingAnomaliesListInfoFromResponse(resp *playdeveloperreporting.GooglePlayDeveloperReportingV1beta1ListAnomaliesResponse) ReportingAnomaliesListInfo {
+	if resp == nil {
+		return ReportingAnomaliesListInfo{}
+	}
+	return ReportingAnomaliesListInfo{
+		Anomalies:     resp.Anomalies,
+		NextPageToken: resp.NextPageToken,
+	}
 }

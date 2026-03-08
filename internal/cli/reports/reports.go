@@ -16,6 +16,8 @@ import (
 )
 
 type Client interface {
+	SearchApps(ctx context.Context, pageSize int64, pageToken string, paginate bool) (gpc.ReportingAppsListInfo, error)
+	ListAnomalies(ctx context.Context, packageName, filter string, pageSize int64, pageToken string, paginate bool) (gpc.ReportingAnomaliesListInfo, error)
 	GetVitalsMetricSet(ctx context.Context, packageName string, metricSet gpc.ReportingVitalsMetricSet) (gpc.ReportingVitalsMetricSetInfo, error)
 	QueryVitalsMetricSet(ctx context.Context, packageName string, metricSet gpc.ReportingVitalsMetricSet, request *gpc.ReportingVitalsQueryRequest) (gpc.ReportingVitalsQueryResult, error)
 }
@@ -37,6 +39,8 @@ func NewCommand(deps Deps) *ffcli.Command {
 		ShortHelp: "Google Play Developer Reporting commands",
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
+			newAppsCommand(deps),
+			newAnomaliesCommand(deps),
 			newVitalsCommand(deps),
 		},
 	}
@@ -74,6 +78,101 @@ func newVitalsCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newVitalsGetCommand(deps),
 			newVitalsQueryCommand(deps),
+		},
+	}
+}
+
+func newAppsCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "apps",
+		ShortHelp: "Reporting app discovery commands",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newAppsListCommand(deps),
+		},
+	}
+}
+
+func newAppsListCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var pageToken string
+	var pageSize int64
+	fs.Int64Var(&pageSize, "page-size", 0, "Maximum apps per page")
+	fs.StringVar(&pageToken, "page-token", "", "Page token for the next page")
+
+	return &ffcli.Command{
+		Name:      "list",
+		ShortHelp: "List reporting-accessible apps",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, requestCtx, cancel, err := buildReportingClient(ctx, deps)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			if pageSize < 0 {
+				return shared.UsageErrorf("--page-size must be greater than or equal to zero")
+			}
+			result, err := client.SearchApps(requestCtx, pageSize, pageToken, shared.ActiveGlobalFlags().Paginate)
+			if err != nil {
+				return fmt.Errorf("failed to list reporting apps: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"apps":          result.Apps,
+				"count":         len(result.Apps),
+				"nextPageToken": result.NextPageToken,
+			})
+		},
+	}
+}
+
+func newAnomaliesCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "anomalies",
+		ShortHelp: "Reporting anomaly commands",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newAnomaliesListCommand(deps),
+		},
+	}
+}
+
+func newAnomaliesListCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, filter, pageToken string
+	var pageSize int64
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&filter, "filter", "", "Anomaly filter expression")
+	fs.Int64Var(&pageSize, "page-size", 0, "Maximum anomalies per page")
+	fs.StringVar(&pageToken, "page-token", "", "Page token for the next page")
+
+	return &ffcli.Command{
+		Name:      "list",
+		ShortHelp: "List reporting anomalies for an app",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			if pageSize < 0 {
+				return shared.UsageErrorf("--page-size must be greater than or equal to zero")
+			}
+			result, err := client.ListAnomalies(requestCtx, pkg, filter, pageSize, pageToken, shared.ActiveGlobalFlags().Paginate)
+			if err != nil {
+				return fmt.Errorf("failed to list anomalies: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":   pkg,
+				"anomalies":     result.Anomalies,
+				"count":         len(result.Anomalies),
+				"nextPageToken": result.NextPageToken,
+			})
 		},
 	}
 }
@@ -173,6 +272,18 @@ func buildClient(ctx context.Context, deps Deps, packageName string) (Client, st
 	}
 
 	return client, pkg, requestCtx, cancel, nil
+}
+
+func buildReportingClient(ctx context.Context, deps Deps) (Client, context.Context, context.CancelFunc, error) {
+	client, requestCtx, cancel, err := shared.BuildClient(ctx, shared.BuildClientDeps[Client]{
+		LoadConfig: deps.LoadConfig,
+		LookupEnv:  deps.LookupEnv,
+		NewClient:  deps.NewClient,
+	})
+	if err != nil {
+		return nil, nil, func() {}, err
+	}
+	return client, requestCtx, cancel, nil
 }
 
 func resolveMetricSet(raw string) (gpc.ReportingVitalsMetricSet, error) {

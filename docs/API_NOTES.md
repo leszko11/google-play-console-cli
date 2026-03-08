@@ -118,6 +118,8 @@ For monetization create/update flows:
 
 ## Developer Reporting API
 
+- `reports apps list` is the quickest way to confirm which apps are visible to the Reporting API for the current credentials.
+- `reports anomalies list` accepts the raw anomaly filter string from the API. The main supported filter helper is `activeBetween(startTime, endTime)` using RFC-3339 timestamps or `UNBOUNDED`.
 - `reports vitals get` returns freshness metadata for a single metric set; it does not return rows.
 - `reports vitals query` accepts raw JSON matching the shared vitals query shape: `dimensions`, `filter`, `metrics`, `pageSize`, `pageToken`, `timelineSpec`, and `userCohort`.
 - Daily reporting timelines typically use the metric set's default timezone, which is often `America/Los_Angeles`; hourly reporting uses `UTC`.
