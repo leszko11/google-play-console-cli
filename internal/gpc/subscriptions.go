@@ -70,6 +70,26 @@ func (c *Client) GetSubscription(ctx context.Context, packageName, productID str
 	return subscriptionInfoFromSubscription(subscription), nil
 }
 
+func (c *Client) GetSubscriptionDiagnostic(ctx context.Context, packageName, productID string) (SubscriptionDiagnosticInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return SubscriptionDiagnosticInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return SubscriptionDiagnosticInfo{}, fmt.Errorf("product id is required")
+	}
+	if c == nil || c.service == nil {
+		return SubscriptionDiagnosticInfo{}, ErrInvalidCredentials
+	}
+
+	subscription, err := c.service.Monetization.Subscriptions.Get(packageName, productID).Context(ctx).Do()
+	if err != nil {
+		return SubscriptionDiagnosticInfo{}, mapGoogleAPIError(err)
+	}
+	return subscriptionDiagnosticInfoFromSubscription(subscription), nil
+}
+
 func (c *Client) BatchGetSubscriptions(ctx context.Context, packageName string, productIDs []string) (SubscriptionsListInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -946,6 +966,62 @@ func subscriptionInfoFromSubscription(subscription *androidpublisher.Subscriptio
 		Archived:      subscription.Archived,
 		BasePlanCount: len(subscription.BasePlans),
 		ListingCount:  len(subscription.Listings),
+	}
+}
+
+func subscriptionDiagnosticInfoFromSubscription(subscription *androidpublisher.Subscription) SubscriptionDiagnosticInfo {
+	if subscription == nil {
+		return SubscriptionDiagnosticInfo{}
+	}
+
+	basePlans := make([]SubscriptionBasePlanDiagnosticInfo, 0, len(subscription.BasePlans))
+	regionSet := map[string]struct{}{}
+	availableRegionSet := map[string]struct{}{}
+	activeBasePlanCount := 0
+
+	for _, basePlan := range subscription.BasePlans {
+		if basePlan == nil {
+			continue
+		}
+
+		if basePlan.State == "ACTIVE" {
+			activeBasePlanCount++
+		}
+
+		availableRegionCount := 0
+		for _, cfg := range basePlan.RegionalConfigs {
+			if cfg == nil {
+				continue
+			}
+			regionCode := strings.TrimSpace(cfg.RegionCode)
+			if regionCode != "" {
+				regionSet[regionCode] = struct{}{}
+			}
+			if regionCode != "" && cfg.NewSubscriberAvailability {
+				availableRegionSet[regionCode] = struct{}{}
+				availableRegionCount++
+			}
+		}
+
+		basePlans = append(basePlans, SubscriptionBasePlanDiagnosticInfo{
+			BasePlanID:           basePlan.BasePlanId,
+			State:                basePlan.State,
+			RegionalConfigCount:  len(basePlan.RegionalConfigs),
+			AvailableRegionCount: availableRegionCount,
+			OfferTagCount:        len(basePlan.OfferTags),
+		})
+	}
+
+	return SubscriptionDiagnosticInfo{
+		PackageName:          subscription.PackageName,
+		ProductID:            subscription.ProductId,
+		Archived:             subscription.Archived,
+		BasePlanCount:        len(subscription.BasePlans),
+		ListingCount:         len(subscription.Listings),
+		RegionCount:          len(regionSet),
+		AvailableRegionCount: len(availableRegionSet),
+		ActiveBasePlanCount:  activeBasePlanCount,
+		BasePlans:            basePlans,
 	}
 }
 

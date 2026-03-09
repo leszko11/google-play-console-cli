@@ -16,6 +16,7 @@ Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankr
 - Binary uploads in edits (`apks list/upload`, `bundles list/upload`)
 - Deobfuscation mapping upload (`deobfuscation upload`)
 - End-to-end deploy orchestration (`deploy`)
+- Read-only operator diagnostics (`doctor`)
 - Staging release workflows (`release verify`, `release alpha`)
 - Reviews management (`reviews list/get/reply`)
 - Google Play Developer Reporting app discovery, anomalies, and vitals queries (`reports apps list`, `reports anomalies list`, `reports vitals get/query`)
@@ -78,6 +79,9 @@ gpc auth init --service-account /path/to/service-account.json --developer-id <de
 # Show current auth profile
 gpc auth status
 gpc auth profiles list --output table
+
+# Run a read-only diagnostic pass for auth, package access, and e2e fixtures
+gpc doctor --package-name com.example.app
 
 # Profile override without mutating persisted active profile
 gpc --profile work auth status --output json
@@ -479,6 +483,7 @@ gpc bundles --help
 gpc apks --help
 gpc deobfuscation --help
 gpc deploy --help
+gpc doctor --help
 gpc release --help
 gpc reviews --help
 gpc reports --help

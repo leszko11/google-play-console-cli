@@ -136,6 +136,26 @@ type OneTimeProductInfo struct {
 	OfferTagCount       int    `json:"offerTagCount,omitempty"`
 }
 
+type OneTimeProductPurchaseOptionDiagnosticInfo struct {
+	PurchaseOptionID     string `json:"purchaseOptionId,omitempty"`
+	State                string `json:"state,omitempty"`
+	RegionalConfigCount  int    `json:"regionalConfigCount,omitempty"`
+	AvailableRegionCount int    `json:"availableRegionCount,omitempty"`
+	OfferTagCount        int    `json:"offerTagCount,omitempty"`
+}
+
+type OneTimeProductDiagnosticInfo struct {
+	PackageName               string                                       `json:"packageName,omitempty"`
+	ProductID                 string                                       `json:"productId,omitempty"`
+	ListingCount              int                                          `json:"listingCount,omitempty"`
+	PurchaseOptionCount       int                                          `json:"purchaseOptionCount,omitempty"`
+	OfferTagCount             int                                          `json:"offerTagCount,omitempty"`
+	RegionCount               int                                          `json:"regionCount,omitempty"`
+	AvailableRegionCount      int                                          `json:"availableRegionCount,omitempty"`
+	ActivePurchaseOptionCount int                                          `json:"activePurchaseOptionCount,omitempty"`
+	PurchaseOptions           []OneTimeProductPurchaseOptionDiagnosticInfo `json:"purchaseOptions,omitempty"`
+}
+
 type OneTimeProductsListInfo struct {
 	Products      []OneTimeProductInfo `json:"products,omitempty"`
 	NextPageToken string               `json:"nextPageToken,omitempty"`
@@ -176,6 +196,26 @@ type SubscriptionInfo struct {
 	Archived      bool   `json:"archived,omitempty"`
 	BasePlanCount int    `json:"basePlanCount,omitempty"`
 	ListingCount  int    `json:"listingCount,omitempty"`
+}
+
+type SubscriptionBasePlanDiagnosticInfo struct {
+	BasePlanID           string `json:"basePlanId,omitempty"`
+	State                string `json:"state,omitempty"`
+	RegionalConfigCount  int    `json:"regionalConfigCount,omitempty"`
+	AvailableRegionCount int    `json:"availableRegionCount,omitempty"`
+	OfferTagCount        int    `json:"offerTagCount,omitempty"`
+}
+
+type SubscriptionDiagnosticInfo struct {
+	PackageName          string                               `json:"packageName,omitempty"`
+	ProductID            string                               `json:"productId,omitempty"`
+	Archived             bool                                 `json:"archived,omitempty"`
+	BasePlanCount        int                                  `json:"basePlanCount,omitempty"`
+	ListingCount         int                                  `json:"listingCount,omitempty"`
+	RegionCount          int                                  `json:"regionCount,omitempty"`
+	AvailableRegionCount int                                  `json:"availableRegionCount,omitempty"`
+	ActiveBasePlanCount  int                                  `json:"activeBasePlanCount,omitempty"`
+	BasePlans            []SubscriptionBasePlanDiagnosticInfo `json:"basePlans,omitempty"`
 }
 
 type SubscriptionsListInfo struct {
