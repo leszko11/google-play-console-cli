@@ -1,0 +1,58 @@
+version: 2
+
+project_name: gpc
+
+builds:
+  - id: gpc
+    main: .
+    binary: gpc
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - >-
+        -s -w
+        -X github.com/leszko11/google-play-console-cli/cmd.Version={{ if .IsSnapshot }}{{ .Version }}{{ else }}v{{ .Version }}{{ end }}
+        -X github.com/leszko11/google-play-console-cli/cmd.Commit={{ .Commit }}
+        -X github.com/leszko11/google-play-console-cli/cmd.Date={{ .Date }}
+
+archives:
+  - id: gpc
+    ids:
+      - gpc
+    name_template: >-
+      {{ .ProjectName }}_{{ if .IsSnapshot }}{{ .Version }}{{ else }}v{{ .Version }}{{ end }}_{{ .Os }}_{{ .Arch }}
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ if .IsSnapshot }}{{ .Version }}{{ else }}v{{ .Version }}{{ end }}_checksums.txt"
+  algorithm: sha256
+
+changelog:
+  use: git
+  sort: asc
+  abbrev: -1
+  filters:
+    exclude:
+      - "^Merge "
+
+release:
+  draft: false
+  prerelease: auto

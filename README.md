@@ -4,6 +4,42 @@ A fast, lightweight, and scriptable CLI for Google Play Console. Automate Androi
 
 Inspired by Rudrank Riyaam's [App-Store-Connect-CLI](https://github.com/rudrankriyam/App-Store-Connect-CLI).
 
+## Install
+
+### Go install
+
+```bash
+go install github.com/leszko11/google-play-console-cli@latest
+```
+
+### GitHub Releases
+
+Download the archive for your platform from [GitHub Releases](https://github.com/leszko11/google-play-console-cli/releases), then verify it with the published SHA256 checksums file.
+
+```bash
+VERSION=v0.1.0
+curl -LO "https://github.com/leszko11/google-play-console-cli/releases/download/${VERSION}/gpc_${VERSION}_darwin_arm64.tar.gz"
+curl -LO "https://github.com/leszko11/google-play-console-cli/releases/download/${VERSION}/gpc_${VERSION}_checksums.txt"
+shasum -a 256 --check gpc_${VERSION}_checksums.txt
+tar -xzf "gpc_${VERSION}_darwin_arm64.tar.gz"
+mv gpc /usr/local/bin/gpc
+```
+
+On Linux, replace `shasum -a 256 --check` with `sha256sum --check` if `shasum` is not available.
+
+### Shell Completion
+
+```bash
+# Bash
+gpc completion bash > ~/.local/share/bash-completion/completions/gpc
+
+# Zsh
+mkdir -p ~/.zfunc
+gpc completion zsh > ~/.zfunc/_gpc
+```
+
+Homebrew is planned later. `v0.1.0` supports `go install` and GitHub Release archives only.
+
 ## Current Scope
 
 - Authentication bootstrap with Google service account credentials
@@ -54,6 +90,7 @@ make dev
 Detailed smoke tests: `docs/TESTING.md`.
 Auth behavior and credential source model: `docs/AUTH.md`.
 Google Play API caveats: `docs/API_NOTES.md`.
+Release process: `docs/RELEASING.md`.
 Endpoint index notes: `docs/openapi/README.md`.
 Endpoint coverage report: `docs/openapi/COVERAGE.md`.
 
