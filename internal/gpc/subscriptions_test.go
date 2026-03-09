@@ -290,6 +290,43 @@ func TestSubscriptionInfoFromSubscription(t *testing.T) {
 	}
 }
 
+func TestSubscriptionDiagnosticInfoFromSubscription(t *testing.T) {
+	got := subscriptionDiagnosticInfoFromSubscription(&androidpublisher.Subscription{
+		PackageName: "com.example.app",
+		ProductId:   "premium_yearly",
+		Archived:    true,
+		BasePlans: []*androidpublisher.BasePlan{
+			{
+				BasePlanId: "yearly",
+				State:      "ACTIVE",
+				OfferTags:  []*androidpublisher.OfferTag{{Tag: "tag1"}},
+				RegionalConfigs: []*androidpublisher.RegionalBasePlanConfig{
+					{RegionCode: "US", NewSubscriberAvailability: true},
+					{RegionCode: "PL", NewSubscriberAvailability: false},
+				},
+			},
+			{
+				BasePlanId: "legacy",
+				State:      "INACTIVE",
+				RegionalConfigs: []*androidpublisher.RegionalBasePlanConfig{
+					{RegionCode: "DE", NewSubscriberAvailability: true},
+				},
+			},
+		},
+		Listings: []*androidpublisher.SubscriptionListing{
+			{LanguageCode: "en-US"},
+			{LanguageCode: "pl-PL"},
+		},
+	})
+
+	if got.ProductID != "premium_yearly" || got.BasePlanCount != 2 || got.ActiveBasePlanCount != 1 || got.ListingCount != 2 || got.RegionCount != 3 || got.AvailableRegionCount != 2 {
+		t.Fatalf("unexpected subscription diagnostic map: %+v", got)
+	}
+	if len(got.BasePlans) != 2 || got.BasePlans[0].BasePlanID != "yearly" {
+		t.Fatalf("unexpected base plan diagnostic map: %+v", got.BasePlans)
+	}
+}
+
 func TestSubscriptionOffersListInfoFromResponse(t *testing.T) {
 	got := subscriptionOffersListInfoFromResponse(&androidpublisher.ListSubscriptionOffersResponse{
 		NextPageToken: "next-token",

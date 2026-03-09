@@ -7,7 +7,6 @@ import (
 	"io"
 	"strings"
 
-	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/peterbourgon/ff/v3/ffcli"
@@ -47,65 +46,11 @@ func NewStatusCommand(deps Deps) *ffcli.Command {
 }
 
 type statusPayload struct {
-	ActiveProfile      string   `json:"activeProfile,omitempty"`
-	SelectedProfile    string   `json:"selectedProfile,omitempty"`
-	Authenticated      bool     `json:"authenticated"`
-	Source             string   `json:"source,omitempty"`
-	StorageBackend     string   `json:"storageBackend,omitempty"`
-	ServiceAccountPath string   `json:"serviceAccountPath,omitempty"`
-	LastValidatedAt    string   `json:"lastValidatedAt,omitempty"`
-	DeveloperID        string   `json:"developerId,omitempty"`
-	Warnings           []string `json:"warnings,omitempty"`
+	shared.AuthStatusSnapshot
 }
 
 func buildStatus(cfg config.Config, lookupEnv func(string) string) statusPayload {
-	if lookupEnv == nil {
-		lookupEnv = func(string) string { return "" }
-	}
-
-	selectedProfile := shared.ResolveProfileName(cfg)
-	out := statusPayload{
-		ActiveProfile:   cfg.ActiveProfile,
-		SelectedProfile: selectedProfile,
-		Authenticated:   false,
-	}
-
-	profile, ok := cfg.Profiles[selectedProfile]
-	if !ok {
-		profile = config.Profile{}
-	}
-	out.LastValidatedAt = profile.LastValidatedAt
-	out.DeveloperID = profile.DeveloperID
-
-	keychainAvailable, keychainErr := authresolver.KeychainAvailable(lookupEnv)
-	switch {
-	case authresolver.ShouldBypassKeychain(lookupEnv):
-		out.StorageBackend = "config"
-		out.Warnings = append(out.Warnings, "keychain bypassed via GPC_BYPASS_KEYCHAIN")
-	case keychainAvailable:
-		out.StorageBackend = "keychain"
-	case keychainErr != nil:
-		out.StorageBackend = "config"
-		out.Warnings = append(out.Warnings, fmt.Sprintf("keychain error: %v", keychainErr))
-	default:
-		out.StorageBackend = "config"
-		out.Warnings = append(out.Warnings, "system keychain unavailable; using config/environment/flags")
-	}
-
-	resolved, err := shared.ResolveCredentials(cfg, lookupEnv)
-	if err != nil {
-		if !shared.IsUsageError(err) {
-			out.Warnings = append(out.Warnings, err.Error())
-		}
-		return out
-	}
-	out.Source = string(resolved.Source)
-	out.ServiceAccountPath = resolved.ServiceAccountPath
-	out.Warnings = append(out.Warnings, resolved.Warnings...)
-	if shared.CredentialLocallyValid(resolved.Input) {
-		out.Authenticated = true
-	}
-	return out
+	return statusPayload{AuthStatusSnapshot: shared.BuildAuthStatusSnapshot(cfg, lookupEnv)}
 }
 
 func writeStatusTable(out io.Writer, status statusPayload) error {

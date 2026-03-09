@@ -240,6 +240,45 @@ func TestOneTimeProductInfoFromProduct(t *testing.T) {
 	}
 }
 
+func TestOneTimeProductDiagnosticInfoFromProduct(t *testing.T) {
+	got := oneTimeProductDiagnosticInfoFromProduct(&androidpublisher.OneTimeProduct{
+		PackageName: "com.example.app",
+		ProductId:   "coins_100",
+		Listings: []*androidpublisher.OneTimeProductListing{
+			{LanguageCode: "en-US"},
+		},
+		OfferTags: []*androidpublisher.OfferTag{
+			{Tag: "coins"},
+			{Tag: "sale"},
+		},
+		PurchaseOptions: []*androidpublisher.OneTimeProductPurchaseOption{
+			{
+				PurchaseOptionId: "buy",
+				State:            "ACTIVE",
+				OfferTags:        []*androidpublisher.OfferTag{{Tag: "tag1"}},
+				RegionalPricingAndAvailabilityConfigs: []*androidpublisher.OneTimeProductPurchaseOptionRegionalPricingAndAvailabilityConfig{
+					{RegionCode: "US", Availability: "AVAILABLE"},
+					{RegionCode: "PL", Availability: "NO_LONGER_AVAILABLE"},
+				},
+			},
+			{
+				PurchaseOptionId: "rent",
+				State:            "INACTIVE",
+				RegionalPricingAndAvailabilityConfigs: []*androidpublisher.OneTimeProductPurchaseOptionRegionalPricingAndAvailabilityConfig{
+					{RegionCode: "DE", Availability: "AVAILABLE_FOR_OFFERS_ONLY"},
+				},
+			},
+		},
+	})
+
+	if got.ProductID != "coins_100" || got.PurchaseOptionCount != 2 || got.ActivePurchaseOptionCount != 1 || got.ListingCount != 1 || got.RegionCount != 3 || got.AvailableRegionCount != 2 {
+		t.Fatalf("unexpected one-time product diagnostic map: %+v", got)
+	}
+	if len(got.PurchaseOptions) != 2 || got.PurchaseOptions[0].PurchaseOptionID != "buy" {
+		t.Fatalf("unexpected purchase option diagnostic map: %+v", got.PurchaseOptions)
+	}
+}
+
 func TestOneTimeProductOffersListInfoFromResponse(t *testing.T) {
 	resp := &androidpublisher.ListOneTimeProductOffersResponse{
 		NextPageToken: "next",

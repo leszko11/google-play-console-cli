@@ -70,6 +70,26 @@ func (c *Client) GetOneTimeProduct(ctx context.Context, packageName, productID s
 	return oneTimeProductInfoFromProduct(product), nil
 }
 
+func (c *Client) GetOneTimeProductDiagnostic(ctx context.Context, packageName, productID string) (OneTimeProductDiagnosticInfo, error) {
+	packageName = strings.TrimSpace(packageName)
+	if packageName == "" {
+		return OneTimeProductDiagnosticInfo{}, fmt.Errorf("package name is required")
+	}
+	productID = strings.TrimSpace(productID)
+	if productID == "" {
+		return OneTimeProductDiagnosticInfo{}, fmt.Errorf("product id is required")
+	}
+	if c == nil || c.service == nil {
+		return OneTimeProductDiagnosticInfo{}, ErrInvalidCredentials
+	}
+
+	product, err := c.service.Monetization.Onetimeproducts.Get(packageName, productID).Context(ctx).Do()
+	if err != nil {
+		return OneTimeProductDiagnosticInfo{}, mapGoogleAPIError(err)
+	}
+	return oneTimeProductDiagnosticInfoFromProduct(product), nil
+}
+
 func (c *Client) BatchGetOneTimeProducts(ctx context.Context, packageName string, productIDs []string) (OneTimeProductsListInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
@@ -784,6 +804,62 @@ func oneTimeProductInfoFromProduct(product *androidpublisher.OneTimeProduct) One
 		ListingCount:        len(product.Listings),
 		PurchaseOptionCount: len(product.PurchaseOptions),
 		OfferTagCount:       len(product.OfferTags),
+	}
+}
+
+func oneTimeProductDiagnosticInfoFromProduct(product *androidpublisher.OneTimeProduct) OneTimeProductDiagnosticInfo {
+	if product == nil {
+		return OneTimeProductDiagnosticInfo{}
+	}
+
+	purchaseOptions := make([]OneTimeProductPurchaseOptionDiagnosticInfo, 0, len(product.PurchaseOptions))
+	regionSet := map[string]struct{}{}
+	availableRegionSet := map[string]struct{}{}
+	activePurchaseOptionCount := 0
+
+	for _, option := range product.PurchaseOptions {
+		if option == nil {
+			continue
+		}
+
+		if option.State == "ACTIVE" {
+			activePurchaseOptionCount++
+		}
+
+		availableRegionCount := 0
+		for _, cfg := range option.RegionalPricingAndAvailabilityConfigs {
+			if cfg == nil {
+				continue
+			}
+			regionCode := strings.TrimSpace(cfg.RegionCode)
+			if regionCode != "" {
+				regionSet[regionCode] = struct{}{}
+			}
+			if regionCode != "" && (cfg.Availability == "AVAILABLE" || cfg.Availability == "AVAILABLE_IF_RELEASED" || cfg.Availability == "AVAILABLE_FOR_OFFERS_ONLY") {
+				availableRegionSet[regionCode] = struct{}{}
+				availableRegionCount++
+			}
+		}
+
+		purchaseOptions = append(purchaseOptions, OneTimeProductPurchaseOptionDiagnosticInfo{
+			PurchaseOptionID:     option.PurchaseOptionId,
+			State:                option.State,
+			RegionalConfigCount:  len(option.RegionalPricingAndAvailabilityConfigs),
+			AvailableRegionCount: availableRegionCount,
+			OfferTagCount:        len(option.OfferTags),
+		})
+	}
+
+	return OneTimeProductDiagnosticInfo{
+		PackageName:               product.PackageName,
+		ProductID:                 product.ProductId,
+		ListingCount:              len(product.Listings),
+		PurchaseOptionCount:       len(product.PurchaseOptions),
+		OfferTagCount:             len(product.OfferTags),
+		RegionCount:               len(regionSet),
+		AvailableRegionCount:      len(availableRegionSet),
+		ActivePurchaseOptionCount: activePurchaseOptionCount,
+		PurchaseOptions:           purchaseOptions,
 	}
 }
 
