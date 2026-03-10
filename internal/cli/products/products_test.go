@@ -21,6 +21,8 @@ type fakeClient struct {
 	listErr        error
 	get            gpc.OneTimeProductInfo
 	getErr         error
+	getDiagnostic  gpc.OneTimeProductDiagnosticInfo
+	getDiagErr     error
 	batchGet       gpc.OneTimeProductsListInfo
 	batchGetErr    error
 	batchUpdate    gpc.OneTimeProductsListInfo
@@ -79,6 +81,10 @@ func (f fakeClient) ListOneTimeProducts(_ context.Context, _ string, pageSize in
 
 func (f fakeClient) GetOneTimeProduct(_ context.Context, _, _ string) (gpc.OneTimeProductInfo, error) {
 	return f.get, f.getErr
+}
+
+func (f fakeClient) GetOneTimeProductDiagnostic(_ context.Context, _, _ string) (gpc.OneTimeProductDiagnosticInfo, error) {
+	return f.getDiagnostic, f.getDiagErr
 }
 
 func (f fakeClient) BatchGetOneTimeProducts(_ context.Context, packageName string, productIDs []string) (gpc.OneTimeProductsListInfo, error) {
@@ -268,6 +274,67 @@ func TestProductsGet_RequiresProductID(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--product-id is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestProductsGet_ReturnsProduct(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				get: gpc.OneTimeProductInfo{
+					PackageName: "com.example.app",
+					ProductID:   "coins_100",
+				},
+			}, nil
+		},
+	}
+
+	out, err := runProducts(t, deps, "get", "--package-name", "com.example.app", "--product-id", "coins_100")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"productId":"coins_100"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestProductsGetVerbose_ReturnsDiagnostics(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				getDiagnostic: gpc.OneTimeProductDiagnosticInfo{
+					PackageName:               "com.example.app",
+					ProductID:                 "coins_100",
+					ListingCount:              1,
+					PurchaseOptionCount:       2,
+					OfferTagCount:             1,
+					RegionCount:               3,
+					AvailableRegionCount:      2,
+					ActivePurchaseOptionCount: 1,
+					PurchaseOptions: []gpc.OneTimeProductPurchaseOptionDiagnosticInfo{
+						{PurchaseOptionID: "buy", State: "ACTIVE"},
+					},
+				},
+			}, nil
+		},
+	}
+
+	out, err := runProducts(t, deps, "get", "--package-name", "com.example.app", "--product-id", "coins_100", "--verbose")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{
+		`"productId":"coins_100"`,
+		`"diagnostic":`,
+		`"regionCount":3`,
+		`"activePurchaseOptionCount":1`,
+		`"purchaseOptionId":"buy"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got %s", want, out)
+		}
 	}
 }
 

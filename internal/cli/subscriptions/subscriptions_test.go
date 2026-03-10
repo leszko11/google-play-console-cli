@@ -21,6 +21,8 @@ type fakeClient struct {
 	listErr                    error
 	get                        gpc.SubscriptionInfo
 	getErr                     error
+	getDiagnostic              gpc.SubscriptionDiagnosticInfo
+	getDiagnosticErr           error
 	batchGet                   gpc.SubscriptionsListInfo
 	batchGetErr                error
 	create                     gpc.SubscriptionInfo
@@ -89,6 +91,11 @@ func (f *fakeClient) ListSubscriptions(_ context.Context, _ string, pageSize int
 func (f *fakeClient) GetSubscription(_ context.Context, _, productID string) (gpc.SubscriptionInfo, error) {
 	f.productID = productID
 	return f.get, f.getErr
+}
+
+func (f *fakeClient) GetSubscriptionDiagnostic(_ context.Context, _, productID string) (gpc.SubscriptionDiagnosticInfo, error) {
+	f.productID = productID
+	return f.getDiagnostic, f.getDiagnosticErr
 }
 
 func (f *fakeClient) BatchGetSubscriptions(_ context.Context, _ string, productIDs []string) (gpc.SubscriptionsListInfo, error) {
@@ -428,6 +435,49 @@ func TestSubscriptionsGet_ReturnsSubscription(t *testing.T) {
 	}
 	if !strings.Contains(out, `"productId":"premium_yearly"`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.productID != "premium_yearly" {
+		t.Fatalf("unexpected product id passed to client: %s", fc.productID)
+	}
+}
+
+func TestSubscriptionsGetVerbose_ReturnsDiagnostics(t *testing.T) {
+	fc := &fakeClient{
+		getDiagnostic: gpc.SubscriptionDiagnosticInfo{
+			PackageName:          "com.example.app",
+			ProductID:            "premium_yearly",
+			Archived:             true,
+			BasePlanCount:        2,
+			ListingCount:         1,
+			RegionCount:          3,
+			AvailableRegionCount: 2,
+			ActiveBasePlanCount:  1,
+			BasePlans: []gpc.SubscriptionBasePlanDiagnosticInfo{
+				{BasePlanID: "yearly", State: "ACTIVE"},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(t, deps, "get", "--package-name", "com.example.app", "--product-id", "premium_yearly", "--verbose")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{
+		`"productId":"premium_yearly"`,
+		`"diagnostic":`,
+		`"regionCount":3`,
+		`"activeBasePlanCount":1`,
+		`"basePlanId":"yearly"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got %s", want, out)
+		}
 	}
 	if fc.productID != "premium_yearly" {
 		t.Fatalf("unexpected product id passed to client: %s", fc.productID)
