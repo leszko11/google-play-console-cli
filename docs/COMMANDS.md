@@ -1930,6 +1930,7 @@ USAGE
 FLAGS
   -package-name string  Package name
   -product-id string    Subscription product ID
+  -verbose=false        Include base plan and region diagnostics
 ```
 
 ## `gpc subscriptions batch-get --help`
@@ -2370,6 +2371,7 @@ USAGE
 FLAGS
   -package-name string  Package name
   -product-id string    One-time product ID
+  -verbose=false        Include purchase option and region diagnostics
 ```
 
 ## `gpc products batch-get --help`

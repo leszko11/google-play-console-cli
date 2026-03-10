@@ -19,6 +19,7 @@ import (
 type Client interface {
 	ListOneTimeProducts(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.OneTimeProductsListInfo, error)
 	GetOneTimeProduct(ctx context.Context, packageName, productID string) (gpc.OneTimeProductInfo, error)
+	GetOneTimeProductDiagnostic(ctx context.Context, packageName, productID string) (gpc.OneTimeProductDiagnosticInfo, error)
 	BatchGetOneTimeProducts(ctx context.Context, packageName string, productIDs []string) (gpc.OneTimeProductsListInfo, error)
 	BatchUpdateOneTimeProducts(ctx context.Context, packageName string, requests []*androidpublisher.UpdateOneTimeProductRequest) (gpc.OneTimeProductsListInfo, error)
 	BatchDeleteOneTimeProducts(ctx context.Context, packageName string, requests []*androidpublisher.DeleteOneTimeProductRequest) error
@@ -128,8 +129,10 @@ func newGetCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, productID string
+	var verbose bool
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&productID, "product-id", "", "One-time product ID")
+	fs.BoolVar(&verbose, "verbose", false, "Include purchase option and region diagnostics")
 
 	return &ffcli.Command{
 		Name:      "get",
@@ -147,15 +150,37 @@ func newGetCommand(deps Deps) *ffcli.Command {
 			if productID == "" {
 				return fmt.Errorf("--product-id is required")
 			}
-			product, err := client.GetOneTimeProduct(requestCtx, pkg, productID)
+			if !verbose {
+				product, err := client.GetOneTimeProduct(requestCtx, pkg, productID)
+				if err != nil {
+					return fmt.Errorf("failed to get one-time product: %w", err)
+				}
+				return shared.WriteJSON(deps.Stdout, map[string]any{
+					"packageName": pkg,
+					"product":     product,
+				})
+			}
+
+			diagnostic, err := client.GetOneTimeProductDiagnostic(requestCtx, pkg, productID)
 			if err != nil {
-				return fmt.Errorf("failed to get one-time product: %w", err)
+				return fmt.Errorf("failed to get one-time product diagnostics: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
-				"product":     product,
+				"product":     oneTimeProductInfoFromDiagnostic(diagnostic),
+				"diagnostic":  diagnostic,
 			})
 		},
+	}
+}
+
+func oneTimeProductInfoFromDiagnostic(diagnostic gpc.OneTimeProductDiagnosticInfo) gpc.OneTimeProductInfo {
+	return gpc.OneTimeProductInfo{
+		PackageName:         diagnostic.PackageName,
+		ProductID:           diagnostic.ProductID,
+		ListingCount:        diagnostic.ListingCount,
+		PurchaseOptionCount: diagnostic.PurchaseOptionCount,
+		OfferTagCount:       diagnostic.OfferTagCount,
 	}
 }
 

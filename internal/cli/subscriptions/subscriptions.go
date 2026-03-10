@@ -19,6 +19,7 @@ import (
 type Client interface {
 	ListSubscriptions(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionsListInfo, error)
 	GetSubscription(ctx context.Context, packageName, productID string) (gpc.SubscriptionInfo, error)
+	GetSubscriptionDiagnostic(ctx context.Context, packageName, productID string) (gpc.SubscriptionDiagnosticInfo, error)
 	BatchGetSubscriptions(ctx context.Context, packageName string, productIDs []string) (gpc.SubscriptionsListInfo, error)
 	CreateSubscription(ctx context.Context, packageName string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error)
 	BatchUpdateSubscriptions(ctx context.Context, packageName string, requests []*androidpublisher.UpdateSubscriptionRequest) (gpc.SubscriptionsListInfo, error)
@@ -134,8 +135,10 @@ func newGetCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, productID string
+	var verbose bool
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
+	fs.BoolVar(&verbose, "verbose", false, "Include base plan and region diagnostics")
 
 	return &ffcli.Command{
 		Name:      "get",
@@ -152,15 +155,37 @@ func newGetCommand(deps Deps) *ffcli.Command {
 			if productID == "" {
 				return fmt.Errorf("--product-id is required")
 			}
-			subscription, err := client.GetSubscription(requestCtx, pkg, productID)
+			if !verbose {
+				subscription, err := client.GetSubscription(requestCtx, pkg, productID)
+				if err != nil {
+					return fmt.Errorf("failed to get subscription: %w", err)
+				}
+				return shared.WriteJSON(deps.Stdout, map[string]any{
+					"packageName":  pkg,
+					"subscription": subscription,
+				})
+			}
+
+			diagnostic, err := client.GetSubscriptionDiagnostic(requestCtx, pkg, productID)
 			if err != nil {
-				return fmt.Errorf("failed to get subscription: %w", err)
+				return fmt.Errorf("failed to get subscription diagnostics: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName":  pkg,
-				"subscription": subscription,
+				"subscription": subscriptionInfoFromDiagnostic(diagnostic),
+				"diagnostic":   diagnostic,
 			})
 		},
+	}
+}
+
+func subscriptionInfoFromDiagnostic(diagnostic gpc.SubscriptionDiagnosticInfo) gpc.SubscriptionInfo {
+	return gpc.SubscriptionInfo{
+		PackageName:   diagnostic.PackageName,
+		ProductID:     diagnostic.ProductID,
+		Archived:      diagnostic.Archived,
+		BasePlanCount: diagnostic.BasePlanCount,
+		ListingCount:  diagnostic.ListingCount,
 	}
 }
 
