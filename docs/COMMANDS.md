@@ -88,6 +88,7 @@ make generate-command-docs
 - `gpc release`
 - `gpc release verify`
 - `gpc release alpha`
+- `gpc release promote`
 - `gpc reviews`
 - `gpc reviews list`
 - `gpc reviews get`
@@ -1351,8 +1352,9 @@ USAGE
   release
 
 SUBCOMMANDS
-  verify  Run non-mutating release readiness checks
-  alpha   Build staging AAB and deploy to alpha track in one flow
+  verify   Run non-mutating release readiness checks
+  alpha    Build staging AAB and deploy to alpha track in one flow
+  promote  Promote the latest releasable release from one track to another
 ```
 
 ## `gpc release verify --help`
@@ -1406,6 +1408,25 @@ FLAGS
   -user-fraction -1                      Rollout user fraction (0-1)
   -version-code 0                        Release versionCode override (default computed if empty)
   -version-name string                   Release versionName override
+```
+
+## `gpc release promote --help`
+
+```text
+DESCRIPTION
+  Promote the latest releasable release from one track to another
+
+USAGE
+  promote
+
+FLAGS
+  -confirm=false        Confirm committing promotion (required unless --dry-run)
+  -dry-run=false        Create and validate the promotion but delete the edit instead of committing
+  -from-track string    Source track name
+  -package-name string  Target package name
+  -release-name string  Optional target release name override
+  -status string        Optional target release status override
+  -to-track string      Target track name
 ```
 
 ## `gpc reviews --help`

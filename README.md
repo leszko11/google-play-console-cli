@@ -435,6 +435,15 @@ gpc release alpha \
   --status completed \
   --notes-mode git \
   --confirm
+
+# Promote the latest releasable release between tracks in one flow
+gpc release promote \
+  --package-name com.example.app \
+  --from-track internal \
+  --to-track production \
+  --status inProgress \
+  --release-name "Production rollout" \
+  --confirm
 ```
 
 ## Auth Profiles and Credential Sources

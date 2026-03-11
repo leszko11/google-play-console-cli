@@ -115,7 +115,12 @@ func baseReleaseDeps(t *testing.T, client *fakeReleaseClient) Deps {
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return client, nil
 		},
-		LookupEnv: func(string) string { return "" },
+		LookupEnv: func(key string) string {
+			if key == "GPC_BYPASS_KEYCHAIN" {
+				return "1"
+			}
+			return ""
+		},
 		RunCommand: func(_ context.Context, _ string, name string, args ...string) (string, error) {
 			switch {
 			case name == "java":

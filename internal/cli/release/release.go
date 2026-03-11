@@ -55,6 +55,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newVerifyCommand(deps),
 			newAlphaCommand(deps),
+			newPromoteCommand(deps),
 		},
 	}
 }
