@@ -251,11 +251,23 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 		res.addWarn("reporting", "reporting client initialization failed")
 		res.addNextStep("Enable Google Play Developer Reporting API for the service-account project.")
 	} else {
-		apps, reportingErr := reportingClient.SearchApps(requestCtx, 1, "", false)
+		apps, reportingErr := reportingClient.SearchApps(requestCtx, 100, "", true)
 		switch {
 		case reportingErr == nil:
-			res.addOK("reporting", fmt.Sprintf("reporting accessible apps probe succeeded (count=%d)", len(apps.Apps)))
-		case isReportingAvailabilityWarning(reportingErr):
+			reportingCheckStatus, detail, nextStep := evaluateReportingProbe(res.PackageName, apps)
+			switch reportingCheckStatus {
+			case "ok":
+				res.addOK("reporting", detail)
+			case "warn":
+				res.addWarn("reporting", detail)
+			default:
+				res.addBlocking("reporting", detail)
+			}
+			res.addNextStep(nextStep)
+		case isReportingPermissionError(reportingErr):
+			res.addWarn("reporting", reportingErr.Error())
+			res.addNextStep("Grant the service account access to Google Play Developer Reporting and verify the Cloud project binding.")
+		case isReportingAPIEnablementError(reportingErr):
 			res.addWarn("reporting", reportingErr.Error())
 			res.addNextStep("Enable Google Play Developer Reporting API for the service-account project.")
 		default:
@@ -316,15 +328,14 @@ func runSubscriptionChecks(ctx context.Context, client Client, packageName strin
 		if err != nil {
 			res.addBlocking("subscription_fixture", err.Error())
 		} else {
-			res.addOK("subscription_fixture", fmt.Sprintf(
-				"subscription %s verified (basePlans=%d activeBasePlans=%d listings=%d regions=%d availableRegions=%d)",
-				subscription.ProductID,
-				subscription.BasePlanCount,
-				subscription.ActiveBasePlanCount,
-				subscription.ListingCount,
-				subscription.RegionCount,
-				subscription.AvailableRegionCount,
-			))
+			detail, needsReview := summarizeSubscriptionDiagnostic(subscription)
+			if needsReview {
+				res.addWarn("subscription_fixture", detail)
+				res.addNextStep("Review subscription regional availability and add required regions such as PL/US for billing smoke tests.")
+				res.addNextStep("Activate the subscription base plan intended for billing smoke tests.")
+			} else {
+				res.addOK("subscription_fixture", detail)
+			}
 		}
 	}
 
@@ -360,15 +371,14 @@ func runProductChecks(ctx context.Context, client Client, packageName string, fi
 		if err != nil {
 			res.addBlocking("product_fixture", err.Error())
 		} else {
-			res.addOK("product_fixture", fmt.Sprintf(
-				"one-time product %s verified (purchaseOptions=%d activePurchaseOptions=%d listings=%d regions=%d availableRegions=%d)",
-				product.ProductID,
-				product.PurchaseOptionCount,
-				product.ActivePurchaseOptionCount,
-				product.ListingCount,
-				product.RegionCount,
-				product.AvailableRegionCount,
-			))
+			detail, needsReview := summarizeProductDiagnostic(product)
+			if needsReview {
+				res.addWarn("product_fixture", detail)
+				res.addNextStep("Review one-time product regional availability and add required regions such as PL/US for billing smoke tests.")
+				res.addNextStep("Activate the one-time product purchase option intended for billing smoke tests.")
+			} else {
+				res.addOK("product_fixture", detail)
+			}
 		}
 	}
 
@@ -476,16 +486,86 @@ func runVersionChecks(ctx context.Context, client Client, packageName string, ve
 	}
 }
 
-func isReportingAvailabilityWarning(err error) bool {
+func isReportingAPIEnablementError(err error) bool {
 	if err == nil {
 		return false
 	}
 	lower := strings.ToLower(err.Error())
 	return strings.Contains(lower, "playdeveloperreporting api error") ||
-		strings.Contains(lower, "play developer reporting api") ||
 		strings.Contains(lower, "serviceusage.services.enable") ||
 		strings.Contains(lower, "has not been used in project") ||
-		(strings.Contains(lower, "permission") && strings.Contains(lower, "reporting"))
+		strings.Contains(lower, "api has not been used in project") ||
+		strings.Contains(lower, "play developer reporting api")
+}
+
+func isReportingPermissionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "permission") ||
+		strings.Contains(lower, "caller does not have permission") ||
+		strings.Contains(lower, "permission denied")
+}
+
+func evaluateReportingProbe(packageName string, apps gpc.ReportingAppsListInfo) (status string, detail string, nextStep string) {
+	if len(apps.Apps) == 0 {
+		return "warn", "reporting probe succeeded but returned zero accessible apps", "Verify that the app has reporting data and that the service account can see the reporting app inventory."
+	}
+
+	target := "apps/" + strings.TrimSpace(packageName)
+	for _, app := range apps.Apps {
+		if app != nil && strings.TrimSpace(app.Name) == target {
+			return "ok", fmt.Sprintf("reporting package visible in accessible app discovery (count=%d)", len(apps.Apps)), ""
+		}
+	}
+
+	return "warn", fmt.Sprintf("package is not visible in reporting app discovery (count=%d)", len(apps.Apps)), "Verify that the package has reporting data and that the service account can access reporting for this app."
+}
+
+func summarizeSubscriptionDiagnostic(subscription gpc.SubscriptionDiagnosticInfo) (string, bool) {
+	basePlanStates := make([]string, 0, len(subscription.BasePlans))
+	for _, plan := range subscription.BasePlans {
+		basePlanStates = append(basePlanStates, fmt.Sprintf("%s:%s", plan.BasePlanID, plan.State))
+	}
+	detail := fmt.Sprintf(
+		"subscription %s verified (basePlans=%d activeBasePlans=%d listings=%d regions=%d availableRegions=%d states=%s)",
+		subscription.ProductID,
+		subscription.BasePlanCount,
+		subscription.ActiveBasePlanCount,
+		subscription.ListingCount,
+		subscription.RegionCount,
+		subscription.AvailableRegionCount,
+		joinDiagnosticStates(basePlanStates),
+	)
+	needsReview := subscription.ActiveBasePlanCount < subscription.BasePlanCount || subscription.AvailableRegionCount < subscription.RegionCount
+	return detail, needsReview
+}
+
+func summarizeProductDiagnostic(product gpc.OneTimeProductDiagnosticInfo) (string, bool) {
+	purchaseOptionStates := make([]string, 0, len(product.PurchaseOptions))
+	for _, option := range product.PurchaseOptions {
+		purchaseOptionStates = append(purchaseOptionStates, fmt.Sprintf("%s:%s", option.PurchaseOptionID, option.State))
+	}
+	detail := fmt.Sprintf(
+		"one-time product %s verified (purchaseOptions=%d activePurchaseOptions=%d listings=%d regions=%d availableRegions=%d states=%s)",
+		product.ProductID,
+		product.PurchaseOptionCount,
+		product.ActivePurchaseOptionCount,
+		product.ListingCount,
+		product.RegionCount,
+		product.AvailableRegionCount,
+		joinDiagnosticStates(purchaseOptionStates),
+	)
+	needsReview := product.ActivePurchaseOptionCount < product.PurchaseOptionCount || product.AvailableRegionCount < product.RegionCount
+	return detail, needsReview
+}
+
+func joinDiagnosticStates(values []string) string {
+	if len(values) == 0 {
+		return "n/a"
+	}
+	return strings.Join(values, ",")
 }
 
 func (r *result) addOK(name, detail string) {
