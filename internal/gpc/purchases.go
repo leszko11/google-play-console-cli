@@ -468,6 +468,7 @@ func subscriptionPurchaseInfoFromSubscriptionPurchaseV2(purchase *androidpublish
 	}
 	return SubscriptionPurchaseInfo{
 		Kind:                 purchase.Kind,
+		Etag:                 purchase.Etag,
 		LatestOrderID:        purchase.LatestOrderId,
 		SubscriptionState:    purchase.SubscriptionState,
 		AcknowledgementState: purchase.AcknowledgementState,

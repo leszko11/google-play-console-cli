@@ -146,6 +146,14 @@ func (f *fakeClient) ListVoidedPurchases(_ context.Context, _ string, query gpc.
 func runPurchases(t *testing.T, deps Deps, args ...string) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
+	if deps.LookupEnv == nil {
+		deps.LookupEnv = func(key string) string {
+			if key == "GPC_BYPASS_KEYCHAIN" {
+				return "1"
+			}
+			return ""
+		}
+	}
 	deps.Stdout = &out
 	deps.Stderr = &bytes.Buffer{}
 	cmd := NewCommand(deps)
@@ -206,6 +214,30 @@ func TestPurchasesProductsV2Get_ReturnsPurchase(t *testing.T) {
 		t.Fatalf("command failed: %v", err)
 	}
 	if !strings.Contains(out, `"orderId":"GPA.2"`) || !strings.Contains(out, `"purchaseState":"PENDING"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestPurchasesSubscriptionsGet_ReturnsPurchaseWithEtag(t *testing.T) {
+	fc := &fakeClient{
+		subscriptionPurchase: gpc.SubscriptionPurchaseInfo{
+			Etag:              "etag-1",
+			LatestOrderID:     "GPA.3",
+			SubscriptionState: "SUBSCRIPTION_STATE_ACTIVE",
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runPurchases(t, deps, "subscriptions", "get", "--package-name", "com.example.app", "--token", "tok-1")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"etag":"etag-1"`) || !strings.Contains(out, `"latestOrderId":"GPA.3"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
