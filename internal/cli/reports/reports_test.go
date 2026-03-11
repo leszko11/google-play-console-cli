@@ -62,6 +62,14 @@ func (f *fakeClient) QueryVitalsMetricSet(_ context.Context, packageName string,
 func runReports(t *testing.T, deps Deps, args ...string) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
+	if deps.LookupEnv == nil {
+		deps.LookupEnv = func(key string) string {
+			if key == "GPC_BYPASS_KEYCHAIN" {
+				return "1"
+			}
+			return ""
+		}
+	}
 	deps.Stdout = &out
 	deps.Stderr = &bytes.Buffer{}
 	cmd := NewCommand(deps)
@@ -246,6 +254,102 @@ func TestReportsAppsList_UsesGlobalPaginate(t *testing.T) {
 	}
 	if !fc.capturedPaginate {
 		t.Fatal("expected paginate=true from global flags")
+	}
+}
+
+func TestReportsSummary_ReturnsAggregate(t *testing.T) {
+	fc := &fakeClient{
+		appsResult: gpc.ReportingAppsListInfo{
+			Apps: []*gpc.ReportingApp{
+				{Name: "apps/com.example.app", PackageName: "com.example.app", DisplayName: "Example App"},
+			},
+		},
+		anomaliesResult: gpc.ReportingAnomaliesListInfo{},
+		getResult: gpc.ReportingVitalsMetricSetInfo{
+			MetricSet:    "crash-rate",
+			ResourceName: "apps/com.example.app/crashRateMetricSet",
+		},
+		queryResult: gpc.ReportingVitalsQueryResult{
+			MetricSet:     "crash-rate",
+			ResourceName:  "apps/com.example.app/crashRateMetricSet",
+			Rows:          []*gpc.ReportingMetricsRow{{AggregationPeriod: "DAILY"}},
+			NextPageToken: "",
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+	}
+
+	out, err := runReports(t, deps, "summary", "--package-name", "com.example.app")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{`"status":"ok"`, `"packageName":"com.example.app"`, `"visible":true`, `"count":0`, `"rowCount":1`, `"metricSet":"crash-rate"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got %s", want, out)
+		}
+	}
+	if fc.capturedMetricSet != gpc.ReportingVitalsMetricSetCrashRate {
+		t.Fatalf("expected crash-rate metric set, got %q", fc.capturedMetricSet)
+	}
+	if fc.capturedQuery == nil || len(fc.capturedQuery.Metrics) != 1 || fc.capturedQuery.Metrics[0] != "crashRate" {
+		t.Fatalf("expected default crash-rate query payload, got %#v", fc.capturedQuery)
+	}
+}
+
+func TestReportsSummary_WarnsWhenAnomaliesPresent(t *testing.T) {
+	fc := &fakeClient{
+		appsResult: gpc.ReportingAppsListInfo{
+			Apps: []*gpc.ReportingApp{
+				{Name: "apps/com.example.app", PackageName: "com.example.app"},
+			},
+		},
+		anomaliesResult: gpc.ReportingAnomaliesListInfo{
+			Anomalies: []*gpc.ReportingAnomaly{{Name: "apps/com.example.app/anomalies/a1"}},
+		},
+		getResult: gpc.ReportingVitalsMetricSetInfo{MetricSet: "anr-rate"},
+		queryResult: gpc.ReportingVitalsQueryResult{
+			MetricSet: "anr-rate",
+			Rows:      []*gpc.ReportingMetricsRow{},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+	}
+
+	out, err := runReports(t, deps, "summary", "--package-name", "com.example.app", "--metric-set", "anr-rate")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"warn"`) || !strings.Contains(out, `"count":1`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestReportsSummary_WarnsWhenPackageNotVisible(t *testing.T) {
+	fc := &fakeClient{
+		appsResult: gpc.ReportingAppsListInfo{
+			Apps: []*gpc.ReportingApp{
+				{Name: "apps/com.other.app", PackageName: "com.other.app"},
+			},
+		},
+		anomaliesResult: gpc.ReportingAnomaliesListInfo{},
+		getResult:       gpc.ReportingVitalsMetricSetInfo{MetricSet: "crash-rate"},
+		queryResult:     gpc.ReportingVitalsQueryResult{MetricSet: "crash-rate"},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+	}
+
+	out, err := runReports(t, deps, "summary", "--package-name", "com.example.app")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"warn"`) || !strings.Contains(out, `"visible":false`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
 
