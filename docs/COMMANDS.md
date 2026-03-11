@@ -85,6 +85,9 @@ make generate-command-docs
 - `gpc deobfuscation upload`
 - `gpc deploy`
 - `gpc doctor`
+- `gpc e2e`
+- `gpc e2e fixtures`
+- `gpc e2e fixtures status`
 - `gpc release`
 - `gpc release verify`
 - `gpc release alpha`
@@ -237,6 +240,7 @@ SUBCOMMANDS
   deobfuscation          Manage deobfuscation files in an edit
   deploy                 Upload artifact and publish to a track in one flow
   doctor                 Run read-only diagnostics for auth, package access, and e2e fixtures
+  e2e                    E2E fixture and smoke-testing helpers
   release                Release workflows for staged Google Play deploys
   reviews                Read and reply to Play Store reviews
   reports                Google Play Developer Reporting commands
@@ -1340,6 +1344,48 @@ FLAGS
   -package-name string   Package name
   -strict=false          Fail on warnings
   -version-code 0        Version code for delivery diagnostics
+```
+
+## `gpc e2e --help`
+
+```text
+DESCRIPTION
+  E2E fixture and smoke-testing helpers
+
+USAGE
+  e2e
+
+SUBCOMMANDS
+  fixtures  Inspect live e2e fixture readiness
+```
+
+## `gpc e2e fixtures --help`
+
+```text
+DESCRIPTION
+  Inspect live e2e fixture readiness
+
+USAGE
+  fixtures
+
+SUBCOMMANDS
+  status  Check which live e2e fixtures are valid, missing, or stale
+```
+
+## `gpc e2e fixtures status --help`
+
+```text
+DESCRIPTION
+  Check which live e2e fixtures are valid, missing, or stale
+
+USAGE
+  status
+
+FLAGS
+  -fixtures-file string  Path to JSON fixture file
+  -package-name string   Package name
+  -strict=false          Fail on warnings
+  -version-code 0        Version code for delivery fixtures
 ```
 
 ## `gpc release --help`
