@@ -44,6 +44,7 @@ Optional environment variables:
 - `GPC_STRICT_PHASE5_PURCHASES=1`: fail phase 5 when purchases endpoints return package/permission skips.
 - `GPC_TEST_SUBSCRIPTION_PRODUCT_ID`, `GPC_TEST_PRODUCT_ID`: optional IDs for `subscriptions get` / `products get` checks.
 - `GPC_TEST_SUBSCRIPTION_TOKEN`, `GPC_TEST_SUBSCRIPTION_ETAG`: optional purchase token + etag for `purchases subscriptions get` and `defer --validate-only`.
+  - Important: for `subscriptionsv2.defer`, a fresh `etag` is not enough. The subscription fixture must already be acknowledged before Play accepts deferral.
 - `GPC_TEST_PRODUCT_TOKEN`: optional purchase token for `purchases products get` when `GPC_TEST_PRODUCT_ID` is set.
 - `GPC_BYPASS_KEYCHAIN=1`: force config-path auth fallback (useful for deterministic CI).
 - `GPC_STRICT_AUTH=1`: enable strict mixed-source auth failure mode.
@@ -71,6 +72,7 @@ CI secret and variable contract:
 - Optional variable `GPC_TEST_PRODUCT_ID`: enables `products get` and `purchases products get` assertions (with token).
 - Optional secret `GPC_TEST_SUBSCRIPTION_TOKEN`: enables `purchases subscriptions get`.
 - Optional secret `GPC_TEST_SUBSCRIPTION_ETAG`: enables `purchases subscriptions defer --validate-only`.
+  - Known Play constraint: as of March 12, 2026, a fresh sandbox `subscriptionsv2` token with a live `etag` still failed deferral until acknowledged, and the legacy acknowledge endpoint was rejected for that token with `The product purchase is not owned by the user`. Treat acknowledged subscription fixtures as a separate prerequisite.
 - Optional secret `GPC_TEST_PRODUCT_TOKEN`: enables `purchases products get`.
 
 The workflow writes credentials to a temp file and exports:
@@ -84,6 +86,14 @@ export GPC_SERVICE_ACCOUNT="$RUNNER_TEMP/gpc-sa.json"
 Phase 3 can be enabled via workflow-dispatch input `run_phase3=true`, with `aab_path` or `apk_path`. Use `expected_version_code` when your test artifact is built with CI-derived monotonic version code.
 
 Phase 5 can be enabled via workflow-dispatch input `run_phase5=true`. If purchase token secrets are missing, token-based checks are skipped.
+
+For `purchases subscriptions defer --validate-only`, the current known blocker is not stale `etag` alone. The verified failure path on March 12, 2026 was:
+
+1. fresh `subscriptionsv2` token with live `etag`
+2. `defer --validate-only` rejected by Play with `Subscription purchase must be acknowledged before deferral`
+3. fallback attempt through the legacy acknowledge endpoint rejected with `The product purchase is not owned by the user`
+
+Until the app-side billing flow yields an already-acknowledged subscription fixture, this check should be treated as a documented external Play constraint rather than a CLI regression.
 
 ## CLI Smoke Commands
 
