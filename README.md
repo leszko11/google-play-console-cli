@@ -53,6 +53,7 @@ Homebrew is planned later. `v0.1.0` supports `go install` and GitHub Release arc
 - Deobfuscation mapping upload (`deobfuscation upload`)
 - End-to-end deploy orchestration (`deploy`)
 - Read-only operator diagnostics (`doctor`)
+- E2E fixture readiness diagnostics (`e2e fixtures status`)
 - Staging release workflows (`release verify`, `release alpha`)
 - Reviews management (`reviews list/get/reply`)
 - Google Play Developer Reporting app discovery, anomalies, and vitals queries (`reports apps list`, `reports anomalies list`, `reports vitals get/query`)
@@ -119,6 +120,9 @@ gpc auth profiles list --output table
 
 # Run a read-only diagnostic pass for auth, package access, and e2e fixtures
 gpc doctor --package-name com.example.app
+
+# Check which live smoke fixtures are valid, missing, or stale
+gpc e2e fixtures status --package-name com.example.app --fixtures-file /path/to/fixtures.json
 
 # Profile override without mutating persisted active profile
 gpc --profile work auth status --output json
@@ -530,6 +534,7 @@ gpc apks --help
 gpc deobfuscation --help
 gpc deploy --help
 gpc doctor --help
+gpc e2e --help
 gpc release --help
 gpc reviews --help
 gpc reports --help
