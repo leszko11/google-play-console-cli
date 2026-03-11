@@ -95,6 +95,7 @@ make generate-command-docs
 - `gpc reviews`
 - `gpc reviews list`
 - `gpc reviews get`
+- `gpc reviews triage`
 - `gpc reviews reply`
 - `gpc reports`
 - `gpc reports apps`
@@ -1486,9 +1487,10 @@ USAGE
   reviews
 
 SUBCOMMANDS
-  list   List app reviews
-  get    Get one review by ID
-  reply  Reply to a review
+  list    List app reviews
+  get     Get one review by ID
+  triage  Group reviews into pending-reply and replied buckets
+  reply   Reply to a review
 ```
 
 ## `gpc reviews list --help`
@@ -1520,6 +1522,23 @@ USAGE
 FLAGS
   -package-name string  Package name
   -review-id string     Review ID
+```
+
+## `gpc reviews triage --help`
+
+```text
+DESCRIPTION
+  Group reviews into pending-reply and replied buckets
+
+USAGE
+  triage
+
+FLAGS
+  -max-results 100              Maximum number of reviews per page
+  -package-name string          Package name
+  -start-index 0                Index of first review to return (non-token pagination)
+  -token string                 Pagination token
+  -translation-language string  Language localization code for translated responses
 ```
 
 ## `gpc reviews reply --help`

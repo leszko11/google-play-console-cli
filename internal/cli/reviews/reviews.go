@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
@@ -37,6 +38,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newListCommand(deps),
 			newGetCommand(deps),
+			newTriageCommand(deps),
 			newReplyCommand(deps),
 		},
 	}
@@ -146,6 +148,119 @@ func newGetCommand(deps Deps) *ffcli.Command {
 			})
 		},
 	}
+}
+
+type triageEntry struct {
+	ReviewID   string `json:"reviewId,omitempty"`
+	AuthorName string `json:"authorName,omitempty"`
+	StarRating int64  `json:"starRating,omitempty"`
+	HasReply   bool   `json:"hasReply,omitempty"`
+}
+
+type triageResult struct {
+	PackageName       string        `json:"packageName"`
+	Status            string        `json:"status"`
+	ReviewCount       int           `json:"reviewCount"`
+	PendingReplyCount int           `json:"pendingReplyCount"`
+	RepliedCount      int           `json:"repliedCount"`
+	PendingReply      []triageEntry `json:"pendingReply,omitempty"`
+	Replied           []triageEntry `json:"replied,omitempty"`
+}
+
+func newTriageCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("triage", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, token, translationLanguage string
+	var maxResults, startIndex int64
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.Int64Var(&maxResults, "max-results", 100, "Maximum number of reviews per page")
+	fs.Int64Var(&startIndex, "start-index", 0, "Index of first review to return (non-token pagination)")
+	fs.StringVar(&token, "token", "", "Pagination token")
+	fs.StringVar(&translationLanguage, "translation-language", "", "Language localization code for translated responses")
+
+	return &ffcli.Command{
+		Name:      "triage",
+		ShortHelp: "Group reviews into pending-reply and replied buckets",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			if maxResults < 0 {
+				return fmt.Errorf("--max-results must be greater than or equal to zero")
+			}
+			if startIndex < 0 {
+				return fmt.Errorf("--start-index must be greater than or equal to zero")
+			}
+
+			result, err := client.ListReviews(
+				requestCtx,
+				pkg,
+				maxResults,
+				startIndex,
+				token,
+				translationLanguage,
+				shared.ActiveGlobalFlags().Paginate,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to list reviews: %w", err)
+			}
+
+			triage := buildTriageResult(pkg, result.Reviews)
+			return shared.WriteJSON(deps.Stdout, triage)
+		},
+	}
+}
+
+func buildTriageResult(packageName string, reviews []gpc.ReviewInfo) triageResult {
+	result := triageResult{
+		PackageName: packageName,
+		Status:      "ok",
+		ReviewCount: len(reviews),
+	}
+
+	for _, review := range reviews {
+		entry := triageEntry{
+			ReviewID:   review.ReviewID,
+			AuthorName: review.AuthorName,
+			StarRating: review.StarRating,
+			HasReply:   review.HasReply,
+		}
+		if review.HasReply {
+			result.Replied = append(result.Replied, entry)
+			continue
+		}
+		result.PendingReply = append(result.PendingReply, entry)
+	}
+
+	slices.SortFunc(result.PendingReply, func(a, b triageEntry) int {
+		if a.StarRating != b.StarRating {
+			if a.StarRating < b.StarRating {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(a.ReviewID, b.ReviewID)
+	})
+	slices.SortFunc(result.Replied, func(a, b triageEntry) int {
+		if a.StarRating != b.StarRating {
+			if a.StarRating < b.StarRating {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(a.ReviewID, b.ReviewID)
+	})
+
+	result.PendingReplyCount = len(result.PendingReply)
+	result.RepliedCount = len(result.Replied)
+	if result.PendingReplyCount > 0 {
+		result.Status = "warn"
+	}
+	return result
 }
 
 func newReplyCommand(deps Deps) *ffcli.Command {

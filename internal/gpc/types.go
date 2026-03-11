@@ -93,6 +93,10 @@ type CountryAvailabilityInfo struct {
 type ReviewInfo struct {
 	ReviewID   string `json:"reviewId,omitempty"`
 	AuthorName string `json:"authorName,omitempty"`
+	StarRating int64  `json:"starRating,omitempty"`
+	Comment    string `json:"comment,omitempty"`
+	HasReply   bool   `json:"hasReply,omitempty"`
+	ReplyText  string `json:"replyText,omitempty"`
 }
 
 type ReviewsListInfo struct {

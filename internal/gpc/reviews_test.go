@@ -40,8 +40,19 @@ func TestReviewMethods_ValidateArgs(t *testing.T) {
 func TestReviewsListInfoFromResponse(t *testing.T) {
 	got := reviewsListInfoFromResponse(&androidpublisher.ReviewsListResponse{
 		Reviews: []*androidpublisher.Review{
-			{ReviewId: "review-1", AuthorName: "Alice"},
-			{ReviewId: "review-2", AuthorName: "Bob"},
+			{
+				ReviewId:   "review-1",
+				AuthorName: "Alice",
+				Comments:   []*androidpublisher.Comment{{UserComment: &androidpublisher.UserComment{StarRating: 1, Text: "bad"}}},
+			},
+			{
+				ReviewId:   "review-2",
+				AuthorName: "Bob",
+				Comments: []*androidpublisher.Comment{{
+					UserComment:      &androidpublisher.UserComment{StarRating: 5, Text: "great"},
+					DeveloperComment: &androidpublisher.DeveloperComment{Text: "thanks"},
+				}},
+			},
 		},
 		TokenPagination: &androidpublisher.TokenPagination{NextPageToken: "next-token"},
 	})
@@ -51,8 +62,15 @@ func TestReviewsListInfoFromResponse(t *testing.T) {
 }
 
 func TestReviewInfoFromReview(t *testing.T) {
-	got := reviewInfoFromReview(&androidpublisher.Review{ReviewId: "review-1", AuthorName: "Alice"})
-	if got.ReviewID != "review-1" || got.AuthorName != "Alice" {
+	got := reviewInfoFromReview(&androidpublisher.Review{
+		ReviewId:   "review-1",
+		AuthorName: "Alice",
+		Comments: []*androidpublisher.Comment{{
+			UserComment:      &androidpublisher.UserComment{StarRating: 2, Text: "needs work"},
+			DeveloperComment: &androidpublisher.DeveloperComment{Text: "we are fixing it"},
+		}},
+	})
+	if got.ReviewID != "review-1" || got.AuthorName != "Alice" || got.StarRating != 2 || got.Comment != "needs work" || !got.HasReply || got.ReplyText != "we are fixing it" {
 		t.Fatalf("unexpected review map: %+v", got)
 	}
 }

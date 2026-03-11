@@ -56,6 +56,7 @@ Homebrew is planned later. `v0.1.0` supports `go install` and GitHub Release arc
 - E2E fixture readiness diagnostics (`e2e fixtures status`)
 - Staging release workflows (`release verify`, `release alpha`)
 - Reviews management (`reviews list/get/reply`)
+- Review triage summary (`reviews triage`)
 - Google Play Developer Reporting app discovery, anomalies, and vitals queries (`reports apps list`, `reports anomalies list`, `reports vitals get/query`)
 - Reporting operator summary (`reports summary`)
 - Orders API support (`orders get/batch-get/refund`)
@@ -157,6 +158,9 @@ gpc reports anomalies list --package-name com.example.app --filter 'activeBetwee
 
 # Summarize reporting visibility, anomaly count, and vitals freshness
 gpc reports summary --package-name com.example.app
+
+# Group reviews into pending-reply and replied buckets
+gpc reviews triage --package-name com.example.app
 
 # Write the app's Data Safety declaration from the exported Play CSV template
 gpc apps data-safety --package-name com.example.app --input /path/to/data-safety.csv
