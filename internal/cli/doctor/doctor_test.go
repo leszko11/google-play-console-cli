@@ -215,6 +215,58 @@ func TestRunReportingDisabledIsWarning(t *testing.T) {
 	}
 }
 
+func TestRunReportingPermissionDeniedIsWarning(t *testing.T) {
+	resetGlobalFlags(t, shared.GlobalFlags{})
+	cfg, lookupEnv := validConfig(t)
+
+	res, err := run(context.Background(), Deps{
+		LoadConfig: func() (config.Config, error) { return cfg, nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+		NewReportingClient: func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
+			return &fakeReportingClient{err: fmt.Errorf("playdeveloperreporting api error (403): The caller does not have permission")}, nil
+		},
+		LookupEnv: lookupEnv,
+	}, options{PackageName: "com.example.app"})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	if checkStatus(res, "reporting") != "warn" {
+		t.Fatalf("expected reporting warn, got %+v", res.Checks)
+	}
+	if !containsSubstring(res.NextSteps, "Grant the service account access to Google Play Developer Reporting") {
+		t.Fatalf("expected permission next step, got %+v", res.NextSteps)
+	}
+}
+
+func TestRunReportingPackageNotAccessibleWarns(t *testing.T) {
+	resetGlobalFlags(t, shared.GlobalFlags{})
+	cfg, lookupEnv := validConfig(t)
+
+	res, err := run(context.Background(), Deps{
+		LoadConfig: func() (config.Config, error) { return cfg, nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+		NewReportingClient: func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
+			return &fakeReportingClient{apps: []string{"apps/com.other.app"}}, nil
+		},
+		LookupEnv: lookupEnv,
+	}, options{PackageName: "com.example.app"})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	if checkStatus(res, "reporting") != "warn" {
+		t.Fatalf("expected reporting warn, got %+v", res.Checks)
+	}
+	if !containsSubstring(res.Warnings, "package is not visible in reporting app discovery") {
+		t.Fatalf("expected reporting package warning, got %+v", res.Warnings)
+	}
+}
+
 func TestRunInvalidFixturesFileReturnsError(t *testing.T) {
 	resetGlobalFlags(t, shared.GlobalFlags{})
 	path := filepath.Join(t.TempDir(), "fixtures.json")
@@ -264,6 +316,86 @@ func TestRunVersionChecksExecuteWhenVersionCodeProvided(t *testing.T) {
 		if checkStatus(res, name) != "ok" {
 			t.Fatalf("expected %s check ok, got %+v", name, res.Checks)
 		}
+	}
+}
+
+func TestRunSubscriptionDiagnosticWarnsOnInactiveBasePlansAndRegions(t *testing.T) {
+	resetGlobalFlags(t, shared.GlobalFlags{})
+	cfg, lookupEnv := validConfig(t)
+	fixturesPath := writeFixtures(t, `{"subscriptionProductId":"premium"}`)
+
+	res, err := run(context.Background(), Deps{
+		LoadConfig: func() (config.Config, error) { return cfg, nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{
+				subscriptionDiagnostic: gpc.SubscriptionDiagnosticInfo{
+					ProductID:            "premium",
+					BasePlanCount:        2,
+					ActiveBasePlanCount:  1,
+					ListingCount:         1,
+					RegionCount:          2,
+					AvailableRegionCount: 1,
+					BasePlans: []gpc.SubscriptionBasePlanDiagnosticInfo{
+						{BasePlanID: "monthly", State: "ACTIVE", RegionalConfigCount: 2, AvailableRegionCount: 1},
+						{BasePlanID: "legacy", State: "INACTIVE", RegionalConfigCount: 0, AvailableRegionCount: 0},
+					},
+				},
+			}, nil
+		},
+		NewReportingClient: func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
+			return &fakeReportingClient{}, nil
+		},
+		LookupEnv: lookupEnv,
+	}, options{PackageName: "com.example.app", FixturesPath: fixturesPath})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	if checkStatus(res, "subscription_fixture") != "warn" {
+		t.Fatalf("expected subscription warn, got %+v", res.Checks)
+	}
+	if !containsSubstring(res.NextSteps, "Review subscription regional availability") {
+		t.Fatalf("expected subscription regional next step, got %+v", res.NextSteps)
+	}
+}
+
+func TestRunProductDiagnosticWarnsOnInactivePurchaseOptionsAndRegions(t *testing.T) {
+	resetGlobalFlags(t, shared.GlobalFlags{})
+	cfg, lookupEnv := validConfig(t)
+	fixturesPath := writeFixtures(t, `{"productId":"coins_100"}`)
+
+	res, err := run(context.Background(), Deps{
+		LoadConfig: func() (config.Config, error) { return cfg, nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{
+				oneTimeProductDiag: gpc.OneTimeProductDiagnosticInfo{
+					ProductID:                 "coins_100",
+					PurchaseOptionCount:       2,
+					ActivePurchaseOptionCount: 1,
+					ListingCount:              1,
+					RegionCount:               2,
+					AvailableRegionCount:      1,
+					PurchaseOptions: []gpc.OneTimeProductPurchaseOptionDiagnosticInfo{
+						{PurchaseOptionID: "buy", State: "ACTIVE", RegionalConfigCount: 2, AvailableRegionCount: 1},
+						{PurchaseOptionID: "legacy", State: "DRAFT", RegionalConfigCount: 0, AvailableRegionCount: 0},
+					},
+				},
+			}, nil
+		},
+		NewReportingClient: func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
+			return &fakeReportingClient{}, nil
+		},
+		LookupEnv: lookupEnv,
+	}, options{PackageName: "com.example.app", FixturesPath: fixturesPath})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	if checkStatus(res, "product_fixture") != "warn" {
+		t.Fatalf("expected product warn, got %+v", res.Checks)
+	}
+	if !containsSubstring(res.NextSteps, "Review one-time product regional availability") {
+		t.Fatalf("expected product regional next step, got %+v", res.NextSteps)
 	}
 }
 
