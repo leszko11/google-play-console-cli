@@ -57,6 +57,7 @@ Homebrew is planned later. `v0.1.0` supports `go install` and GitHub Release arc
 - Staging release workflows (`release verify`, `release alpha`)
 - Reviews management (`reviews list/get/reply`)
 - Google Play Developer Reporting app discovery, anomalies, and vitals queries (`reports apps list`, `reports anomalies list`, `reports vitals get/query`)
+- Reporting operator summary (`reports summary`)
 - Orders API support (`orders get/batch-get/refund`)
 - External transactions API support (`external-transactions get/create/refund`)
 - Device tier config support (`device-tier-configs list/get/create`)
@@ -153,6 +154,9 @@ gpc reports apps list --page-size 100
 
 # List anomalies for one app
 gpc reports anomalies list --package-name com.example.app --filter 'activeBetween("2026-03-01T00:00:00Z", UNBOUNDED)'
+
+# Summarize reporting visibility, anomaly count, and vitals freshness
+gpc reports summary --package-name com.example.app
 
 # Write the app's Data Safety declaration from the exported Play CSV template
 gpc apps data-safety --package-name com.example.app --input /path/to/data-safety.csv

@@ -8,11 +8,13 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
+	playdeveloperreporting "google.golang.org/api/playdeveloperreporting/v1beta1"
 )
 
 type Client interface {
@@ -31,6 +33,33 @@ type Deps struct {
 	Stderr     io.Writer
 }
 
+type summaryAppInfo struct {
+	Visible     bool   `json:"visible"`
+	DisplayName string `json:"displayName,omitempty"`
+	Resource    string `json:"resource,omitempty"`
+}
+
+type summaryAnomaliesInfo struct {
+	Count int `json:"count"`
+}
+
+type summaryVitalsInfo struct {
+	MetricSet     string                      `json:"metricSet"`
+	ResourceName  string                      `json:"resourceName,omitempty"`
+	FreshnessInfo *gpc.ReportingFreshnessInfo `json:"freshnessInfo,omitempty"`
+	RowCount      int                         `json:"rowCount"`
+	NextPageToken string                      `json:"nextPageToken,omitempty"`
+}
+
+type summaryResult struct {
+	Status      string               `json:"status"`
+	PackageName string               `json:"packageName"`
+	App         summaryAppInfo       `json:"app"`
+	Anomalies   summaryAnomaliesInfo `json:"anomalies"`
+	Vitals      summaryVitalsInfo    `json:"vitals"`
+	Warnings    []string             `json:"warnings,omitempty"`
+}
+
 func NewCommand(deps Deps) *ffcli.Command {
 	deps = withDefaults(deps)
 
@@ -41,6 +70,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newAppsCommand(deps),
 			newAnomaliesCommand(deps),
+			newSummaryCommand(deps),
 			newVitalsCommand(deps),
 		},
 	}
@@ -135,6 +165,67 @@ func newAnomaliesCommand(deps Deps) *ffcli.Command {
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
 			newAnomaliesListCommand(deps),
+		},
+	}
+}
+
+func newSummaryCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("summary", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, metricSetRaw, inputPath string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&metricSetRaw, "metric-set", string(gpc.ReportingVitalsMetricSetCrashRate), "Vitals metric set")
+	fs.StringVar(&inputPath, "input", "", "Path to vitals query JSON payload (defaults to a built-in last-7-days window)")
+
+	return &ffcli.Command{
+		Name:      "summary",
+		ShortHelp: "Summarize reporting visibility, anomalies, and vitals freshness for an app",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			metricSet, err := resolveMetricSet(metricSetRaw)
+			if err != nil {
+				return err
+			}
+
+			queryPayload, err := readSummaryQueryPayload(metricSet, inputPath, deps.Stdin)
+			if err != nil {
+				return err
+			}
+
+			appsResult, err := client.SearchApps(requestCtx, 100, "", true)
+			if err != nil {
+				return fmt.Errorf("failed to list reporting apps: %w", err)
+			}
+			anomaliesResult, err := client.ListAnomalies(requestCtx, pkg, "", 100, "", false)
+			if err != nil {
+				return fmt.Errorf("failed to list anomalies: %w", err)
+			}
+			vitalsResult, err := client.GetVitalsMetricSet(requestCtx, pkg, metricSet)
+			if err != nil {
+				return fmt.Errorf("failed to get vitals metric set: %w", err)
+			}
+			queryResult, err := client.QueryVitalsMetricSet(requestCtx, pkg, metricSet, queryPayload)
+			if err != nil {
+				return fmt.Errorf("failed to query vitals metric set: %w", err)
+			}
+
+			result := buildSummaryResult(pkg, appsResult, anomaliesResult, vitalsResult, queryResult)
+
+			switch shared.ResolveOutput("") {
+			case "json":
+				return shared.WriteJSON(deps.Stdout, result)
+			case "table":
+				return writeSummaryTable(deps.Stdout, result)
+			default:
+				return shared.UsageErrorf("unsupported output format %q", shared.ResolveOutput(""))
+			}
 		},
 	}
 }
@@ -322,4 +413,113 @@ func readVitalsQueryPayload(path string, stdin io.Reader) (*gpc.ReportingVitalsQ
 		return nil, fmt.Errorf("failed to decode vitals query payload: %w", err)
 	}
 	return &payload, nil
+}
+
+func readSummaryQueryPayload(metricSet gpc.ReportingVitalsMetricSet, path string, stdin io.Reader) (*gpc.ReportingVitalsQueryRequest, error) {
+	if strings.TrimSpace(path) != "" {
+		return readVitalsQueryPayload(path, stdin)
+	}
+	payload, err := defaultSummaryQuery(metricSet)
+	if err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func defaultSummaryQuery(metricSet gpc.ReportingVitalsMetricSet) (*gpc.ReportingVitalsQueryRequest, error) {
+	metricName, ok := defaultSummaryMetricNames[metricSet]
+	if !ok {
+		return nil, fmt.Errorf("no default query metric is configured for %q; pass --input explicitly", metricSet)
+	}
+
+	end := time.Now().UTC().AddDate(0, 0, -1)
+	start := end.AddDate(0, 0, -6)
+	return &gpc.ReportingVitalsQueryRequest{
+		Metrics: []string{metricName},
+		TimelineSpec: &gpc.ReportingTimelineSpec{
+			AggregationPeriod: "DAILY",
+			StartTime:         &playdeveloperreporting.GoogleTypeDateTime{Year: int64(start.Year()), Month: int64(start.Month()), Day: int64(start.Day())},
+			EndTime:           &playdeveloperreporting.GoogleTypeDateTime{Year: int64(end.Year()), Month: int64(end.Month()), Day: int64(end.Day())},
+		},
+	}, nil
+}
+
+var defaultSummaryMetricNames = map[gpc.ReportingVitalsMetricSet]string{
+	gpc.ReportingVitalsMetricSetANRRate:                     "anrRate",
+	gpc.ReportingVitalsMetricSetCrashRate:                   "crashRate",
+	gpc.ReportingVitalsMetricSetErrorCounts:                 "errorCount",
+	gpc.ReportingVitalsMetricSetExcessiveWakeupRate:         "excessiveWakeupRate",
+	gpc.ReportingVitalsMetricSetLMKRate:                     "lmkRate",
+	gpc.ReportingVitalsMetricSetSlowRenderingRate:           "slowRenderingRate",
+	gpc.ReportingVitalsMetricSetSlowStartRate:               "slowStartRate",
+	gpc.ReportingVitalsMetricSetStuckBackgroundWakelockRate: "stuckBackgroundWakelockRate",
+}
+
+func buildSummaryResult(pkg string, apps gpc.ReportingAppsListInfo, anomalies gpc.ReportingAnomaliesListInfo, vitals gpc.ReportingVitalsMetricSetInfo, query gpc.ReportingVitalsQueryResult) summaryResult {
+	result := summaryResult{
+		Status:      "ok",
+		PackageName: pkg,
+		Anomalies: summaryAnomaliesInfo{
+			Count: len(anomalies.Anomalies),
+		},
+		Vitals: summaryVitalsInfo{
+			MetricSet:     vitals.MetricSet,
+			ResourceName:  vitals.ResourceName,
+			FreshnessInfo: vitals.FreshnessInfo,
+			RowCount:      len(query.Rows),
+			NextPageToken: query.NextPageToken,
+		},
+	}
+
+	targetName := "apps/" + pkg
+	for _, app := range apps.Apps {
+		if app != nil && strings.TrimSpace(app.Name) == targetName {
+			result.App = summaryAppInfo{
+				Visible:     true,
+				DisplayName: strings.TrimSpace(app.DisplayName),
+				Resource:    strings.TrimSpace(app.Name),
+			}
+			break
+		}
+	}
+
+	if !result.App.Visible {
+		result.Status = "warn"
+		result.Warnings = append(result.Warnings, "package is not visible in reporting accessible app discovery")
+	}
+	if result.Anomalies.Count > 0 {
+		result.Status = "warn"
+		result.Warnings = append(result.Warnings, fmt.Sprintf("%d active reporting anomalies detected", result.Anomalies.Count))
+	}
+
+	return result
+}
+
+func writeSummaryTable(out io.Writer, result summaryResult) error {
+	if _, err := fmt.Fprintf(out, "STATUS\t%s\n", result.Status); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "PACKAGE\t%s\n", result.PackageName); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "APP_VISIBLE\t%t\n", result.App.Visible); err != nil {
+		return err
+	}
+	if result.App.Resource != "" {
+		if _, err := fmt.Fprintf(out, "APP_RESOURCE\t%s\n", result.App.Resource); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprintf(out, "ANOMALIES\t%d\n", result.Anomalies.Count); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "VITALS\t%s\trows=%d\n", result.Vitals.MetricSet, result.Vitals.RowCount); err != nil {
+		return err
+	}
+	for _, warning := range result.Warnings {
+		if _, err := fmt.Fprintf(out, "warning\t%s\n", warning); err != nil {
+			return err
+		}
+	}
+	return nil
 }

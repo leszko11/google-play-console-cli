@@ -101,6 +101,7 @@ make generate-command-docs
 - `gpc reports apps list`
 - `gpc reports anomalies`
 - `gpc reports anomalies list`
+- `gpc reports summary`
 - `gpc reports vitals`
 - `gpc reports vitals get`
 - `gpc reports vitals query`
@@ -1548,6 +1549,7 @@ USAGE
 SUBCOMMANDS
   apps       Reporting app discovery commands
   anomalies  Reporting anomaly commands
+  summary    Summarize reporting visibility, anomalies, and vitals freshness for an app
   vitals     Vitals metric set reporting commands
 ```
 
@@ -1605,6 +1607,21 @@ FLAGS
   -package-name string  Package name
   -page-size 0          Maximum anomalies per page
   -page-token string    Page token for the next page
+```
+
+## `gpc reports summary --help`
+
+```text
+DESCRIPTION
+  Summarize reporting visibility, anomalies, and vitals freshness for an app
+
+USAGE
+  summary
+
+FLAGS
+  -input string           Path to vitals query JSON payload (defaults to a built-in last-7-days window)
+  -metric-set crash-rate  Vitals metric set
+  -package-name string    Package name
 ```
 
 ## `gpc reports vitals --help`
