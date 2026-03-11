@@ -136,10 +136,24 @@ func reviewInfoFromReview(review *androidpublisher.Review) ReviewInfo {
 	if review == nil {
 		return ReviewInfo{}
 	}
-	return ReviewInfo{
+	info := ReviewInfo{
 		ReviewID:   review.ReviewId,
 		AuthorName: review.AuthorName,
 	}
+	for _, comment := range review.Comments {
+		if comment == nil {
+			continue
+		}
+		if comment.UserComment != nil {
+			info.StarRating = comment.UserComment.StarRating
+			info.Comment = strings.TrimSpace(comment.UserComment.Text)
+		}
+		if comment.DeveloperComment != nil {
+			info.HasReply = true
+			info.ReplyText = strings.TrimSpace(comment.DeveloperComment.Text)
+		}
+	}
+	return info
 }
 
 func reviewReplyInfoFromResponse(resp *androidpublisher.ReviewsReplyResponse) ReviewReplyInfo {

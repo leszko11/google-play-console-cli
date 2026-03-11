@@ -49,6 +49,14 @@ func (f *fakeClient) ReplyReview(_ context.Context, _, _, _ string) (gpc.ReviewR
 func runReviews(t *testing.T, deps Deps, args ...string) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
+	if deps.LookupEnv == nil {
+		deps.LookupEnv = func(key string) string {
+			if key == "GPC_BYPASS_KEYCHAIN" {
+				return "1"
+			}
+			return ""
+		}
+	}
 	deps.Stdout = &out
 	deps.Stderr = &bytes.Buffer{}
 	cmd := NewCommand(deps)
@@ -187,5 +195,52 @@ func TestReviewsReply_ReturnsAPIError(t *testing.T) {
 	)
 	if err == nil || !strings.Contains(err.Error(), "failed to reply to review") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReviewsTriage_ReturnsPendingAndRepliedBuckets(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{
+				list: gpc.ReviewsListInfo{
+					Reviews: []gpc.ReviewInfo{
+						{ReviewID: "review-1", AuthorName: "Alice", StarRating: 1, HasReply: false},
+						{ReviewID: "review-2", AuthorName: "Bob", StarRating: 5, HasReply: true},
+					},
+				},
+			}, nil
+		},
+	}
+
+	out, err := runReviews(t, deps, "triage", "--package-name", "com.example.app")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{`"status":"warn"`, `"pendingReplyCount":1`, `"repliedCount":1`, `"reviewId":"review-1"`, `"reviewId":"review-2"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got %s", want, out)
+		}
+	}
+}
+
+func TestReviewsTriage_ReturnsOkWhenNoPendingReplies(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{
+				list: gpc.ReviewsListInfo{
+					Reviews: []gpc.ReviewInfo{{ReviewID: "review-1", AuthorName: "Alice", HasReply: true}},
+				},
+			}, nil
+		},
+	}
+
+	out, err := runReviews(t, deps, "triage", "--package-name", "com.example.app")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"status":"ok"`) || !strings.Contains(out, `"pendingReplyCount":0`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
