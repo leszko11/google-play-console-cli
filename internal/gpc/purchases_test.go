@@ -158,6 +158,7 @@ func TestProductPurchaseV2InfoFromProductPurchaseV2(t *testing.T) {
 func TestSubscriptionPurchaseInfoFromSubscriptionPurchaseV2(t *testing.T) {
 	got := subscriptionPurchaseInfoFromSubscriptionPurchaseV2(&androidpublisher.SubscriptionPurchaseV2{
 		Kind:                 "androidpublisher#subscriptionPurchaseV2",
+		Etag:                 "etag-1",
 		LatestOrderId:        "GPA.2",
 		SubscriptionState:    "SUBSCRIPTION_STATE_ACTIVE",
 		AcknowledgementState: "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED",
@@ -165,7 +166,7 @@ func TestSubscriptionPurchaseInfoFromSubscriptionPurchaseV2(t *testing.T) {
 		StartTime:            "2026-01-01T00:00:00Z",
 		LineItems:            []*androidpublisher.SubscriptionPurchaseLineItem{{}, {}},
 	})
-	if got.LatestOrderID != "GPA.2" || got.LineItemCount != 2 || got.SubscriptionState != "SUBSCRIPTION_STATE_ACTIVE" {
+	if got.Etag != "etag-1" || got.LatestOrderID != "GPA.2" || got.LineItemCount != 2 || got.SubscriptionState != "SUBSCRIPTION_STATE_ACTIVE" {
 		t.Fatalf("unexpected subscription purchase map: %+v", got)
 	}
 }

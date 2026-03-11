@@ -265,6 +265,7 @@ type ProductPurchaseV2Info struct {
 
 type SubscriptionPurchaseInfo struct {
 	Kind                 string `json:"kind,omitempty"`
+	Etag                 string `json:"etag,omitempty"`
 	LatestOrderID        string `json:"latestOrderId,omitempty"`
 	SubscriptionState    string `json:"subscriptionState,omitempty"`
 	AcknowledgementState string `json:"acknowledgementState,omitempty"`
