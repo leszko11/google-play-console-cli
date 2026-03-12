@@ -21,6 +21,8 @@ type fakeClient struct {
 	listErr                    error
 	get                        gpc.SubscriptionInfo
 	getErr                     error
+	getRaw                     *androidpublisher.Subscription
+	getRawErr                  error
 	getDiagnostic              gpc.SubscriptionDiagnosticInfo
 	getDiagnosticErr           error
 	batchGet                   gpc.SubscriptionsListInfo
@@ -91,6 +93,11 @@ func (f *fakeClient) ListSubscriptions(_ context.Context, _ string, pageSize int
 func (f *fakeClient) GetSubscription(_ context.Context, _, productID string) (gpc.SubscriptionInfo, error) {
 	f.productID = productID
 	return f.get, f.getErr
+}
+
+func (f *fakeClient) GetSubscriptionRaw(_ context.Context, _, productID string) (*androidpublisher.Subscription, error) {
+	f.productID = productID
+	return f.getRaw, f.getRawErr
 }
 
 func (f *fakeClient) GetSubscriptionDiagnostic(_ context.Context, _, productID string) (gpc.SubscriptionDiagnosticInfo, error) {
@@ -306,6 +313,16 @@ func writeOfferPayload(t *testing.T) string {
 	return path
 }
 
+func writeOfferPayloadWithoutRecurrenceCount(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "offer-no-recurrence.json")
+	payload := `{"packageName":"com.example.app","productId":"premium_monthly","basePlanId":"monthly","offerId":"intro","phases":[{"duration":"P1M"}],"regionalConfigs":[{"regionCode":"US","newSubscriberAvailability":true}]}`
+	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	return path
+}
+
 func writeOfferBatchUpdatePayload(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "offer-batch-update.json")
@@ -481,6 +498,48 @@ func TestSubscriptionsGetVerbose_ReturnsDiagnostics(t *testing.T) {
 	}
 	if fc.productID != "premium_yearly" {
 		t.Fatalf("unexpected product id passed to client: %s", fc.productID)
+	}
+}
+
+func TestSubscriptionsGetFullReturnsRawSubscription(t *testing.T) {
+	fc := &fakeClient{
+		getRaw: &androidpublisher.Subscription{
+			PackageName: "com.example.app",
+			ProductId:   "premium_yearly",
+			BasePlans: []*androidpublisher.BasePlan{
+				{BasePlanId: "yearly"},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(t, deps, "get", "--package-name", "com.example.app", "--product-id", "premium_yearly", "--full")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{`"productId":"premium_yearly"`, `"basePlanId":"yearly"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got %s", want, out)
+		}
+	}
+}
+
+func TestSubscriptionsGetRejectsVerboseAndFullTogether(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runSubscriptions(t, deps, "get", "--package-name", "com.example.app", "--product-id", "premium_yearly", "--verbose", "--full")
+	if err == nil || !strings.Contains(err.Error(), "--verbose and --full cannot be used together") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -847,6 +906,109 @@ func TestSubscriptionsOffersCreate_ReturnsStatusCreated(t *testing.T) {
 	}
 	if fc.capturedOfferInput == nil || fc.capturedOfferInput.OfferId != "intro" {
 		t.Fatalf("unexpected offer payload parsed: %+v", fc.capturedOfferInput)
+	}
+}
+
+func TestSubscriptionsOffersCreate_DefaultsPhaseRecurrenceCount(t *testing.T) {
+	payloadPath := writeOfferPayloadWithoutRecurrenceCount(t)
+	fc := &fakeClient{
+		offerCreate: gpc.SubscriptionOfferInfo{PackageName: "com.example.app", ProductID: "premium_monthly", BasePlanID: "monthly", OfferID: "intro"},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	if _, err := runSubscriptions(t, deps, "offers", "create", "--package-name", "com.example.app", "--product-id", "premium_monthly", "--base-plan-id", "monthly", "--input", payloadPath); err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if fc.capturedOfferInput == nil || len(fc.capturedOfferInput.Phases) != 1 {
+		t.Fatalf("unexpected offer payload parsed: %+v", fc.capturedOfferInput)
+	}
+	if fc.capturedOfferInput.Phases[0].RecurrenceCount != 1 {
+		t.Fatalf("expected default recurrence count 1, got %+v", fc.capturedOfferInput.Phases[0])
+	}
+}
+
+func TestSubscriptionsOffersCreateActivate_ReturnsCreatedAndActivated(t *testing.T) {
+	payloadPath := writeOfferPayload(t)
+	fc := &fakeClient{
+		offerCreate:   gpc.SubscriptionOfferInfo{PackageName: "com.example.app", ProductID: "premium_monthly", BasePlanID: "monthly", OfferID: "intro", State: "INACTIVE"},
+		offerActivate: gpc.SubscriptionOfferInfo{PackageName: "com.example.app", ProductID: "premium_monthly", BasePlanID: "monthly", OfferID: "intro", State: "ACTIVE"},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(t, deps, "offers", "create", "--package-name", "com.example.app", "--product-id", "premium_monthly", "--base-plan-id", "monthly", "--input", payloadPath, "--activate")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{`"status":"created"`, `"activated":true`, `"state":"ACTIVE"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in output, got %s", want, out)
+		}
+	}
+	if fc.offerID != "intro" {
+		t.Fatalf("expected activation for intro, got %q", fc.offerID)
+	}
+}
+
+func TestSubscriptionsOffersUpdateActivate_ReturnsUpdatedAndActivated(t *testing.T) {
+	payloadPath := writeOfferPayload(t)
+	fc := &fakeClient{
+		offerUpdate:   gpc.SubscriptionOfferInfo{PackageName: "com.example.app", ProductID: "premium_monthly", BasePlanID: "monthly", OfferID: "intro", State: "INACTIVE"},
+		offerActivate: gpc.SubscriptionOfferInfo{PackageName: "com.example.app", ProductID: "premium_monthly", BasePlanID: "monthly", OfferID: "intro", State: "ACTIVE"},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(t, deps, "offers", "update", "--package-name", "com.example.app", "--product-id", "premium_monthly", "--base-plan-id", "monthly", "--offer-id", "intro", "--input", payloadPath, "--update-mask", "phases,regionalConfigs", "--activate")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{`"status":"updated"`, `"activated":true`, `"state":"ACTIVE"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in output, got %s", want, out)
+		}
+	}
+	if fc.offerID != "intro" {
+		t.Fatalf("expected activation for intro, got %q", fc.offerID)
+	}
+	if fc.updateMask != "phases,regionalConfigs" {
+		t.Fatalf("unexpected update mask: %q", fc.updateMask)
+	}
+}
+
+func TestSubscriptionsOffersUpdate_DefaultsPhaseRecurrenceCount(t *testing.T) {
+	payloadPath := writeOfferPayloadWithoutRecurrenceCount(t)
+	fc := &fakeClient{
+		offerUpdate: gpc.SubscriptionOfferInfo{PackageName: "com.example.app", ProductID: "premium_monthly", BasePlanID: "monthly", OfferID: "intro"},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	if _, err := runSubscriptions(t, deps, "offers", "update", "--package-name", "com.example.app", "--product-id", "premium_monthly", "--base-plan-id", "monthly", "--offer-id", "intro", "--input", payloadPath, "--update-mask", "phases,regionalConfigs"); err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if fc.capturedOfferInput == nil || len(fc.capturedOfferInput.Phases) != 1 {
+		t.Fatalf("unexpected offer payload parsed: %+v", fc.capturedOfferInput)
+	}
+	if fc.capturedOfferInput.Phases[0].RecurrenceCount != 1 {
+		t.Fatalf("expected default recurrence count 1, got %+v", fc.capturedOfferInput.Phases[0])
 	}
 }
 

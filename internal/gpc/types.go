@@ -227,6 +227,16 @@ type SubscriptionsListInfo struct {
 	NextPageToken string             `json:"nextPageToken,omitempty"`
 }
 
+type MonetizationRegionInfo struct {
+	RegionCode   string `json:"regionCode,omitempty"`
+	CurrencyCode string `json:"currencyCode,omitempty"`
+}
+
+type MonetizationRegionsInfo struct {
+	RegionsVersion string                  `json:"regionsVersion,omitempty"`
+	Regions        []MonetizationRegionInfo `json:"regions,omitempty"`
+}
+
 type SubscriptionOfferInfo struct {
 	PackageName string `json:"packageName,omitempty"`
 	ProductID   string `json:"productId,omitempty"`
