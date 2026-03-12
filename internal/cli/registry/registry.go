@@ -26,6 +26,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/reviews"
 	"github.com/leszko11/google-play-console-cli/internal/cli/rollback"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	"github.com/leszko11/google-play-console-cli/internal/cli/status"
 	"github.com/leszko11/google-play-console-cli/internal/cli/subscriptions"
 	"github.com/leszko11/google-play-console-cli/internal/cli/systemapks"
 	"github.com/leszko11/google-play-console-cli/internal/cli/tracks"
@@ -54,6 +55,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		e2e.NewCommand(e2e.Deps{}),
 		release.NewCommand(release.Deps{}),
 		rollback.NewCommand(rollback.Deps{}),
+		status.NewCommand(status.Deps{}),
 		reviews.NewCommand(reviews.Deps{}),
 		reports.NewCommand(reports.Deps{}),
 		orders.NewCommand(orders.Deps{}),
