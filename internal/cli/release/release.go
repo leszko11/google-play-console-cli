@@ -30,6 +30,8 @@ type Client interface {
 	CommitEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
 	UpdateTrack(ctx context.Context, packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error)
 	UploadBundle(ctx context.Context, packageName, editID, bundlePath string) (gpc.BundleInfo, error)
+	UploadAPK(ctx context.Context, packageName, editID, apkPath string) (gpc.APKInfo, error)
+	UploadDeobfuscationFile(ctx context.Context, packageName, editID string, versionCode int64, fileType, filePath string) (gpc.DeobfuscationFileInfo, error)
 	GetTrack(ctx context.Context, packageName, editID, trackName string) (gpc.TrackInfo, error)
 }
 
@@ -55,6 +57,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newVerifyCommand(deps),
 			newAlphaCommand(deps),
+			newFullCommand(deps),
 			newPromoteCommand(deps),
 		},
 	}

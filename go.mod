@@ -7,6 +7,7 @@ toolchain go1.24.13
 require (
 	github.com/99designs/keyring v1.2.2
 	github.com/peterbourgon/ff/v3 v3.4.0
+	gopkg.in/yaml.v3 v3.0.1
 	google.golang.org/api v0.265.0
 )
 
