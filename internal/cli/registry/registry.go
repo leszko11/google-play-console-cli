@@ -2,6 +2,7 @@ package registry
 
 import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/apks"
+	"github.com/leszko11/google-play-console-cli/internal/cli/appinit"
 	"github.com/leszko11/google-play-console-cli/internal/cli/apprecoveries"
 	"github.com/leszko11/google-play-console-cli/internal/cli/apps"
 	"github.com/leszko11/google-play-console-cli/internal/cli/auth"
@@ -46,6 +47,7 @@ func Register(root *ffcli.Command, deps Deps) {
 
 	root.Subcommands = []*ffcli.Command{
 		auth.NewCommand(auth.Deps{}),
+		appinit.NewCommand(appinit.Deps{}),
 		apps.NewCommand(apps.Deps{}),
 		apprecoveries.NewCommand(apprecoveries.Deps{}),
 		changelog.NewCommand(changelog.Deps{}),

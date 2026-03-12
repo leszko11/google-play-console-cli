@@ -65,6 +65,7 @@ Homebrew is planned later. `v0.1.0` supports `go install` and GitHub Release arc
 - System APK variant support (`system-apks list/get/create/download`)
 - Generated APK metadata support (`generated-apks list/download`)
 - App recovery action support (`app-recoveries list/create/add-targeting/cancel/deploy`)
+- App bootstrap workflow (`appinit`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Manifest-driven monetization setup workflow (`monetization setup`)
 - Monetization one-time product commands (`products ...`)
@@ -535,6 +536,7 @@ When CLI output includes `access denied` or `missing Play Console permissions`:
 ```bash
 gpc --help
 gpc auth --help
+gpc appinit --help
 gpc apps --help
 gpc changelog --help
 gpc edits --help
