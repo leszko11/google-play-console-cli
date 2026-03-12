@@ -2551,8 +2551,8 @@ USAGE
 
 SUBCOMMANDS
   regions  List billable monetization regions
-  setup  Create a subscription product from a YAML or JSON manifest
-  sync    Create or update a subscription product from a YAML or JSON manifest
+  setup    Create a subscription product from a YAML or JSON manifest
+  sync     Create or update a subscription product from a YAML or JSON manifest
 ```
 
 ## `gpc monetization regions --help`
