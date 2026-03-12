@@ -51,41 +51,37 @@ func (c *Client) ListSubscriptions(ctx context.Context, packageName string, page
 }
 
 func (c *Client) GetSubscription(ctx context.Context, packageName, productID string) (SubscriptionInfo, error) {
-	packageName = strings.TrimSpace(packageName)
-	if packageName == "" {
-		return SubscriptionInfo{}, fmt.Errorf("package name is required")
-	}
-	productID = strings.TrimSpace(productID)
-	if productID == "" {
-		return SubscriptionInfo{}, fmt.Errorf("product id is required")
-	}
-	if c == nil || c.service == nil {
-		return SubscriptionInfo{}, ErrInvalidCredentials
-	}
-
-	subscription, err := c.service.Monetization.Subscriptions.Get(packageName, productID).Context(ctx).Do()
+	subscription, err := c.GetSubscriptionRaw(ctx, packageName, productID)
 	if err != nil {
-		return SubscriptionInfo{}, mapGoogleAPIError(err)
+		return SubscriptionInfo{}, err
 	}
 	return subscriptionInfoFromSubscription(subscription), nil
 }
 
-func (c *Client) GetSubscriptionDiagnostic(ctx context.Context, packageName, productID string) (SubscriptionDiagnosticInfo, error) {
+func (c *Client) GetSubscriptionRaw(ctx context.Context, packageName, productID string) (*androidpublisher.Subscription, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
-		return SubscriptionDiagnosticInfo{}, fmt.Errorf("package name is required")
+		return nil, fmt.Errorf("package name is required")
 	}
 	productID = strings.TrimSpace(productID)
 	if productID == "" {
-		return SubscriptionDiagnosticInfo{}, fmt.Errorf("product id is required")
+		return nil, fmt.Errorf("product id is required")
 	}
 	if c == nil || c.service == nil {
-		return SubscriptionDiagnosticInfo{}, ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 
 	subscription, err := c.service.Monetization.Subscriptions.Get(packageName, productID).Context(ctx).Do()
 	if err != nil {
-		return SubscriptionDiagnosticInfo{}, mapGoogleAPIError(err)
+		return nil, mapGoogleAPIError(err)
+	}
+	return subscription, nil
+}
+
+func (c *Client) GetSubscriptionDiagnostic(ctx context.Context, packageName, productID string) (SubscriptionDiagnosticInfo, error) {
+	subscription, err := c.GetSubscriptionRaw(ctx, packageName, productID)
+	if err != nil {
+		return SubscriptionDiagnosticInfo{}, err
 	}
 	return subscriptionDiagnosticInfoFromSubscription(subscription), nil
 }

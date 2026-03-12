@@ -160,7 +160,9 @@ make generate-command-docs
 - `gpc subscriptions offers update`
 - `gpc subscriptions offers delete`
 - `gpc monetization`
+- `gpc monetization regions`
 - `gpc monetization setup`
+- `gpc monetization sync`
 - `gpc products`
 - `gpc products list`
 - `gpc products get`
@@ -2141,6 +2143,7 @@ USAGE
   get
 
 FLAGS
+  -full=false           Return the full raw subscription resource
   -package-name string  Package name
   -product-id string    Subscription product ID
   -verbose=false        Include base plan and region diagnostics
@@ -2494,6 +2497,7 @@ USAGE
   create
 
 FLAGS
+  -activate=false       Activate the offer after creating it when needed
   -base-plan-id string  Base plan ID
   -input string         Path to subscription offer JSON payload (use - for stdin)
   -package-name string  Package name
@@ -2510,6 +2514,7 @@ USAGE
   update
 
 FLAGS
+  -activate=false       Activate the offer after updating it when needed
   -base-plan-id string  Base plan ID
   -input string         Path to subscription offer JSON payload (use - for stdin)
   -offer-id string      Offer ID
@@ -2545,7 +2550,22 @@ USAGE
   monetization
 
 SUBCOMMANDS
-  setup  Create a subscription product from a YAML or JSON manifest
+  regions  List billable monetization regions
+  setup    Create a subscription product from a YAML or JSON manifest
+  sync     Create or update a subscription product from a YAML or JSON manifest
+```
+
+## `gpc monetization regions --help`
+
+```text
+DESCRIPTION
+  List billable monetization regions
+
+USAGE
+  regions
+
+FLAGS
+  -package-name string  Package name
 ```
 
 ## `gpc monetization setup --help`
@@ -2561,6 +2581,23 @@ FLAGS
   -activate=false       Activate created base plans and offers after creation
   -confirm=false        Confirm creating monetization resources (required unless --dry-run)
   -dry-run=false        Validate manifest and check for conflicts without creating resources
+  -manifest string      Path to monetization manifest (.json/.yaml/.yml)
+  -package-name string  Package name
+```
+
+## `gpc monetization sync --help`
+
+```text
+DESCRIPTION
+  Create or update a subscription product from a YAML or JSON manifest
+
+USAGE
+  sync
+
+FLAGS
+  -activate=false       Activate synced base plans and offers when needed
+  -confirm=false        Confirm syncing monetization resources (required unless --dry-run)
+  -dry-run=false        Validate manifest and show planned sync actions without applying changes
   -manifest string      Path to monetization manifest (.json/.yaml/.yml)
   -package-name string  Package name
 ```

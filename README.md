@@ -261,6 +261,7 @@ gpc app-recoveries deploy --package-name com.example.app --app-recovery-id 7 --c
 # List/get subscription products
 gpc subscriptions list --package-name com.example.app --page-size 100
 gpc subscriptions get --package-name com.example.app --product-id premium_monthly
+gpc subscriptions get --package-name com.example.app --product-id premium_monthly --full
 gpc subscriptions batch-get --package-name com.example.app --product-ids premium_monthly,premium_yearly
 
 # Create/update subscriptions from JSON payload files
@@ -288,10 +289,15 @@ gpc subscriptions offers batch-update --package-name com.example.app --product-i
 gpc subscriptions offers batch-update-states --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --input /path/to/subscription-offers-batch-update-states.json --confirm
 gpc subscriptions offers activate --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro
 gpc subscriptions offers deactivate --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --confirm
-gpc subscriptions offers create --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --input /path/to/offer.json
-gpc subscriptions offers update --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --input /path/to/offer.json --update-mask phases,regionalConfigs
+gpc subscriptions offers create --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --input /path/to/offer.json --activate
+gpc subscriptions offers update --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --input /path/to/offer.json --update-mask phases,regionalConfigs --activate
 gpc subscriptions offers delete --package-name com.example.app --product-id premium_monthly --base-plan-id monthly --offer-id intro --confirm
 # Note: offer create/update auto-resolve the active Play regions version via API.
+
+# Inspect billable regions and sync a manifest onto existing subscriptions
+gpc monetization regions --package-name com.example.app
+gpc monetization sync --package-name com.example.app --manifest /path/to/monetization.yaml --dry-run
+gpc monetization sync --package-name com.example.app --manifest /path/to/monetization.yaml --confirm --activate
 
 # One-time product management
 gpc products list --package-name com.example.app --page-size 100
