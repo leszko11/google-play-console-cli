@@ -233,7 +233,7 @@ type MonetizationRegionInfo struct {
 }
 
 type MonetizationRegionsInfo struct {
-	RegionsVersion string                  `json:"regionsVersion,omitempty"`
+	RegionsVersion string                   `json:"regionsVersion,omitempty"`
 	Regions        []MonetizationRegionInfo `json:"regions,omitempty"`
 }
 
