@@ -6,6 +6,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/apps"
 	"github.com/leszko11/google-play-console-cli/internal/cli/auth"
 	"github.com/leszko11/google-play-console-cli/internal/cli/bundles"
+	"github.com/leszko11/google-play-console-cli/internal/cli/changelog"
 	"github.com/leszko11/google-play-console-cli/internal/cli/completion"
 	"github.com/leszko11/google-play-console-cli/internal/cli/deobfuscation"
 	"github.com/leszko11/google-play-console-cli/internal/cli/deploy"
@@ -46,6 +47,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		auth.NewCommand(auth.Deps{}),
 		apps.NewCommand(apps.Deps{}),
 		apprecoveries.NewCommand(apprecoveries.Deps{}),
+		changelog.NewCommand(changelog.Deps{}),
 		edits.NewCommand(edits.Deps{}),
 		tracks.NewCommand(tracks.Deps{}),
 		apks.NewCommand(apks.Deps{}),

@@ -535,6 +535,7 @@ When CLI output includes `access denied` or `missing Play Console permissions`:
 gpc --help
 gpc auth --help
 gpc apps --help
+gpc changelog --help
 gpc edits --help
 gpc tracks --help
 gpc bundles --help
