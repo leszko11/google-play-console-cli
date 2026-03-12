@@ -93,6 +93,7 @@ make generate-command-docs
 - `gpc release alpha`
 - `gpc release promote`
 - `gpc rollback`
+- `gpc status`
 - `gpc reviews`
 - `gpc reviews list`
 - `gpc reviews get`
@@ -246,6 +247,7 @@ SUBCOMMANDS
   e2e                    E2E fixture and smoke-testing helpers
   release                Release workflows for staged Google Play deploys
   rollback               Halt the active staged rollout on a track
+  status                 Summarize tracks and recent review health for an app
   reviews                Read and reply to Play Store reviews
   reports                Google Play Developer Reporting commands
   orders                 Inspect and refund Play orders
@@ -1493,6 +1495,20 @@ FLAGS
   -dry-run=false        Create and validate the edit, then delete it instead of updating the track
   -package-name string  Package name
   -track string         Track name (e.g. production)
+```
+
+## `gpc status --help`
+
+```text
+DESCRIPTION
+  Summarize tracks and recent review health for an app
+
+USAGE
+  status
+
+FLAGS
+  -output string        Output format: json or table
+  -package-name string  Package name
 ```
 
 ## `gpc reviews --help`
