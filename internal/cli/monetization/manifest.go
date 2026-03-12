@@ -20,6 +20,8 @@ type manifest struct {
 	Offers       []*androidpublisher.SubscriptionOffer
 }
 
+type Manifest = manifest
+
 type rawManifest struct {
 	Subscription rawSubscription `json:"subscription" yaml:"subscription"`
 }
@@ -73,6 +75,10 @@ func loadManifest(path string) (manifest, error) {
 		return manifest{}, err
 	}
 	return normalizeManifest(raw)
+}
+
+func LoadManifest(path string) (Manifest, error) {
+	return loadManifest(path)
 }
 
 func normalizeManifest(raw rawManifest) (manifest, error) {

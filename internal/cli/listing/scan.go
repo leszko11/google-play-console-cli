@@ -31,6 +31,12 @@ type localeData struct {
 	Images  map[string][]string
 }
 
+type LocaleData = localeData
+
+func ScanListingsDir(root string) ([]LocaleData, error) {
+	return scanListingsDir(root)
+}
+
 func scanListingsDir(root string) ([]localeData, error) {
 	root = strings.TrimSpace(root)
 	if root == "" {

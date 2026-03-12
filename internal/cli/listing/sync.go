@@ -44,6 +44,8 @@ type syncOptions struct {
 	DeleteMissing bool
 }
 
+type SyncOptions = syncOptions
+
 func newSyncCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
@@ -178,6 +180,10 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 	result.Committed = true
 	result.Status = "committed"
 	return shared.WriteJSON(out, result)
+}
+
+func RunSync(parentCtx, requestCtx context.Context, client Client, out io.Writer, opts SyncOptions, locales []LocaleData) error {
+	return runSync(parentCtx, requestCtx, client, out, opts, locales)
 }
 
 func localesToDelete(remote []gpc.ListingInfo, locales []localeData) []string {

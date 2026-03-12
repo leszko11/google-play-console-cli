@@ -41,6 +41,8 @@ type setupOptions struct {
 	Activate     bool
 }
 
+type SetupOptions = setupOptions
+
 type setupResult struct {
 	PackageName         string       `json:"packageName"`
 	Manifest            string       `json:"manifest"`
@@ -192,4 +194,8 @@ func runSetup(ctx context.Context, client Client, out io.Writer, opts setupOptio
 	}
 	result.Status = setupStatusCompleted
 	return shared.WriteJSON(out, result)
+}
+
+func RunSetup(ctx context.Context, client Client, out io.Writer, opts SetupOptions, manifest Manifest) error {
+	return runSetup(ctx, client, out, opts, manifest)
 }
