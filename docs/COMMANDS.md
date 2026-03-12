@@ -158,6 +158,8 @@ make generate-command-docs
 - `gpc subscriptions offers create`
 - `gpc subscriptions offers update`
 - `gpc subscriptions offers delete`
+- `gpc monetization`
+- `gpc monetization setup`
 - `gpc products`
 - `gpc products list`
 - `gpc products get`
@@ -262,6 +264,7 @@ SUBCOMMANDS
   system-apks            Manage generated system APK variants
   generated-apks         List and download APKs generated from bundles
   subscriptions          Manage monetization subscriptions
+  monetization           Monetization workflows
   products               Manage monetization one-time products
   iap                    Manage legacy in-app products
   listing                Store listing workflows
@@ -2512,6 +2515,36 @@ FLAGS
   -offer-id string      Offer ID
   -package-name string  Package name
   -product-id string    Subscription product ID
+```
+
+## `gpc monetization --help`
+
+```text
+DESCRIPTION
+  Monetization workflows
+
+USAGE
+  monetization
+
+SUBCOMMANDS
+  setup  Create a subscription product from a YAML or JSON manifest
+```
+
+## `gpc monetization setup --help`
+
+```text
+DESCRIPTION
+  Create a subscription product from a YAML or JSON manifest
+
+USAGE
+  setup
+
+FLAGS
+  -activate=false       Activate created base plans and offers after creation
+  -confirm=false        Confirm creating monetization resources (required unless --dry-run)
+  -dry-run=false        Validate manifest and check for conflicts without creating resources
+  -manifest string      Path to monetization manifest (.json/.yaml/.yml)
+  -package-name string  Package name
 ```
 
 ## `gpc products --help`
