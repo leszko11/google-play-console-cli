@@ -66,6 +66,7 @@ Homebrew is planned later. `v0.1.0` supports `go install` and GitHub Release arc
 - Generated APK metadata support (`generated-apks list/download`)
 - App recovery action support (`app-recoveries list/create/add-targeting/cancel/deploy`)
 - Monetization subscription commands (`subscriptions ...` including offers)
+- Manifest-driven monetization setup workflow (`monetization setup`)
 - Monetization one-time product commands (`products ...`)
 - Legacy in-app product commands (`iap ...`)
 - Purchase lifecycle commands (`purchases ...`)
@@ -556,6 +557,7 @@ gpc system-apks --help
 gpc generated-apks --help
 gpc app-recoveries --help
 gpc subscriptions --help
+gpc monetization --help
 gpc products --help
 gpc iap --help
 gpc listing --help
