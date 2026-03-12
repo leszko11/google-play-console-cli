@@ -36,6 +36,8 @@ make generate-command-docs
 - `gpc app-recoveries add-targeting`
 - `gpc app-recoveries cancel`
 - `gpc app-recoveries deploy`
+- `gpc changelog`
+- `gpc changelog sync`
 - `gpc edits`
 - `gpc edits create`
 - `gpc edits get`
@@ -239,6 +241,7 @@ SUBCOMMANDS
   auth                   Manage authentication profiles
   apps                   App visibility and metadata commands
   app-recoveries         Manage Play app recovery actions
+  changelog              Release changelog workflows
   edits                  Manage Google Play edit transactions
   tracks                 Manage release tracks inside an edit
   apks                   Manage APK uploads in an edit
@@ -555,6 +558,36 @@ FLAGS
   -app-recovery-id 0    App recovery action ID
   -confirm=false        Confirm deploying the app recovery action (required)
   -package-name string  Package name
+```
+
+## `gpc changelog --help`
+
+```text
+DESCRIPTION
+  Release changelog workflows
+
+USAGE
+  changelog
+
+SUBCOMMANDS
+  sync  Sync track release notes from locale-named text files
+```
+
+## `gpc changelog sync --help`
+
+```text
+DESCRIPTION
+  Sync track release notes from locale-named text files
+
+USAGE
+  sync
+
+FLAGS
+  -confirm=false        Confirm committing the edit (required unless --dry-run)
+  -dir string           Changelog directory
+  -dry-run=false        Create and validate the edit, then delete it instead of updating Play
+  -package-name string  Package name
+  -track string         Track name
 ```
 
 ## `gpc edits --help`
