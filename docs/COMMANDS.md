@@ -93,6 +93,7 @@ make generate-command-docs
 - `gpc release`
 - `gpc release verify`
 - `gpc release alpha`
+- `gpc release full`
 - `gpc release promote`
 - `gpc rollback`
 - `gpc status`
@@ -1442,6 +1443,7 @@ USAGE
 SUBCOMMANDS
   verify   Run non-mutating release readiness checks
   alpha    Build staging AAB and deploy to alpha track in one flow
+  full     Deploy a release from a YAML or JSON manifest
   promote  Promote the latest releasable release from one track to another
 ```
 
@@ -1496,6 +1498,23 @@ FLAGS
   -user-fraction -1                      Rollout user fraction (0-1)
   -version-code 0                        Release versionCode override (default computed if empty)
   -version-name string                   Release versionName override
+```
+
+## `gpc release full --help`
+
+```text
+DESCRIPTION
+  Deploy a release from a YAML or JSON manifest
+
+USAGE
+  full
+
+FLAGS
+  -allow-production=false  Allow track=production
+  -confirm=false           Confirm committing release (required unless --dry-run)
+  -dry-run=false           Run all steps but delete edit instead of committing
+  -manifest string         Path to release manifest (.json/.yaml/.yml)
+  -package-name string     Target package name
 ```
 
 ## `gpc release promote --help`
