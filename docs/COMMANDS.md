@@ -187,6 +187,8 @@ make generate-command-docs
 - `gpc iap batch-update`
 - `gpc iap batch-delete`
 - `gpc iap delete`
+- `gpc listing`
+- `gpc listing sync`
 - `gpc purchases`
 - `gpc purchases products`
 - `gpc purchases products get`
@@ -258,6 +260,7 @@ SUBCOMMANDS
   subscriptions          Manage monetization subscriptions
   products               Manage monetization one-time products
   iap                    Manage legacy in-app products
+  listing                Store listing workflows
   purchases              Manage one-time and subscription purchases
   users                  Manage Play Console account users
   grants                 Manage per-app user grants
@@ -2965,6 +2968,36 @@ FLAGS
   -confirm=false        Confirm deleting the in-app product (required)
   -package-name string  Package name
   -sku string           In-app product SKU
+```
+
+## `gpc listing --help`
+
+```text
+DESCRIPTION
+  Store listing workflows
+
+USAGE
+  listing
+
+SUBCOMMANDS
+  sync  Sync store listing metadata and images from a directory
+```
+
+## `gpc listing sync --help`
+
+```text
+DESCRIPTION
+  Sync store listing metadata and images from a directory
+
+USAGE
+  sync
+
+FLAGS
+  -confirm=false         Confirm committing the edit (required unless --dry-run)
+  -delete-missing=false  Delete remote locales that do not exist locally
+  -dir string            Listings directory root
+  -dry-run=false         Create and validate the edit, then delete it instead of mutating Play
+  -package-name string   Package name
 ```
 
 ## `gpc purchases --help`

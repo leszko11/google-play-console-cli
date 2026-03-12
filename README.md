@@ -557,6 +557,7 @@ gpc app-recoveries --help
 gpc subscriptions --help
 gpc products --help
 gpc iap --help
+gpc listing --help
 gpc purchases --help
 gpc users --help
 gpc grants --help
