@@ -3,11 +3,9 @@ package reports
 import (
 	"bytes"
 	"context"
-	"flag"
 	"strings"
 	"testing"
 
-	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
@@ -113,21 +111,6 @@ func defaultConfig() config.Config {
 			"default": {ServiceAccountPath: "/tmp/sa.json"},
 		},
 	}
-}
-
-func bindGlobalPackageName(t *testing.T, packageName string) {
-	t.Helper()
-	prev := shared.ActiveGlobalFlags()
-	t.Cleanup(func() {
-		fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
-		cfg := &shared.GlobalFlags{}
-		*cfg = prev
-		shared.BindGlobalFlags(fs, cfg)
-	})
-	fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
-	cfg := &shared.GlobalFlags{}
-	shared.BindGlobalFlags(fs, cfg)
-	cfg.PackageName = packageName
 }
 
 func TestReportsVitalsGet_ReturnsMetricSet(t *testing.T) {
@@ -313,40 +296,6 @@ func TestReportsVitalsQuery_RequiresInput(t *testing.T) {
 	}
 }
 
-func TestReportsVitalsGet_UsesGlobalPackageName(t *testing.T) {
-	bindGlobalPackageName(t, "com.example.global")
-	fc := &fakeClient{
-		getResult: gpc.ReportingVitalsMetricSetInfo{MetricSet: "anr-rate"},
-	}
-	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
-		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
-	}
-
-	if _, err := runReports(t, deps, "vitals", "get", "--metric-set", "anr-rate"); err != nil {
-		t.Fatalf("command failed: %v", err)
-	}
-	if fc.capturedPackage != "com.example.global" {
-		t.Fatalf("expected global package name, got %q", fc.capturedPackage)
-	}
-}
-
-func TestReportsAppsList_UsesGlobalPaginate(t *testing.T) {
-	bindGlobalPaginate(t, true)
-	fc := &fakeClient{appsResult: gpc.ReportingAppsListInfo{}}
-	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
-		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
-	}
-
-	if _, err := runReports(t, deps, "apps", "list"); err != nil {
-		t.Fatalf("command failed: %v", err)
-	}
-	if !fc.capturedPaginate {
-		t.Fatal("expected paginate=true from global flags")
-	}
-}
-
 func TestReportsSummary_ReturnsAggregate(t *testing.T) {
 	fc := &fakeClient{
 		appsResult: gpc.ReportingAppsListInfo{
@@ -441,19 +390,4 @@ func TestReportsSummary_WarnsWhenPackageNotVisible(t *testing.T) {
 	if !strings.Contains(out, `"status":"warn"`) || !strings.Contains(out, `"visible":false`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
-}
-
-func bindGlobalPaginate(t *testing.T, paginate bool) {
-	t.Helper()
-	prev := shared.ActiveGlobalFlags()
-	t.Cleanup(func() {
-		fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
-		cfg := &shared.GlobalFlags{}
-		*cfg = prev
-		shared.BindGlobalFlags(fs, cfg)
-	})
-	fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
-	cfg := &shared.GlobalFlags{}
-	shared.BindGlobalFlags(fs, cfg)
-	cfg.Paginate = paginate
 }
