@@ -117,6 +117,13 @@ func defaultConfig() config.Config {
 
 func bindGlobalPackageName(t *testing.T, packageName string) {
 	t.Helper()
+	prev := shared.ActiveGlobalFlags()
+	t.Cleanup(func() {
+		fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
+		cfg := &shared.GlobalFlags{}
+		*cfg = prev
+		shared.BindGlobalFlags(fs, cfg)
+	})
 	fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
 	cfg := &shared.GlobalFlags{}
 	shared.BindGlobalFlags(fs, cfg)
@@ -438,6 +445,13 @@ func TestReportsSummary_WarnsWhenPackageNotVisible(t *testing.T) {
 
 func bindGlobalPaginate(t *testing.T, paginate bool) {
 	t.Helper()
+	prev := shared.ActiveGlobalFlags()
+	t.Cleanup(func() {
+		fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
+		cfg := &shared.GlobalFlags{}
+		*cfg = prev
+		shared.BindGlobalFlags(fs, cfg)
+	})
 	fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
 	cfg := &shared.GlobalFlags{}
 	shared.BindGlobalFlags(fs, cfg)
