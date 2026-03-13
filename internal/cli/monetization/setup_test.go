@@ -15,13 +15,23 @@ import (
 type fakeClient struct {
 	listSubscriptionsResult gpc.SubscriptionsListInfo
 	listSubscriptionsErr    error
+	getSubscriptionRaw      *androidpublisher.Subscription
+	getSubscriptionRawErr   error
 	createSubscriptionErr   error
+	updateSubscriptionErr   error
 	createOfferErr          map[string]error
+	updateOfferErr          map[string]error
+	listOffersResult        map[string]gpc.SubscriptionOffersListInfo
+	listOffersErr           map[string]error
 	activateBasePlanErr     map[string]error
 	activateOfferErr        map[string]error
+	monetizationRegions     gpc.MonetizationRegionsInfo
+	monetizationRegionsErr  error
 
 	createdSubscription *androidpublisher.Subscription
+	updatedSubscription *androidpublisher.Subscription
 	createdOffers       []*androidpublisher.SubscriptionOffer
+	updatedOffers       []*androidpublisher.SubscriptionOffer
 	activatedBasePlans  []string
 	activatedOffers     []string
 }
@@ -41,12 +51,34 @@ func (f *fakeClient) CreateSubscription(_ context.Context, _ string, subscriptio
 	return gpc.SubscriptionInfo{ProductID: subscription.ProductId}, nil
 }
 
+func (f *fakeClient) GetSubscriptionRaw(_ context.Context, _, _ string) (*androidpublisher.Subscription, error) {
+	if f.getSubscriptionRawErr != nil {
+		return nil, f.getSubscriptionRawErr
+	}
+	return f.getSubscriptionRaw, nil
+}
+
+func (f *fakeClient) UpdateSubscription(_ context.Context, _ string, _ string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error) {
+	if f.updateSubscriptionErr != nil {
+		return gpc.SubscriptionInfo{}, f.updateSubscriptionErr
+	}
+	f.updatedSubscription = subscription
+	return gpc.SubscriptionInfo{ProductID: subscription.ProductId}, nil
+}
+
 func (f *fakeClient) ActivateSubscriptionBasePlan(_ context.Context, _ string, productID, basePlanID string) ([]gpc.SubscriptionInfo, error) {
 	if err := f.activateBasePlanErr[basePlanID]; err != nil {
 		return nil, err
 	}
 	f.activatedBasePlans = append(f.activatedBasePlans, basePlanID)
 	return []gpc.SubscriptionInfo{{ProductID: productID}}, nil
+}
+
+func (f *fakeClient) ListSubscriptionOffers(_ context.Context, _ string, _ string, basePlanID string, _ int64, _ string, _ bool) (gpc.SubscriptionOffersListInfo, error) {
+	if err := f.listOffersErr[basePlanID]; err != nil {
+		return gpc.SubscriptionOffersListInfo{}, err
+	}
+	return f.listOffersResult[basePlanID], nil
 }
 
 func (f *fakeClient) CreateSubscriptionOffer(_ context.Context, _ string, _, _ string, offer *androidpublisher.SubscriptionOffer) (gpc.SubscriptionOfferInfo, error) {
@@ -57,12 +89,27 @@ func (f *fakeClient) CreateSubscriptionOffer(_ context.Context, _ string, _, _ s
 	return gpc.SubscriptionOfferInfo{OfferID: offer.OfferId, BasePlanID: offer.BasePlanId}, nil
 }
 
+func (f *fakeClient) UpdateSubscriptionOffer(_ context.Context, _ string, _, _, _ string, offer *androidpublisher.SubscriptionOffer, _ string) (gpc.SubscriptionOfferInfo, error) {
+	if err := f.updateOfferErr[offer.OfferId]; err != nil {
+		return gpc.SubscriptionOfferInfo{}, err
+	}
+	f.updatedOffers = append(f.updatedOffers, offer)
+	return gpc.SubscriptionOfferInfo{OfferID: offer.OfferId, BasePlanID: offer.BasePlanId}, nil
+}
+
 func (f *fakeClient) ActivateSubscriptionOffer(_ context.Context, _ string, _, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error) {
 	if err := f.activateOfferErr[offerID]; err != nil {
 		return gpc.SubscriptionOfferInfo{}, err
 	}
 	f.activatedOffers = append(f.activatedOffers, offerID)
 	return gpc.SubscriptionOfferInfo{OfferID: offerID, BasePlanID: basePlanID}, nil
+}
+
+func (f *fakeClient) GetMonetizationRegions(_ context.Context, _ string) (gpc.MonetizationRegionsInfo, error) {
+	if f.monetizationRegionsErr != nil {
+		return gpc.MonetizationRegionsInfo{}, f.monetizationRegionsErr
+	}
+	return f.monetizationRegions, nil
 }
 
 func defaultConfig() config.Config {

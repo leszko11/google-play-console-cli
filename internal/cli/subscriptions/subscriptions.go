@@ -20,6 +20,7 @@ type Client interface {
 	ListSubscriptions(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionsListInfo, error)
 	GetLatestRegionsVersion(ctx context.Context, packageName string) (string, error)
 	GetSubscription(ctx context.Context, packageName, productID string) (gpc.SubscriptionInfo, error)
+	GetSubscriptionRaw(ctx context.Context, packageName, productID string) (*androidpublisher.Subscription, error)
 	GetSubscriptionDiagnostic(ctx context.Context, packageName, productID string) (gpc.SubscriptionDiagnosticInfo, error)
 	BatchGetSubscriptions(ctx context.Context, packageName string, productIDs []string) (gpc.SubscriptionsListInfo, error)
 	CreateSubscription(ctx context.Context, packageName string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error)
@@ -137,10 +138,11 @@ func newGetCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, productID string
-	var verbose bool
+	var verbose, full bool
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
 	fs.BoolVar(&verbose, "verbose", false, "Include base plan and region diagnostics")
+	fs.BoolVar(&full, "full", false, "Return the full raw subscription resource")
 
 	return &ffcli.Command{
 		Name:      "get",
@@ -157,7 +159,20 @@ func newGetCommand(deps Deps) *ffcli.Command {
 			if productID == "" {
 				return fmt.Errorf("--product-id is required")
 			}
+			if verbose && full {
+				return fmt.Errorf("--verbose and --full cannot be used together")
+			}
 			if !verbose {
+				if full {
+					subscription, err := client.GetSubscriptionRaw(requestCtx, pkg, productID)
+					if err != nil {
+						return fmt.Errorf("failed to get subscription: %w", err)
+					}
+					return shared.WriteJSON(deps.Stdout, map[string]any{
+						"packageName":  pkg,
+						"subscription": subscription,
+					})
+				}
 				subscription, err := client.GetSubscription(requestCtx, pkg, productID)
 				if err != nil {
 					return fmt.Errorf("failed to get subscription: %w", err)
@@ -833,10 +848,12 @@ func newOffersCreateCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("create", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, productID, basePlanID, inputPath string
+	var activate bool
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
 	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
 	fs.StringVar(&inputPath, "input", "", "Path to subscription offer JSON payload (use - for stdin)")
+	fs.BoolVar(&activate, "activate", false, "Activate the offer after creating it when needed")
 
 	return &ffcli.Command{
 		Name:      "create",
@@ -866,11 +883,20 @@ func newOffersCreateCommand(deps Deps) *ffcli.Command {
 			if err != nil {
 				return fmt.Errorf("failed to create subscription offer: %w", err)
 			}
-			return shared.WriteJSON(deps.Stdout, map[string]any{
+			response := map[string]any{
 				"packageName": pkg,
 				"offer":       created,
 				"status":      "created",
-			})
+			}
+			if activate && created.State != "ACTIVE" {
+				activated, err := client.ActivateSubscriptionOffer(requestCtx, pkg, productID, basePlanID, created.OfferID)
+				if err != nil {
+					return fmt.Errorf("failed to activate subscription offer: %w", err)
+				}
+				response["offer"] = activated
+				response["activated"] = true
+			}
+			return shared.WriteJSON(deps.Stdout, response)
 		},
 	}
 }
@@ -1129,12 +1155,14 @@ func newOffersUpdateCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, productID, basePlanID, offerID, inputPath, updateMask string
+	var activate bool
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&productID, "product-id", "", "Subscription product ID")
 	fs.StringVar(&basePlanID, "base-plan-id", "", "Base plan ID")
 	fs.StringVar(&offerID, "offer-id", "", "Offer ID")
 	fs.StringVar(&inputPath, "input", "", "Path to subscription offer JSON payload (use - for stdin)")
 	fs.StringVar(&updateMask, "update-mask", "", "Comma-separated list of fields to update")
+	fs.BoolVar(&activate, "activate", false, "Activate the offer after updating it when needed")
 
 	return &ffcli.Command{
 		Name:      "update",
@@ -1168,11 +1196,20 @@ func newOffersUpdateCommand(deps Deps) *ffcli.Command {
 			if err != nil {
 				return fmt.Errorf("failed to update subscription offer: %w", err)
 			}
-			return shared.WriteJSON(deps.Stdout, map[string]any{
+			response := map[string]any{
 				"packageName": pkg,
 				"offer":       updated,
 				"status":      "updated",
-			})
+			}
+			if activate && updated.State != "ACTIVE" {
+				activated, err := client.ActivateSubscriptionOffer(requestCtx, pkg, productID, basePlanID, offerID)
+				if err != nil {
+					return fmt.Errorf("failed to activate subscription offer: %w", err)
+				}
+				response["offer"] = activated
+				response["activated"] = true
+			}
+			return shared.WriteJSON(deps.Stdout, response)
 		},
 	}
 }
@@ -1303,7 +1340,22 @@ func readSubscriptionOfferPayload(inputPath string, stdin io.Reader) (*androidpu
 	if err := json.Unmarshal(raw, &offer); err != nil {
 		return nil, fmt.Errorf("invalid subscription offer JSON payload: %w", err)
 	}
+	normalizeSubscriptionOfferPhases(&offer)
 	return &offer, nil
+}
+
+func normalizeSubscriptionOfferPhases(offer *androidpublisher.SubscriptionOffer) {
+	if offer == nil {
+		return
+	}
+	for _, phase := range offer.Phases {
+		if phase == nil {
+			continue
+		}
+		if phase.RecurrenceCount == 0 {
+			phase.RecurrenceCount = 1
+		}
+	}
 }
 
 func readSubscriptionOffersBatchUpdatePayload(inputPath string, stdin io.Reader) (*androidpublisher.BatchUpdateSubscriptionOffersRequest, error) {

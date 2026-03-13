@@ -26,7 +26,9 @@ func NewCommand(deps Deps) *ffcli.Command {
 		ShortHelp: "Monetization workflows",
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
+			newRegionsCommand(deps),
 			newSetupCommand(deps),
+			newSyncCommand(deps),
 		},
 	}
 }

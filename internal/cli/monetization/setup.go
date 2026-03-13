@@ -21,10 +21,15 @@ const (
 
 type Client interface {
 	ListSubscriptions(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionsListInfo, error)
+	GetSubscriptionRaw(ctx context.Context, packageName, productID string) (*androidpublisher.Subscription, error)
 	CreateSubscription(ctx context.Context, packageName string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error)
+	UpdateSubscription(ctx context.Context, packageName, productID string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error)
 	ActivateSubscriptionBasePlan(ctx context.Context, packageName, productID, basePlanID string) ([]gpc.SubscriptionInfo, error)
+	ListSubscriptionOffers(ctx context.Context, packageName, productID, basePlanID string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionOffersListInfo, error)
 	CreateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID string, offer *androidpublisher.SubscriptionOffer) (gpc.SubscriptionOfferInfo, error)
+	UpdateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string, offer *androidpublisher.SubscriptionOffer, updateMask string) (gpc.SubscriptionOfferInfo, error)
 	ActivateSubscriptionOffer(ctx context.Context, packageName, productID, basePlanID, offerID string) (gpc.SubscriptionOfferInfo, error)
+	GetMonetizationRegions(ctx context.Context, packageName string) (gpc.MonetizationRegionsInfo, error)
 }
 
 type stepResult struct {

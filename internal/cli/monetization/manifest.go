@@ -2,6 +2,7 @@ package monetization
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -14,6 +15,8 @@ const (
 	phaseTypeFreeTrial  = "FREE_TRIAL"
 	phaseTypeDiscounted = "DISCOUNTED"
 )
+
+var regionCodePattern = regexp.MustCompile(`^[A-Z]{2}$`)
 
 type manifest struct {
 	Subscription *androidpublisher.Subscription
@@ -197,6 +200,23 @@ func normalizeBasePlanRegion(basePlanID string, region rawRegionalConfig) (rawRe
 	if region.RegionCode == "" {
 		return rawRegionalConfig{}, nil, shared.UsageErrorf("subscription.basePlans[%q].regionalConfigs[].regionCode is required", basePlanID)
 	}
+	if regionCodePattern.MatchString(region.RegionCode) {
+		// Valid ISO alpha-2 codes like NO must remain accepted even if they overlap
+		// with YAML 1.1 boolean spellings when unquoted in source manifests.
+	} else if isYAMLBooleanLike(region.RegionCode) {
+		return rawRegionalConfig{}, nil, shared.UsageErrorf(
+			"subscription.basePlans[%q].regionalConfigs[%q].regionCode looks like a YAML boolean; quote region codes like %q to prevent coercion",
+			basePlanID,
+			region.RegionCode,
+			strings.ToUpper(region.RegionCode),
+		)
+	} else {
+		return rawRegionalConfig{}, nil, shared.UsageErrorf(
+			"subscription.basePlans[%q].regionalConfigs[%q].regionCode must be a 2-letter uppercase ISO 3166-1 alpha-2 code",
+			basePlanID,
+			region.RegionCode,
+		)
+	}
 	if region.Price.CurrencyCode == "" {
 		return rawRegionalConfig{}, nil, shared.UsageErrorf("subscription.basePlans[%q].regionalConfigs[%q].price.currencyCode is required", basePlanID, region.RegionCode)
 	}
@@ -213,6 +233,15 @@ func normalizeBasePlanRegion(basePlanID string, region rawRegionalConfig) (rawRe
 			Nanos:        region.Price.Nanos,
 		},
 	}, nil
+}
+
+func isYAMLBooleanLike(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "y", "yes", "n", "no", "on", "off", "true", "false":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeOffer(productID string, offer rawSubscriptionOfferDef, basePlanRegions map[string][]rawRegionalConfig) (*androidpublisher.SubscriptionOffer, error) {

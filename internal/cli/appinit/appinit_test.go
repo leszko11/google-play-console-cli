@@ -136,8 +136,20 @@ func (f *fakeClient) CreateSubscription(_ context.Context, _ string, subscriptio
 	return gpc.SubscriptionInfo{ProductID: subscription.ProductId}, nil
 }
 
+func (f *fakeClient) GetSubscriptionRaw(_ context.Context, _, _ string) (*androidpublisher.Subscription, error) {
+	return nil, nil
+}
+
+func (f *fakeClient) UpdateSubscription(_ context.Context, _, _ string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error) {
+	return gpc.SubscriptionInfo{ProductID: subscription.ProductId}, nil
+}
+
 func (f *fakeClient) ActivateSubscriptionBasePlan(_ context.Context, _, _, _ string) ([]gpc.SubscriptionInfo, error) {
 	return []gpc.SubscriptionInfo{{ProductID: "premium"}}, nil
+}
+
+func (f *fakeClient) ListSubscriptionOffers(_ context.Context, _, _, _ string, _ int64, _ string, _ bool) (gpc.SubscriptionOffersListInfo, error) {
+	return gpc.SubscriptionOffersListInfo{}, nil
 }
 
 func (f *fakeClient) CreateSubscriptionOffer(_ context.Context, _ string, _, _ string, offer *androidpublisher.SubscriptionOffer) (gpc.SubscriptionOfferInfo, error) {
@@ -149,8 +161,16 @@ func (f *fakeClient) CreateSubscriptionOffer(_ context.Context, _ string, _, _ s
 	return gpc.SubscriptionOfferInfo{OfferID: offer.OfferId}, nil
 }
 
+func (f *fakeClient) UpdateSubscriptionOffer(_ context.Context, _, _, _, _ string, offer *androidpublisher.SubscriptionOffer, _ string) (gpc.SubscriptionOfferInfo, error) {
+	return gpc.SubscriptionOfferInfo{OfferID: offer.OfferId}, nil
+}
+
 func (f *fakeClient) ActivateSubscriptionOffer(_ context.Context, _, _, _, offerID string) (gpc.SubscriptionOfferInfo, error) {
 	return gpc.SubscriptionOfferInfo{OfferID: offerID}, nil
+}
+
+func (f *fakeClient) GetMonetizationRegions(_ context.Context, _ string) (gpc.MonetizationRegionsInfo, error) {
+	return gpc.MonetizationRegionsInfo{}, nil
 }
 
 func defaultConfig() config.Config {

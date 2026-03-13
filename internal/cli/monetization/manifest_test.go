@@ -3,6 +3,7 @@ package monetization
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -160,5 +161,57 @@ subscription:
 
 	if _, err := loadManifest(path); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestLoadManifestRejectsYAMLBooleanLikeRegionCode(t *testing.T) {
+	path := writeManifestFixture(t, ".yaml", `
+subscription:
+  productId: premium
+  listings:
+    en-US:
+      title: Premium
+      description: Unlock all features
+  basePlans:
+    - basePlanId: monthly
+      billingPeriod: P1M
+      regionalConfigs:
+        - regionCode: no
+          price:
+            currencyCode: USD
+            units: 9
+            nanos: 990000000
+  offers: []
+`)
+
+	_, err := loadManifest(path)
+	if err == nil || !strings.Contains(err.Error(), `quote region codes like "NO"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadManifestRejectsNonUppercaseRegionCode(t *testing.T) {
+	path := writeManifestFixture(t, ".yaml", `
+subscription:
+  productId: premium
+  listings:
+    en-US:
+      title: Premium
+      description: Unlock all features
+  basePlans:
+    - basePlanId: monthly
+      billingPeriod: P1M
+      regionalConfigs:
+        - regionCode: Usa
+          price:
+            currencyCode: USD
+            units: 9
+            nanos: 990000000
+  offers: []
+`)
+
+	_, err := loadManifest(path)
+	if err == nil || !strings.Contains(err.Error(), "2-letter uppercase ISO 3166-1 alpha-2 code") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
