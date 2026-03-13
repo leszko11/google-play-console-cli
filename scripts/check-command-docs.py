@@ -152,8 +152,9 @@ def validate_readme_discovery() -> int:
 
 def main() -> int:
     failures = 0
-    with tempfile.NamedTemporaryFile(suffix=".md") as tmp:
-        cmd = [sys.executable, str(GEN_SCRIPT), "--output", tmp.name]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        generated_path = Path(tmpdir) / "COMMANDS.generated.md"
+        cmd = [sys.executable, str(GEN_SCRIPT), "--output", str(generated_path)]
         env = os.environ.copy()
         # Keep the docs check deterministic by always generating from source tree help output.
         env.pop("GPC_BIN", None)
@@ -170,7 +171,7 @@ def main() -> int:
             sys.stderr.write(proc.stderr)
             return proc.returncode
 
-        generated = Path(tmp.name).read_text(encoding="utf-8")
+        generated = generated_path.read_text(encoding="utf-8")
 
     if not DOC_PATH.exists():
         sys.stderr.write(

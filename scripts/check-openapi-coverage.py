@@ -16,9 +16,10 @@ GEN_SCRIPT = ROOT / "scripts" / "generate-openapi-coverage.py"
 
 
 def main() -> int:
-    with tempfile.NamedTemporaryFile(suffix=".md") as tmp:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        generated_path = Path(tmpdir) / "COVERAGE.generated.md"
         proc = subprocess.run(
-            [sys.executable, str(GEN_SCRIPT), "--output", tmp.name],
+            [sys.executable, str(GEN_SCRIPT), "--output", str(generated_path)],
             cwd=ROOT,
             text=True,
             capture_output=True,
@@ -29,7 +30,7 @@ def main() -> int:
             sys.stderr.write(proc.stderr)
             return proc.returncode
 
-        generated = Path(tmp.name).read_text(encoding="utf-8")
+        generated = generated_path.read_text(encoding="utf-8")
 
     if not DOC_PATH.exists():
         sys.stderr.write(f"{DOC_PATH} is missing. Run `make generate-openapi-coverage`.\n")
