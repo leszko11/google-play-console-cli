@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
+	"github.com/leszko11/google-play-console-cli/internal/validate"
 )
 
 var screenshotImageTypes = map[string]struct{}{
@@ -76,13 +77,22 @@ func scanLocaleDir(locale, dir string) (localeData, error) {
 	if err != nil {
 		return localeData{}, fmt.Errorf("%s: %w", locale, err)
 	}
+	if err := validate.Title(title); err != nil {
+		return localeData{}, fmt.Errorf("%s title.txt: %w", locale, err)
+	}
 	shortDescription, err := readRequiredFile(filepath.Join(dir, "short-description.txt"))
 	if err != nil {
 		return localeData{}, fmt.Errorf("%s: %w", locale, err)
 	}
+	if err := validate.ShortDescription(shortDescription); err != nil {
+		return localeData{}, fmt.Errorf("%s short-description.txt: %w", locale, err)
+	}
 	fullDescription, err := readRequiredFile(filepath.Join(dir, "full-description.txt"))
 	if err != nil {
 		return localeData{}, fmt.Errorf("%s: %w", locale, err)
+	}
+	if err := validate.FullDescription(fullDescription); err != nil {
+		return localeData{}, fmt.Errorf("%s full-description.txt: %w", locale, err)
 	}
 
 	images, err := scanImagesDir(filepath.Join(dir, "images"))

@@ -67,10 +67,21 @@ type result struct {
 	Status         string        `json:"status"`
 	PackageName    string        `json:"packageName,omitempty"`
 	VersionCode    int64         `json:"versionCode,omitempty"`
+	ProjectConfig  *projectInfo  `json:"projectConfig,omitempty"`
 	Checks         []doctorCheck `json:"checks"`
 	Warnings       []string      `json:"warnings,omitempty"`
 	BlockingIssues []string      `json:"blockingIssues,omitempty"`
 	NextSteps      []string      `json:"nextSteps,omitempty"`
+}
+
+type projectInfo struct {
+	Path          string   `json:"path"`
+	PackageName   string   `json:"packageName,omitempty"`
+	Profile       string   `json:"profile,omitempty"`
+	Output        string   `json:"output,omitempty"`
+	DefaultTrack  string   `json:"defaultTrack,omitempty"`
+	DefaultLocale string   `json:"defaultLocale,omitempty"`
+	DefaultPaths  []string `json:"defaultPaths,omitempty"`
 }
 
 func NewCommand(deps Deps) *ffcli.Command {
@@ -180,6 +191,31 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 		PackageName: resolvePackageName(opts.PackageName),
 		VersionCode: opts.VersionCode,
 		Checks:      make([]doctorCheck, 0, 16),
+	}
+	projectCfg, projectErr := config.LoadProject()
+	if projectErr == nil && projectCfg.Path != "" {
+		defaultPaths := make([]string, 0, 4)
+		if projectCfg.Config.ListingDir != "" {
+			defaultPaths = append(defaultPaths, "listing-dir="+projectCfg.Config.ListingDir)
+		}
+		if projectCfg.Config.ChangelogDir != "" {
+			defaultPaths = append(defaultPaths, "changelog-dir="+projectCfg.Config.ChangelogDir)
+		}
+		if projectCfg.Config.AppInitManifest != "" {
+			defaultPaths = append(defaultPaths, "appinit-manifest="+projectCfg.Config.AppInitManifest)
+		}
+		if projectCfg.Config.ReleaseManifest != "" {
+			defaultPaths = append(defaultPaths, "release-manifest="+projectCfg.Config.ReleaseManifest)
+		}
+		res.ProjectConfig = &projectInfo{
+			Path:          projectCfg.Path,
+			PackageName:   projectCfg.Config.PackageName,
+			Profile:       projectCfg.Config.Profile,
+			Output:        projectCfg.Config.Output,
+			DefaultTrack:  projectCfg.Config.DefaultTrack,
+			DefaultLocale: projectCfg.Config.DefaultLocale,
+			DefaultPaths:  defaultPaths,
+		}
 	}
 
 	authStatus := shared.BuildAuthStatusSnapshot(cfg, deps.LookupEnv)

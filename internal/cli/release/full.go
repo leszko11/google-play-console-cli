@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
@@ -77,6 +78,10 @@ func validateFullOptions(opts fullOptions) (fullOptions, fullManifest, error) {
 		return fullOptions{}, fullManifest{}, err
 	}
 	opts.PackageName = pkg
+	opts.ManifestPath, err = shared.ResolveProjectPath(opts.ManifestPath, func(cfg config.ProjectConfig) string { return cfg.ReleaseManifest })
+	if err != nil {
+		return fullOptions{}, fullManifest{}, err
+	}
 	opts.ManifestPath = strings.TrimSpace(opts.ManifestPath)
 	if opts.ManifestPath == "" {
 		return fullOptions{}, fullManifest{}, shared.UsageErrorf("--manifest is required")

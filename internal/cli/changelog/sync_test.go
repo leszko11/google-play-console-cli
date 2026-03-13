@@ -88,7 +88,7 @@ func runCommand(t *testing.T, deps Deps, args ...string) (string, error) {
 }
 
 func TestLoadReleaseNotesDir(t *testing.T) {
-	notes, err := loadReleaseNotesDir(writeNotesDir(t))
+	notes, _, err := loadReleaseNotesDir(writeNotesDir(t), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -156,5 +156,45 @@ func TestChangelogSyncFailsOnMultipleReleases(t *testing.T) {
 	_, err := runCommand(t, deps, "sync", "--package-name", "com.example.app", "--track", "production", "--dir", writeNotesDir(t), "--confirm")
 	if err == nil || !strings.Contains(err.Error(), "multiple releases") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestChangelogSyncUsesDefaultFallbackForMissingLocales(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "default.txt"), []byte("Fallback"), 0o600); err != nil {
+		t.Fatalf("write fallback notes: %v", err)
+	}
+	client := &fakeClient{
+		getTrack: gpc.TrackInfo{
+			Name: "production",
+			Releases: []gpc.TrackReleaseInfo{
+				{
+					Name:         "1.2.3",
+					Status:       "completed",
+					VersionCodes: []int64{123},
+					ReleaseNotes: []gpc.LocalizedText{
+						{Language: "en-US", Text: "Old EN"},
+						{Language: "fr-FR", Text: "Old FR"},
+					},
+				},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	_, err := runCommand(t, deps, "sync", "--package-name", "com.example.app", "--track", "production", "--dir", root, "--confirm")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(client.updateTrack.ReleaseNotes) != 2 {
+		t.Fatalf("unexpected release notes: %+v", client.updateTrack.ReleaseNotes)
+	}
+	for _, note := range client.updateTrack.ReleaseNotes {
+		if note.Text != "Fallback" {
+			t.Fatalf("expected fallback text, got %+v", client.updateTrack.ReleaseNotes)
+		}
 	}
 }

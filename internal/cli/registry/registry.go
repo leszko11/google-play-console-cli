@@ -78,6 +78,6 @@ func Register(root *ffcli.Command, deps Deps) {
 		users.NewCommand(users.Deps{}),
 		grants.NewCommand(grants.Deps{}),
 		internalsharing.NewCommand(internalsharing.Deps{}),
-		completion.NewCommand(),
+		completion.NewCommand(root),
 	}
 }

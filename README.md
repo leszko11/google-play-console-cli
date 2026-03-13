@@ -27,6 +27,12 @@ mv gpc /usr/local/bin/gpc
 
 On Linux, replace `shasum -a 256 --check` with `sha256sum --check` if `shasum` is not available.
 
+### Homebrew
+
+```bash
+brew install leszko11/tap/gpc
+```
+
 ### Shell Completion
 
 ```bash
@@ -37,8 +43,6 @@ gpc completion bash > ~/.local/share/bash-completion/completions/gpc
 mkdir -p ~/.zfunc
 gpc completion zsh > ~/.zfunc/_gpc
 ```
-
-Homebrew is planned later. `v0.1.0` supports `go install` and GitHub Release archives only.
 
 ## Current Scope
 
@@ -57,7 +61,7 @@ Homebrew is planned later. `v0.1.0` supports `go install` and GitHub Release arc
 - Staging release workflows (`release verify`, `release alpha`)
 - Reviews management (`reviews list/get/reply`)
 - Review triage summary (`reviews triage`)
-- Google Play Developer Reporting app discovery, anomalies, and vitals queries (`reports apps list`, `reports anomalies list`, `reports vitals get/query`)
+- Google Play Developer Reporting app discovery, anomalies, vitals, and error search queries (`reports apps list`, `reports anomalies list`, `reports vitals get/query`, `reports errors issues list`, `reports errors reports list`)
 - Reporting operator summary (`reports summary`)
 - Orders API support (`orders get/batch-get/refund`)
 - External transactions API support (`external-transactions get/create/refund`)
@@ -66,19 +70,17 @@ Homebrew is planned later. `v0.1.0` supports `go install` and GitHub Release arc
 - Generated APK metadata support (`generated-apks list/download`)
 - App recovery action support (`app-recoveries list/create/add-targeting/cancel/deploy`)
 - App bootstrap workflow (`appinit`)
+- App store export/bootstrap workflow (`appinit export`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Manifest-driven monetization setup workflow (`monetization setup`)
 - Monetization one-time product commands (`products ...`)
+- Directory-driven product and subscription sync workflows (`products sync`, `subscriptions sync`)
 - Legacy in-app product commands (`iap ...`)
 - Purchase lifecycle commands (`purchases ...`)
 - Account users management (`users list/create/update/delete`)
 - Per-app grants management (`grants create/update/delete`)
 - Internal app sharing upload (`internal-sharing upload`)
 - CI quality gates for format, lint, test, and build
-
-## Not Yet Implemented
-
-- Reporting error issue and error report search surfaces
 
 ## Build
 
@@ -158,11 +160,18 @@ gpc reports apps list --page-size 100
 # List anomalies for one app
 gpc reports anomalies list --package-name com.example.app --filter 'activeBetween("2026-03-01T00:00:00Z", UNBOUNDED)'
 
+# Search reporting error issues and reports
+gpc reports errors issues list --package-name com.example.app --filter 'issueType = "CRASH"' --start-time 2026-03-01T00:00:00Z
+gpc reports errors reports list --package-name com.example.app --filter 'issueType = "CRASH"' --start-time 2026-03-01T00:00:00Z
+
 # Summarize reporting visibility, anomaly count, and vitals freshness
 gpc reports summary --package-name com.example.app
 
 # Group reviews into pending-reply and replied buckets
 gpc reviews triage --package-name com.example.app
+
+# Export the current Play store state into local round-trip files
+gpc appinit export --package-name com.example.app --dir ./store --write-project-config
 
 # Write the app's Data Safety declaration from the exported Play CSV template
 gpc apps data-safety --package-name com.example.app --input /path/to/data-safety.csv

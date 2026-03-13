@@ -8,12 +8,15 @@ import (
 const EnvServiceAccountPath = "GPC_SERVICE_ACCOUNT_PATH"
 const EnvDefaultOutput = "GPC_DEFAULT_OUTPUT"
 const EnvStrictAuth = "GPC_STRICT_AUTH"
+const EnvPackageName = "GPC_PACKAGE_NAME"
+const EnvProfile = "GPC_PROFILE"
 
 type GlobalFlags struct {
 	PackageName     string
 	ServiceAccount  string
 	Profile         string
 	Output          string
+	Fields          string
 	Timeout         time.Duration
 	UploadTimeout   time.Duration
 	Debug           string
@@ -35,6 +38,7 @@ func BindGlobalFlags(fs *flag.FlagSet, cfg *GlobalFlags) {
 	fs.StringVar(&cfg.ServiceAccount, "service-account", "", "Path to service account JSON")
 	fs.StringVar(&cfg.Profile, "profile", "", "Authentication profile override")
 	fs.StringVar(&cfg.Output, "output", "", "Output format override: json, table, markdown")
+	fs.StringVar(&cfg.Fields, "fields", "", "Comma-separated JSON field projection")
 	fs.DurationVar(&cfg.Timeout, "timeout", 0, "Request timeout")
 	fs.DurationVar(&cfg.UploadTimeout, "upload-timeout", 0, "Upload request timeout")
 	fs.StringVar(&cfg.Debug, "debug", "", "Enable debug logging")

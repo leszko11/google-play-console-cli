@@ -56,3 +56,14 @@ changelog:
 release:
   draft: false
   prerelease: auto
+
+brews:
+  - name: gpc
+    repository:
+      owner: leszko11
+      name: homebrew-tap
+    homepage: https://github.com/leszko11/google-play-console-cli
+    description: Google Play Console CLI
+    license: MIT
+    install: |
+      bin.install "gpc"

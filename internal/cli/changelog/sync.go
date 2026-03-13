@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
@@ -25,11 +26,12 @@ type Client interface {
 }
 
 type syncOptions struct {
-	PackageName string
-	Track       string
-	Dir         string
-	Confirm     bool
-	DryRun      bool
+	PackageName    string
+	Track          string
+	Dir            string
+	FallbackLocale string
+	Confirm        bool
+	DryRun         bool
 }
 
 type syncResult struct {
@@ -49,6 +51,7 @@ func newSyncCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&opts.PackageName, "package-name", "", "Package name")
 	fs.StringVar(&opts.Track, "track", "", "Track name")
 	fs.StringVar(&opts.Dir, "dir", "", "Changelog directory")
+	fs.StringVar(&opts.FallbackLocale, "fallback-locale", "", "Locale file to reuse when a locale-specific file is missing")
 	fs.BoolVar(&opts.Confirm, "confirm", false, "Confirm committing the edit (required unless --dry-run)")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Create and validate the edit, then delete it instead of updating Play")
 
@@ -62,7 +65,7 @@ func newSyncCommand(deps Deps) *ffcli.Command {
 			if err != nil {
 				return err
 			}
-			notes, err := loadReleaseNotesDir(opts.Dir)
+			notes, fallback, err := loadReleaseNotesDir(opts.Dir, opts.FallbackLocale)
 			if err != nil {
 				return err
 			}
@@ -75,7 +78,7 @@ func newSyncCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 			defer cancel()
-			return runSync(ctx, requestCtx, client, deps.Stdout, opts, notes)
+			return runSync(ctx, requestCtx, client, deps.Stdout, opts, notes, fallback)
 		},
 	}
 }
@@ -86,8 +89,25 @@ func validateOptions(opts syncOptions) (syncOptions, error) {
 		return syncOptions{}, err
 	}
 	opts.PackageName = pkg
+	opts.Track, err = shared.ResolveDefaultTrack(opts.Track)
+	if err != nil {
+		return syncOptions{}, err
+	}
 	opts.Track = strings.TrimSpace(opts.Track)
+	opts.Dir, err = shared.ResolveProjectPath(opts.Dir, func(cfg config.ProjectConfig) string {
+		if strings.TrimSpace(cfg.ChangelogDir) == "" {
+			return ""
+		}
+		if strings.TrimSpace(opts.Track) == "" {
+			return cfg.ChangelogDir
+		}
+		return filepath.Join(cfg.ChangelogDir, opts.Track)
+	})
+	if err != nil {
+		return syncOptions{}, err
+	}
 	opts.Dir = strings.TrimSpace(opts.Dir)
+	opts.FallbackLocale = strings.TrimSpace(opts.FallbackLocale)
 	if opts.Track == "" {
 		return syncOptions{}, shared.UsageErrorf("--track is required")
 	}
@@ -100,11 +120,12 @@ func validateOptions(opts syncOptions) (syncOptions, error) {
 	return opts, nil
 }
 
-func loadReleaseNotesDir(dir string) ([]gpc.LocalizedText, error) {
+func loadReleaseNotesDir(dir, fallbackLocale string) ([]gpc.LocalizedText, map[string]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("read changelog directory: %w", err)
+		return nil, nil, fmt.Errorf("read changelog directory: %w", err)
 	}
+	fallback := make(map[string]string, 2)
 	notes := make([]gpc.LocalizedText, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") || strings.ToLower(filepath.Ext(entry.Name())) != ".txt" {
@@ -113,22 +134,39 @@ func loadReleaseNotesDir(dir string) ([]gpc.LocalizedText, error) {
 		locale := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
 		raw, err := os.ReadFile(filepath.Join(dir, entry.Name()))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		text := strings.TrimSpace(string(raw))
 		if text == "" {
-			return nil, fmt.Errorf("release notes file %s is empty", entry.Name())
+			return nil, nil, fmt.Errorf("release notes file %s is empty", entry.Name())
+		}
+		if locale == "default" {
+			fallback["default"] = text
+			continue
 		}
 		notes = append(notes, gpc.LocalizedText{Language: locale, Text: text})
 	}
 	sort.Slice(notes, func(i, j int) bool { return notes[i].Language < notes[j].Language })
-	if len(notes) == 0 {
-		return nil, fmt.Errorf("no release notes files found in %s", dir)
+	if len(notes) == 0 && len(fallback) == 0 {
+		return nil, nil, fmt.Errorf("no release notes files found in %s", dir)
 	}
-	return notes, nil
+	if fallbackLocale != "" {
+		var fallbackText string
+		for _, note := range notes {
+			if note.Language == fallbackLocale {
+				fallbackText = note.Text
+				break
+			}
+		}
+		if fallbackText == "" {
+			return nil, nil, fmt.Errorf("fallback locale %q not found in %s", fallbackLocale, dir)
+		}
+		fallback[fallbackLocale] = fallbackText
+	}
+	return notes, fallback, nil
 }
 
-func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer, opts syncOptions, notes []gpc.LocalizedText) error {
+func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer, opts syncOptions, notes []gpc.LocalizedText, fallback map[string]string) error {
 	result := syncResult{
 		PackageName: opts.PackageName,
 		Track:       opts.Track,
@@ -155,6 +193,8 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 		return fail(err)
 	}
 	result.ReleaseName = release.Name
+	notes = applyFallbackNotes(notes, release.ReleaseNotes, fallback)
+	result.Notes = notes
 
 	if opts.DryRun {
 		if err := client.ValidateEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
@@ -186,6 +226,41 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 	result.Status = "committed"
 	result.Committed = true
 	return shared.WriteJSON(out, result)
+}
+
+func applyFallbackNotes(local []gpc.LocalizedText, existing []gpc.LocalizedText, fallback map[string]string) []gpc.LocalizedText {
+	if len(fallback) == 0 {
+		return local
+	}
+	byLocale := make(map[string]string, len(local))
+	for _, note := range local {
+		byLocale[note.Language] = note.Text
+	}
+	defaultText := fallback["default"]
+	explicitFallbackText := ""
+	for locale, text := range fallback {
+		if locale != "default" {
+			explicitFallbackText = text
+			break
+		}
+	}
+	for _, note := range existing {
+		if _, ok := byLocale[note.Language]; ok {
+			continue
+		}
+		switch {
+		case explicitFallbackText != "":
+			byLocale[note.Language] = explicitFallbackText
+		case defaultText != "":
+			byLocale[note.Language] = defaultText
+		}
+	}
+	merged := make([]gpc.LocalizedText, 0, len(byLocale))
+	for locale, text := range byLocale {
+		merged = append(merged, gpc.LocalizedText{Language: locale, Text: text})
+	}
+	sort.Slice(merged, func(i, j int) bool { return merged[i].Language < merged[j].Language })
+	return merged
 }
 
 func selectRelease(track gpc.TrackInfo) (gpc.TrackReleaseInfo, error) {

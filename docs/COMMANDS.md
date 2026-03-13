@@ -25,6 +25,7 @@ make generate-command-docs
 - `gpc auth switch`
 - `gpc auth logout`
 - `gpc appinit`
+- `gpc appinit export`
 - `gpc apps`
 - `gpc apps list`
 - `gpc apps get`
@@ -108,6 +109,11 @@ make generate-command-docs
 - `gpc reports apps list`
 - `gpc reports anomalies`
 - `gpc reports anomalies list`
+- `gpc reports errors`
+- `gpc reports errors issues`
+- `gpc reports errors issues list`
+- `gpc reports errors reports`
+- `gpc reports errors reports list`
 - `gpc reports summary`
 - `gpc reports vitals`
 - `gpc reports vitals get`
@@ -135,6 +141,7 @@ make generate-command-docs
 - `gpc subscriptions`
 - `gpc subscriptions list`
 - `gpc subscriptions get`
+- `gpc subscriptions sync`
 - `gpc subscriptions batch-get`
 - `gpc subscriptions create`
 - `gpc subscriptions batch-update`
@@ -164,6 +171,7 @@ make generate-command-docs
 - `gpc products`
 - `gpc products list`
 - `gpc products get`
+- `gpc products sync`
 - `gpc products batch-get`
 - `gpc products batch-update`
 - `gpc products batch-delete`
@@ -279,6 +287,7 @@ SUBCOMMANDS
 FLAGS
   -bootstrap-assist=false  Enable interactive bootstrap build assistance
   -debug string            Enable debug logging
+  -fields string           Comma-separated JSON field projection
   -output string           Output format override: json, table, markdown
   -package-name string     App package name
   -paginate=false          Fetch all paginated API responses
@@ -400,11 +409,33 @@ DESCRIPTION
 USAGE
   appinit
 
+SUBCOMMANDS
+  export  Export existing Play store state into local files
+
 FLAGS
   -confirm=false        Confirm applying bootstrap changes (required unless --dry-run)
   -dry-run=false        Validate all sections and use dry-run flows where supported
   -manifest string      Path to app bootstrap manifest (.json/.yaml/.yml)
   -package-name string  Package name
+```
+
+## `gpc appinit export --help`
+
+```text
+DESCRIPTION
+  Export existing Play store state into local files
+
+USAGE
+  export
+
+FLAGS
+  -dir string                  Export directory
+  -include string              Comma-separated sections: app-details,listing,changelog,products,subscriptions
+  -layout gpc                  Export layout: gpc or gpp
+  -package-name string         Package name
+  -skip-images=false           Skip downloading listing images
+  -tracks string               Comma-separated tracks to export changelogs from
+  -write-project-config=false  Write .gpc.yaml with project-local defaults
 ```
 
 ## `gpc apps --help`
@@ -605,11 +636,12 @@ USAGE
   sync
 
 FLAGS
-  -confirm=false        Confirm committing the edit (required unless --dry-run)
-  -dir string           Changelog directory
-  -dry-run=false        Create and validate the edit, then delete it instead of updating Play
-  -package-name string  Package name
-  -track string         Track name
+  -confirm=false           Confirm committing the edit (required unless --dry-run)
+  -dir string              Changelog directory
+  -dry-run=false           Create and validate the edit, then delete it instead of updating Play
+  -fallback-locale string  Locale file to reuse when a locale-specific file is missing
+  -package-name string     Package name
+  -track string            Track name
 ```
 
 ## `gpc edits --help`
@@ -1678,6 +1710,7 @@ USAGE
 SUBCOMMANDS
   apps       Reporting app discovery commands
   anomalies  Reporting anomaly commands
+  errors     Reporting error issue and report commands
   summary    Summarize reporting visibility, anomalies, and vitals freshness for an app
   vitals     Vitals metric set reporting commands
 ```
@@ -1736,6 +1769,84 @@ FLAGS
   -package-name string  Package name
   -page-size 0          Maximum anomalies per page
   -page-token string    Page token for the next page
+```
+
+## `gpc reports errors --help`
+
+```text
+DESCRIPTION
+  Reporting error issue and report commands
+
+USAGE
+  errors
+
+SUBCOMMANDS
+  issues   Grouped error issue commands
+  reports  Raw error report commands
+```
+
+## `gpc reports errors issues --help`
+
+```text
+DESCRIPTION
+  Grouped error issue commands
+
+USAGE
+  issues
+
+SUBCOMMANDS
+  list  Search grouped error issues for an app
+```
+
+## `gpc reports errors issues list --help`
+
+```text
+DESCRIPTION
+  Search grouped error issues for an app
+
+USAGE
+  list
+
+FLAGS
+  -end-time string              RFC3339 interval end time
+  -filter string                Error issue filter expression
+  -order-by string              Sort order (for example: errorReportCount desc)
+  -package-name string          Package name
+  -page-size 0                  Maximum error issues per page
+  -page-token string            Page token for the next page
+  -sample-error-report-limit 0  Sample error reports per issue
+  -start-time string            RFC3339 interval start time
+```
+
+## `gpc reports errors reports --help`
+
+```text
+DESCRIPTION
+  Raw error report commands
+
+USAGE
+  reports
+
+SUBCOMMANDS
+  list  Search raw error reports for an app
+```
+
+## `gpc reports errors reports list --help`
+
+```text
+DESCRIPTION
+  Search raw error reports for an app
+
+USAGE
+  list
+
+FLAGS
+  -end-time string      RFC3339 interval end time
+  -filter string        Error report filter expression
+  -package-name string  Package name
+  -page-size 0          Maximum error reports per page
+  -page-token string    Page token for the next page
+  -start-time string    RFC3339 interval start time
 ```
 
 ## `gpc reports summary --help`
@@ -2106,6 +2217,7 @@ USAGE
 SUBCOMMANDS
   list          List subscriptions
   get           Get a subscription by product ID
+  sync          Sync subscriptions from exported JSON files
   batch-get     Batch-get subscriptions by product IDs
   create        Create a subscription
   batch-update  Batch create or update subscriptions
@@ -2144,6 +2256,23 @@ FLAGS
   -package-name string  Package name
   -product-id string    Subscription product ID
   -verbose=false        Include base plan and region diagnostics
+```
+
+## `gpc subscriptions sync --help`
+
+```text
+DESCRIPTION
+  Sync subscriptions from exported JSON files
+
+USAGE
+  sync
+
+FLAGS
+  -confirm=false         Confirm applying subscription changes (required unless --dry-run)
+  -delete-missing=false  Delete remote subscriptions not present in the local directory
+  -dir string            Directory containing exported subscription JSON files
+  -dry-run=false         Plan subscription changes without mutating Play
+  -package-name string   Package name
 ```
 
 ## `gpc subscriptions batch-get --help`
@@ -2577,6 +2706,7 @@ USAGE
 SUBCOMMANDS
   list              List one-time products
   get               Get a one-time product by product ID
+  sync              Sync one-time products from exported JSON files
   batch-get         Batch-get one-time products by product IDs
   batch-update      Batch create or update one-time products
   batch-delete      Batch delete one-time products
@@ -2615,6 +2745,23 @@ FLAGS
   -package-name string  Package name
   -product-id string    One-time product ID
   -verbose=false        Include purchase option and region diagnostics
+```
+
+## `gpc products sync --help`
+
+```text
+DESCRIPTION
+  Sync one-time products from exported JSON files
+
+USAGE
+  sync
+
+FLAGS
+  -confirm=false         Confirm applying product changes (required unless --dry-run)
+  -delete-missing=false  Delete remote products not present in the local directory
+  -dir string            Directory containing exported product JSON files
+  -dry-run=false         Plan product changes without mutating Play
+  -package-name string   Package name
 ```
 
 ## `gpc products batch-get --help`

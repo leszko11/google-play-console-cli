@@ -10,10 +10,13 @@ jobs:
   test-and-build:
     name: test-and-build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Checkout
@@ -49,6 +52,51 @@ jobs:
           DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           LDFLAGS="-X 'github.com/leszko11/google-play-console-cli/cmd.Version=${VERSION}' -X 'github.com/leszko11/google-play-console-cli/cmd.Commit=${COMMIT}' -X 'github.com/leszko11/google-play-console-cli/cmd.Date=${DATE}'"
           go build -ldflags "$LDFLAGS" ./...
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run coverage
+        run: |
+          go test -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out | tee coverage.txt
+          awk '/^total:/ { gsub("%", "", $3); if ($3 + 0 < 20) { exit 1 } }' coverage.txt
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            coverage.out
+            coverage.txt
+
+  benchmarks:
+    name: benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run benchmarks
+        run: go test -run=^$ -bench=. -benchmem ./internal/cli/shared ./internal/cli/listing ./internal/cli/release
 
   release-config:
     name: release-config

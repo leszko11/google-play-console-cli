@@ -41,3 +41,7 @@ func (c *Client) resolveRegionsVersion(ctx context.Context, packageName, fallbac
 	}
 	return version, nil
 }
+
+func (c *Client) GetLatestRegionsVersion(ctx context.Context, packageName string) (string, error) {
+	return c.resolveRegionsVersion(ctx, packageName, "")
+}

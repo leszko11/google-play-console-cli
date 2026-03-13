@@ -18,6 +18,7 @@ import (
 
 type Client interface {
 	ListSubscriptions(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionsListInfo, error)
+	GetLatestRegionsVersion(ctx context.Context, packageName string) (string, error)
 	GetSubscription(ctx context.Context, packageName, productID string) (gpc.SubscriptionInfo, error)
 	GetSubscriptionDiagnostic(ctx context.Context, packageName, productID string) (gpc.SubscriptionDiagnosticInfo, error)
 	BatchGetSubscriptions(ctx context.Context, packageName string, productIDs []string) (gpc.SubscriptionsListInfo, error)
@@ -62,6 +63,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newListCommand(deps),
 			newGetCommand(deps),
+			newSyncCommand(deps),
 			newBatchGetCommand(deps),
 			newCreateCommand(deps),
 			newBatchUpdateCommand(deps),
