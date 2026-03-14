@@ -1,0 +1,88 @@
+# gpc
+
+> Scriptable Google Play Console CLI for publishing, reporting, release, and monetization workflows.
+
+## Start Here
+
+- Discover commands with `gpc --help` and `gpc <command> --help`.
+- Run the full local verification gate with `make dev`.
+- Build the CLI locally with `make build`.
+
+## Automation-Safe Usage
+
+- Non-interactive sessions default to `json`; interactive terminals default to `table`.
+- Keep stdout for data and stderr for help, warnings, and errors.
+- Prefer explicit `--output json` or `GPC_DEFAULT_OUTPUT=json` in CI.
+- Prefer explicit `--package-name`, `--profile`, `--service-account`, and `--strict-auth` in scripts.
+
+## Global Flags
+
+- `--bootstrap-assist`: Enable interactive bootstrap build assistance
+- `--debug`: Enable debug logging
+- `--fields`: Comma-separated JSON field projection
+- `--output`: Output format override: json, table, markdown
+- `--package-name`: App package name
+- `--paginate`: Fetch all paginated API responses
+- `--pretty`: Pretty print JSON output
+- `--profile`: Authentication profile override
+- `--service-account`: Path to service account JSON
+- `--strict-auth`: Fail when credentials are resolved from multiple sources
+- `--timeout`: Request timeout
+- `--upload-timeout`: Upload request timeout
+- `--version`: Show build version information
+
+## Top-Level Commands
+
+- `auth`: Manage authentication profiles
+- `bootstrap`: Export current Play state into a local bootstrap workspace
+- `appinit`: Bootstrap app store presence from a manifest
+- `apps`: App visibility and metadata commands
+- `app-recoveries`: Manage Play app recovery actions
+- `changelog`: Release changelog workflows
+- `edits`: Manage Google Play edit transactions
+- `tracks`: Manage release tracks inside an edit
+- `apks`: Manage APK uploads in an edit
+- `bundles`: Manage Android App Bundles in an edit
+- `deobfuscation`: Manage deobfuscation files in an edit
+- `deploy`: Upload artifact and publish to a track in one flow
+- `doctor`: Run read-only diagnostics for auth, package access, and e2e fixtures
+- `e2e`: E2E fixture and smoke-testing helpers
+- `release`: Release workflows for staged Google Play deploys
+- `rollback`: Halt the active staged rollout on a track
+- `status`: Summarize tracks and recent review health for an app
+- `reviews`: Read and reply to Play Store reviews
+- `reports`: Google Play Developer Reporting commands
+- `orders`: Inspect and refund Play orders
+- `external-transactions`: Report and refund external transactions
+- `device-tier-configs`: Manage application device tier configs
+- `system-apks`: Manage generated system APK variants
+- `generated-apks`: List and download APKs generated from bundles
+- `subscriptions`: Manage monetization subscriptions
+- `monetization`: Monetization workflows
+- `products`: Manage monetization one-time products
+- `iap`: Manage legacy in-app products
+- `listing`: Store listing workflows
+- `purchases`: Manage one-time and subscription purchases
+- `users`: Manage Play Console account users
+- `grants`: Manage per-app user grants
+- `internal-sharing`: Upload artifacts for internal app sharing
+- `completion`: Generate shell completion script
+
+## Common Flows
+
+- Authenticate: `gpc auth init --service-account /path/to/service-account.json`
+- Inspect configured profiles: `gpc auth status` and `gpc auth profiles list --output table`
+- Bootstrap a local store workspace: `gpc bootstrap --package-name com.example.app --dir ./store --write-project-config`
+- Validate a release before upload: `gpc release verify --package-name com.example.app --aab /path/to/app.aab`
+- Wait for bundle processing in CI: `gpc bundles wait --package-name com.example.app --version-code 123 --output json`
+
+## Repo Docs
+
+- [README.md](README.md): install, quickstart, command discovery, and examples
+- [docs/COMMANDS.md](docs/COMMANDS.md): generated command reference from live help output
+- [docs/AUTH.md](docs/AUTH.md): auth flows, config precedence, and credential storage
+- [docs/API_NOTES.md](docs/API_NOTES.md): Google Play API caveats and behavior notes
+- [docs/TESTING.md](docs/TESTING.md): smoke tests and local verification
+- [docs/RELEASING.md](docs/RELEASING.md): release process for maintainers
+- [docs/openapi/COVERAGE.md](docs/openapi/COVERAGE.md): endpoint coverage status
+- [AGENTS.md](AGENTS.md): repository-specific AI agent guidance

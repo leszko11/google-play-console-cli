@@ -101,6 +101,7 @@ Google Play API caveats: `docs/API_NOTES.md`.
 Release process: `docs/RELEASING.md`.
 Endpoint index notes: `docs/openapi/README.md`.
 Endpoint coverage report: `docs/openapi/COVERAGE.md`.
+AI-agent entrypoint: `llms.txt`.
 
 GitHub smoke workflow: `.github/workflows/smoke-tests.yml`.
 Use workflow-dispatch inputs `run_phase3` / `run_phase5` to enable optional deploy/monetization smoke phases.
@@ -586,3 +587,10 @@ gpc grants --help
 gpc internal-sharing --help
 gpc completion --help
 ```
+
+## Automation-Safe Usage
+
+- Prefer `--output json` or `GPC_DEFAULT_OUTPUT=json` in CI and scripts.
+- Interactive TTY sessions default to `table`; non-interactive sessions default to `json`.
+- Keep stdout reserved for data; expect help, warnings, and errors on stderr.
+- Use explicit `--package-name`, `--profile`, `--service-account`, and `--strict-auth` in automation.

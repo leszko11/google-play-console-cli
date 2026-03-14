@@ -18,7 +18,17 @@ Use `--help` at every level:
 gpc --help
 gpc auth --help
 gpc apps --help
+gpc bootstrap --help
+gpc release --help
+gpc completion --help
 ```
+
+## Automation-Safe Usage
+
+- Prefer `--output json` or `GPC_DEFAULT_OUTPUT=json` in CI and scripts.
+- Interactive TTY sessions default to `table`; non-interactive sessions default to `json`.
+- Keep stdout for machine-readable data and stderr for help, warnings, and errors.
+- Use explicit `--package-name`, `--profile`, `--service-account`, and `--strict-auth` in automation.
 
 ## Build and Test
 
