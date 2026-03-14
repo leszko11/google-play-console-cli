@@ -3,6 +3,7 @@ package systemapks
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"os"
 	"path/filepath"
@@ -189,7 +190,8 @@ func TestSystemAPKsDownload_WritesFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
-	if !strings.Contains(out, `"outputPath":"`+outputPath+`"`) || !strings.Contains(out, `"sizeBytes":9`) {
+	jsonPath, _ := json.Marshal(outputPath)
+	if !strings.Contains(out, `"outputPath":`+string(jsonPath)) || !strings.Contains(out, `"sizeBytes":9`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 	raw, err := os.ReadFile(outputPath)
