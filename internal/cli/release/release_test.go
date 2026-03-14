@@ -1,9 +1,13 @@
 package release
 
 import (
+	"archive/zip"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -151,6 +155,41 @@ func assertContainsStep(t *testing.T, steps []alphaStep, name string, status str
 		}
 	}
 	t.Fatalf("missing step %q with status %q: %+v", name, status, steps)
+}
+
+func writeFakeAAB(t *testing.T, path string, signed bool) string {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir artifact dir: %v", err)
+	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create fake aab: %v", err)
+	}
+	defer file.Close()
+
+	writer := zip.NewWriter(file)
+	writeEntry := func(name, contents string) {
+		t.Helper()
+		entry, err := writer.Create(name)
+		if err != nil {
+			t.Fatalf("create zip entry %s: %v", name, err)
+		}
+		if _, err := io.WriteString(entry, contents); err != nil {
+			t.Fatalf("write zip entry %s: %v", name, err)
+		}
+	}
+
+	writeEntry("BundleConfig.pb", "bundle-config")
+	writeEntry("base/manifest/AndroidManifest.xml", "<manifest package=\"com.example.app\" />")
+	if signed {
+		writeEntry("META-INF/BUNDLE.RSA", "signed")
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close zip writer: %v", err)
+	}
+	return path
 }
 
 func TestValidateAlphaOptions(t *testing.T) {
