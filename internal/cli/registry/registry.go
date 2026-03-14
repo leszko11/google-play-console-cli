@@ -38,6 +38,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/systemapks"
 	"github.com/leszko11/google-play-console-cli/internal/cli/tracks"
 	"github.com/leszko11/google-play-console-cli/internal/cli/users"
+	"github.com/leszko11/google-play-console-cli/internal/cli/workflow"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
@@ -83,6 +84,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		listing.NewCommand(listing.Deps{}),
 		purchases.NewCommand(purchases.Deps{}),
 		users.NewCommand(users.Deps{}),
+		workflow.NewCommand(workflow.Deps{}),
 		grants.NewCommand(grants.Deps{}),
 		internalsharing.NewCommand(internalsharing.Deps{}),
 		completion.NewCommand(root),

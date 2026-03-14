@@ -67,6 +67,7 @@
 - `listing`: Store listing workflows
 - `purchases`: Manage one-time and subscription purchases
 - `users`: Manage Play Console account users
+- `workflow`: Run declarative gpc workflows from .gpc/workflow.yml
 - `grants`: Manage per-app user grants
 - `internal-sharing`: Upload artifacts for internal app sharing
 - `completion`: Generate shell completion script

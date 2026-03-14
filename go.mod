@@ -7,8 +7,8 @@ toolchain go1.24.13
 require (
 	github.com/99designs/keyring v1.2.2
 	github.com/peterbourgon/ff/v3 v3.4.0
-	gopkg.in/yaml.v3 v3.0.1
 	google.golang.org/api v0.265.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -24,6 +24,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.11 // indirect
 	github.com/googleapis/gax-go/v2 v2.16.0 // indirect
