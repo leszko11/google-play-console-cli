@@ -72,6 +72,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - App bootstrap workflow (`appinit`)
 - App store export/bootstrap workflow (`appinit export`)
 - Top-level local bootstrap export workflow (`bootstrap`)
+- Vitals-gated staged releases (`release full --vitals-gate ... --vitals-wait ... --auto-halt-on-regression`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Manifest-driven monetization setup workflow (`monetization setup`)
 - Monetization one-time product commands (`products ...`)
@@ -170,6 +171,9 @@ gpc reports errors reports list --package-name com.example.app --filter 'issueTy
 
 # Deliver a raw JSON summary to a webhook endpoint with event metadata
 gpc notify webhook --url https://hooks.example.com/deploy --event release.completed --input /path/to/release-summary.json
+
+# Commit a staged release manifest, then monitor crash/ANR thresholds and halt on regression
+gpc release full --package-name com.example.app --manifest ./release.yaml --confirm --vitals-gate 'crashRate<2.0,anrRate<0.5' --vitals-wait 24h --auto-halt-on-regression
 
 # Summarize reporting visibility, anomaly count, and vitals freshness
 gpc reports summary --package-name com.example.app

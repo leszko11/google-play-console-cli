@@ -35,16 +35,22 @@ type Client interface {
 	GetTrack(ctx context.Context, packageName, editID, trackName string) (gpc.TrackInfo, error)
 }
 
+type ReportingClient interface {
+	QueryVitalsMetricSet(ctx context.Context, packageName string, metricSet gpc.ReportingVitalsMetricSet, request *gpc.ReportingVitalsQueryRequest) (gpc.ReportingVitalsQueryResult, error)
+}
+
 type RunCommandFunc func(ctx context.Context, dir, name string, args ...string) (string, error)
 
 type Deps struct {
-	LoadConfig func() (config.Config, error)
-	NewClient  func(context.Context, gpc.CredentialInput) (Client, error)
-	LookupEnv  func(string) string
-	RunCommand RunCommandFunc
-	Now        func() time.Time
-	Stdout     io.Writer
-	Stderr     io.Writer
+	LoadConfig         func() (config.Config, error)
+	NewClient          func(context.Context, gpc.CredentialInput) (Client, error)
+	NewReportingClient func(context.Context, gpc.CredentialInput) (ReportingClient, error)
+	LookupEnv          func(string) string
+	RunCommand         RunCommandFunc
+	Now                func() time.Time
+	Sleep              func(context.Context, time.Duration) error
+	Stdout             io.Writer
+	Stderr             io.Writer
 }
 
 func NewCommand(deps Deps) *ffcli.Command {
@@ -72,6 +78,11 @@ func withDefaults(deps Deps) Deps {
 			return gpc.NewClient(ctx, creds)
 		}
 	}
+	if deps.NewReportingClient == nil {
+		deps.NewReportingClient = func(ctx context.Context, creds gpc.CredentialInput) (ReportingClient, error) {
+			return gpc.NewReportingClient(ctx, creds)
+		}
+	}
 	if deps.LookupEnv == nil {
 		deps.LookupEnv = os.Getenv
 	}
@@ -80,6 +91,9 @@ func withDefaults(deps Deps) Deps {
 	}
 	if deps.Now == nil {
 		deps.Now = time.Now
+	}
+	if deps.Sleep == nil {
+		deps.Sleep = sleepContext
 	}
 	if deps.Stdout == nil {
 		deps.Stdout = os.Stdout
@@ -91,22 +105,11 @@ func withDefaults(deps Deps) Deps {
 }
 
 func buildClient(ctx context.Context, deps Deps) (Client, context.Context, context.CancelFunc, error) {
-	cfg, err := deps.LoadConfig()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	resolved, err := shared.ResolveCredentials(cfg, deps.LookupEnv)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	requestCtx, cancel := shared.ContextWithTimeout(ctx, shared.ActiveGlobalFlags().Timeout)
-	client, err := deps.NewClient(requestCtx, resolved.Input)
-	if err != nil {
-		cancel()
-		return nil, nil, nil, err
-	}
-	return client, requestCtx, cancel, nil
+	return shared.BuildClient[Client](ctx, shared.BuildClientDeps[Client]{
+		LoadConfig: deps.LoadConfig,
+		LookupEnv:  deps.LookupEnv,
+		NewClient:  deps.NewClient,
+	})
 }
 
 func runCommand(ctx context.Context, dir, name string, args ...string) (string, error) {
@@ -129,4 +132,24 @@ func runCommand(ctx context.Context, dir, name string, args ...string) (string, 
 		return stdout.String(), nil
 	}
 	return stderr.String(), nil
+}
+
+func buildReportingClient(ctx context.Context, deps Deps) (ReportingClient, context.Context, context.CancelFunc, error) {
+	return shared.BuildClient[ReportingClient](ctx, shared.BuildClientDeps[ReportingClient]{
+		LoadConfig: deps.LoadConfig,
+		LookupEnv:  deps.LookupEnv,
+		NewClient:  deps.NewReportingClient,
+	})
+}
+
+func sleepContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }

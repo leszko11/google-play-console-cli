@@ -2,10 +2,12 @@ package release
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
@@ -20,23 +22,28 @@ type fullStep struct {
 }
 
 type fullResult struct {
-	PackageName          string     `json:"packageName"`
-	Manifest             string     `json:"manifest"`
-	Track                string     `json:"track"`
-	Status               string     `json:"status"`
-	UploadedArtifactType string     `json:"uploadedArtifactType,omitempty"`
-	VersionCode          int64      `json:"versionCode,omitempty"`
-	Committed            bool       `json:"committed"`
-	CleanupPerformed     bool       `json:"cleanupPerformed"`
-	Steps                []fullStep `json:"steps"`
+	PackageName          string                `json:"packageName"`
+	Manifest             string                `json:"manifest"`
+	Track                string                `json:"track"`
+	Status               string                `json:"status"`
+	UploadedArtifactType string                `json:"uploadedArtifactType,omitempty"`
+	VersionCode          int64                 `json:"versionCode,omitempty"`
+	Committed            bool                  `json:"committed"`
+	CleanupPerformed     bool                  `json:"cleanupPerformed"`
+	VitalsGate           *fullVitalsGateResult `json:"vitalsGate,omitempty"`
+	Steps                []fullStep            `json:"steps"`
 }
 
 type fullOptions struct {
-	PackageName     string
-	ManifestPath    string
-	Confirm         bool
-	DryRun          bool
-	AllowProduction bool
+	PackageName          string
+	ManifestPath         string
+	Confirm              bool
+	DryRun               bool
+	AllowProduction      bool
+	VitalsGateRaw        string
+	VitalsGate           []vitalsGateCondition
+	VitalsWait           time.Duration
+	AutoHaltOnRegression bool
 }
 
 func newFullCommand(deps Deps) *ffcli.Command {
@@ -49,6 +56,9 @@ func newFullCommand(deps Deps) *ffcli.Command {
 	fs.BoolVar(&opts.Confirm, "confirm", false, "Confirm committing release (required unless --dry-run)")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Run all steps but delete edit instead of committing")
 	fs.BoolVar(&opts.AllowProduction, "allow-production", false, "Allow track=production")
+	fs.StringVar(&opts.VitalsGateRaw, "vitals-gate", "", "Comma-separated vitals thresholds (for example: crashRate<2.0,anrRate<0.5)")
+	fs.DurationVar(&opts.VitalsWait, "vitals-wait", 0, "Monitor vitals after commit for the given duration")
+	fs.BoolVar(&opts.AutoHaltOnRegression, "auto-halt-on-regression", false, "Halt an in-progress rollout if monitored vitals cross the configured thresholds")
 
 	return &ffcli.Command{
 		Name:      "full",
@@ -68,7 +78,7 @@ func newFullCommand(deps Deps) *ffcli.Command {
 			defer cancel()
 
 			spinner := shared.NewSpinner(deps.Stderr, "Running full release flow")
-			err = runFull(ctx, requestCtx, client, deps.Stdout, opts, manifest)
+			err = runFull(ctx, requestCtx, client, deps, deps.Stdout, opts, manifest)
 			if err != nil {
 				spinner.Fail("Full release flow failed")
 				return err
@@ -96,6 +106,25 @@ func validateFullOptions(opts fullOptions) (fullOptions, fullManifest, error) {
 	if !opts.DryRun && !opts.Confirm {
 		return fullOptions{}, fullManifest{}, shared.UsageErrorf("--confirm is required unless --dry-run is set")
 	}
+	if opts.DryRun && strings.TrimSpace(opts.VitalsGateRaw) != "" {
+		return fullOptions{}, fullManifest{}, shared.UsageErrorf("--vitals-gate cannot be used with --dry-run")
+	}
+	if opts.VitalsWait < 0 {
+		return fullOptions{}, fullManifest{}, shared.UsageErrorf("--vitals-wait must be greater than or equal to zero")
+	}
+	if opts.AutoHaltOnRegression && strings.TrimSpace(opts.VitalsGateRaw) == "" {
+		return fullOptions{}, fullManifest{}, shared.UsageErrorf("--auto-halt-on-regression requires --vitals-gate")
+	}
+	if opts.AutoHaltOnRegression && opts.VitalsWait <= 0 {
+		return fullOptions{}, fullManifest{}, shared.UsageErrorf("--auto-halt-on-regression requires --vitals-wait")
+	}
+	if strings.TrimSpace(opts.VitalsGateRaw) != "" {
+		conditions, err := parseVitalsGate(opts.VitalsGateRaw)
+		if err != nil {
+			return fullOptions{}, fullManifest{}, shared.UsageErrorf("%v", err)
+		}
+		opts.VitalsGate = conditions
+	}
 
 	manifest, err := loadFullManifest(opts.ManifestPath)
 	if err != nil {
@@ -107,7 +136,7 @@ func validateFullOptions(opts fullOptions) (fullOptions, fullManifest, error) {
 	return opts, manifest, nil
 }
 
-func runFull(parentCtx, requestCtx context.Context, client Client, out io.Writer, opts fullOptions, manifest fullManifest) error {
+func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, out io.Writer, opts fullOptions, manifest fullManifest) error {
 	result := fullResult{
 		PackageName: opts.PackageName,
 		Manifest:    opts.ManifestPath,
@@ -181,6 +210,30 @@ func runFull(parentCtx, requestCtx context.Context, client Client, out io.Writer
 	}
 	result.Steps = append(result.Steps, fullStep{Name: "validate_edit", Status: "ok"})
 
+	if len(opts.VitalsGate) > 0 {
+		reportingClient, reportingCtx, reportingCancel, err := buildReportingClient(parentCtx, deps)
+		if err != nil {
+			return fail("create_reporting_client", err)
+		}
+		checks, err := evaluateVitalsGate(reportingCtx, reportingClient, opts.PackageName, deps.Now(), opts.VitalsGate)
+		reportingCancel()
+		if err != nil {
+			return fail("vitals_gate_precommit", fmt.Errorf("failed to evaluate vitals gate: %w", err))
+		}
+		result.VitalsGate = &fullVitalsGateResult{
+			Status:      "passed",
+			Wait:        opts.VitalsWait.String(),
+			AutoHalt:    opts.AutoHaltOnRegression,
+			Evaluations: 1,
+			Checks:      checks,
+		}
+		if hasVitalsGateFailure(checks) {
+			result.VitalsGate.Status = "blocked"
+			return fail("vitals_gate_precommit", fmt.Errorf("vitals gate failed"))
+		}
+		result.Steps = append(result.Steps, fullStep{Name: "vitals_gate_precommit", Status: "ok"})
+	}
+
 	if opts.DryRun {
 		if err := client.DeleteEdit(requestCtx, opts.PackageName, currentEditID); err != nil {
 			return fail("delete_edit_dry_run", fmt.Errorf("failed to delete dry-run edit: %w", err))
@@ -194,9 +247,25 @@ func runFull(parentCtx, requestCtx context.Context, client Client, out io.Writer
 	if _, err := client.CommitEdit(requestCtx, opts.PackageName, currentEditID); err != nil {
 		return fail("commit_edit", fmt.Errorf("failed to commit edit: %w", err))
 	}
+	currentEditID = ""
 	result.Committed = true
 	result.Status = "committed"
 	result.Steps = append(result.Steps, fullStep{Name: "commit_edit", Status: "ok"})
+
+	if len(opts.VitalsGate) > 0 && opts.VitalsWait > 0 {
+		reportingClient, _, reportingCancel, err := buildReportingClient(parentCtx, deps)
+		if err != nil {
+			result.Status = "failed"
+			result.Steps = append(result.Steps, fullStep{Name: "create_reporting_client", Status: "error", Error: err.Error()})
+			_ = shared.WriteJSON(out, result)
+			return err
+		}
+		defer reportingCancel()
+		if err := monitorVitalsGate(parentCtx, deps, client, reportingClient, &result, opts, manifest, versionCode); err != nil {
+			_ = shared.WriteJSON(out, result)
+			return err
+		}
+	}
 	return shared.WriteJSON(out, result)
 }
 
@@ -223,4 +292,106 @@ func uploadManifestArtifact(ctx context.Context, client Client, packageName, edi
 	default:
 		return 0, fmt.Errorf("unsupported artifact type %q", manifest.ArtifactType)
 	}
+}
+
+func hasVitalsGateFailure(checks []fullVitalsGateCheck) bool {
+	for _, check := range checks {
+		if !check.Passed {
+			return true
+		}
+	}
+	return false
+}
+
+func monitorVitalsGate(parentCtx context.Context, deps Deps, client Client, reportingClient ReportingClient, result *fullResult, opts fullOptions, manifest fullManifest, versionCode int64) error {
+	waitCtx, cancel := context.WithTimeout(parentCtx, opts.VitalsWait)
+	defer cancel()
+
+	for {
+		checks, err := evaluateVitalsGate(waitCtx, reportingClient, opts.PackageName, deps.Now(), opts.VitalsGate)
+		if err == nil {
+			result.VitalsGate.Evaluations++
+			result.VitalsGate.Checks = checks
+			if hasVitalsGateFailure(checks) {
+				result.VitalsGate.Status = "regression"
+				result.Steps = append(result.Steps, fullStep{Name: "vitals_gate_monitor", Status: "error", Error: "threshold crossed"})
+				if opts.AutoHaltOnRegression {
+					if err := haltRollout(waitCtx, client, opts.PackageName, manifest, versionCode); err != nil {
+						result.Steps = append(result.Steps, fullStep{Name: "halt_rollout", Status: "error", Error: err.Error()})
+						return fmt.Errorf("vitals regression detected: %w", err)
+					}
+					result.VitalsGate.Status = "halted"
+					result.VitalsGate.Halted = true
+					result.Status = "halted"
+					result.Steps = append(result.Steps, fullStep{Name: "halt_rollout", Status: "ok"})
+				} else {
+					result.Status = "regression"
+				}
+				return fmt.Errorf("vitals regression detected")
+			}
+		} else if !errors.Is(err, errVitalsValueUnavailable) {
+			result.Status = "failed"
+			result.Steps = append(result.Steps, fullStep{Name: "vitals_gate_monitor", Status: "error", Error: err.Error()})
+			return fmt.Errorf("failed to monitor vitals gate: %w", err)
+		}
+
+		if waitCtx.Err() != nil {
+			if result.VitalsGate != nil {
+				result.VitalsGate.Status = "passed"
+			}
+			result.Steps = append(result.Steps, fullStep{Name: "vitals_gate_monitor", Status: "ok"})
+			return nil
+		}
+
+		if err := deps.Sleep(waitCtx, defaultVitalsPollInterval); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || errors.Is(waitCtx.Err(), context.DeadlineExceeded) {
+				if result.VitalsGate != nil {
+					result.VitalsGate.Status = "passed"
+				}
+				result.Steps = append(result.Steps, fullStep{Name: "vitals_gate_monitor", Status: "ok"})
+				return nil
+			}
+			result.Status = "failed"
+			result.Steps = append(result.Steps, fullStep{Name: "vitals_gate_monitor", Status: "error", Error: err.Error()})
+			return err
+		}
+	}
+}
+
+func haltRollout(ctx context.Context, client Client, packageName string, manifest fullManifest, versionCode int64) error {
+	if strings.TrimSpace(manifest.Status) != "inProgress" {
+		return fmt.Errorf("auto halt is only supported for inProgress releases")
+	}
+
+	edit, err := client.CreateEdit(ctx, packageName)
+	if err != nil {
+		return fmt.Errorf("failed to create halt edit: %w", err)
+	}
+	editID := edit.ID
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = client.DeleteEdit(ctx, packageName, editID)
+		}
+	}()
+
+	_, err = client.UpdateTrack(ctx, packageName, editID, manifest.Track, gpc.TrackUpdate{
+		Status:         "halted",
+		ReleaseName:    manifest.ReleaseName,
+		UserFraction:   manifest.UserFraction,
+		VersionCodes:   []int64{versionCode},
+		UpdatePriority: manifest.UpdatePriority,
+		ReleaseNotes:   manifest.ReleaseNotes,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to halt rollout: %w", err)
+	}
+	if err := client.ValidateEdit(ctx, packageName, editID); err != nil {
+		return fmt.Errorf("failed to validate halt edit: %w", err)
+	}
+	if _, err := client.CommitEdit(ctx, packageName, editID); err != nil {
+		return fmt.Errorf("failed to commit halt edit: %w", err)
+	}
+	cleanup = false
+	return nil
 }
