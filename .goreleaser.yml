@@ -62,6 +62,8 @@ brews:
     repository:
       owner: leszko11
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
     homepage: https://github.com/leszko11/google-play-console-cli
     description: Google Play Console CLI
     license: MIT
