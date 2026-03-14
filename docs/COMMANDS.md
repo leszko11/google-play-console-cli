@@ -85,6 +85,7 @@ make generate-command-docs
 - `gpc bundles`
 - `gpc bundles list`
 - `gpc bundles upload`
+- `gpc bundles wait`
 - `gpc deobfuscation`
 - `gpc deobfuscation upload`
 - `gpc deploy`
@@ -1341,6 +1342,7 @@ USAGE
 SUBCOMMANDS
   list    List bundles in an edit
   upload  Upload an Android App Bundle to an edit
+  wait    Wait until a bundle version code finishes processing
 ```
 
 ## `gpc bundles list --help`
@@ -1370,6 +1372,22 @@ FLAGS
   -edit-id string       Edit ID
   -file string          Path to .aab file
   -package-name string  Package name
+```
+
+## `gpc bundles wait --help`
+
+```text
+DESCRIPTION
+  Wait until a bundle version code finishes processing
+
+USAGE
+  wait
+
+FLAGS
+  -interval 5s          Polling interval between generated APK checks
+  -package-name string  Package name
+  -timeout 1m30s        Maximum time to wait for generated APK availability
+  -version-code 0       Version code returned from bundle upload
 ```
 
 ## `gpc deobfuscation --help`
