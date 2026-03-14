@@ -90,6 +90,10 @@ func (f *fakeClient) ListSubscriptions(_ context.Context, _ string, pageSize int
 	return f.list, f.listErr
 }
 
+func (f *fakeClient) GetLatestRegionsVersion(_ context.Context, _ string) (string, error) {
+	return "2026/01", nil
+}
+
 func (f *fakeClient) GetSubscription(_ context.Context, _, productID string) (gpc.SubscriptionInfo, error) {
 	f.productID = productID
 	return f.get, f.getErr
@@ -1265,5 +1269,43 @@ func TestSubscriptionsOffersDeactivate_ReturnsStatusDeactivated(t *testing.T) {
 	}
 	if fc.productID != "premium_monthly" || fc.basePlanID != "monthly" || fc.offerID != "intro" {
 		t.Fatalf("unexpected captured IDs: product=%s basePlan=%s offer=%s", fc.productID, fc.basePlanID, fc.offerID)
+	}
+}
+
+func TestSubscriptionsSync_UpsertsAndDeletes(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "premium_monthly.json"), []byte(`{"subscription":{"productId":"premium_monthly","listings":[{"languageCode":"en-US","title":"Premium","benefits":["All features"]}]},"regionsVersion":"2026/01"}`), 0o600); err != nil {
+		t.Fatalf("write subscription: %v", err)
+	}
+	fc := &fakeClient{
+		list: gpc.SubscriptionsListInfo{
+			Subscriptions: []gpc.SubscriptionInfo{
+				{ProductID: "premium_monthly"},
+				{ProductID: "legacy_monthly"},
+			},
+		},
+		batchUpdate: gpc.SubscriptionsListInfo{
+			Subscriptions: []gpc.SubscriptionInfo{{ProductID: "premium_monthly"}},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(t, deps, "sync", "--package-name", "com.example.app", "--dir", dir, "--delete-missing", "--confirm")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if len(fc.updateRequests) != 1 || fc.updateRequests[0].Subscription.ProductId != "premium_monthly" {
+		t.Fatalf("unexpected update requests: %+v", fc.updateRequests)
+	}
+	if fc.productID != "legacy_monthly" {
+		t.Fatalf("expected delete for legacy subscription, got %q", fc.productID)
+	}
+	if !strings.Contains(out, `"status":"committed"`) || !strings.Contains(out, `"delete legacy_monthly"`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }

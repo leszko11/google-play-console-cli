@@ -5,13 +5,20 @@ DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -X 'github.com/leszko11/google-play-console-cli/cmd.Version=$(VERSION)' -X 'github.com/leszko11/google-play-console-cli/cmd.Commit=$(COMMIT)' -X 'github.com/leszko11/google-play-console-cli/cmd.Date=$(DATE)'
 GO_BUILD := go build -ldflags "$(LDFLAGS)"
 
-.PHONY: build test lint format generate-command-docs check-command-docs generate-openapi-paths generate-openapi-coverage check-openapi-coverage dev
+.PHONY: build test lint format coverage benchmark generate-command-docs check-command-docs generate-openapi-paths generate-openapi-coverage check-openapi-coverage dev
 
 build:
 	$(GO_BUILD) -o build/$(BINARY_NAME) .
 
 test:
 	go test ./...
+
+coverage:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
+
+benchmark:
+	go test -run=^$$ -bench=. -benchmem ./internal/cli/shared ./internal/cli/listing ./internal/cli/release
 
 lint:
 	go vet ./...

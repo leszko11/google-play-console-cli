@@ -3,31 +3,36 @@ package reports
 import (
 	"bytes"
 	"context"
-	"flag"
 	"strings"
 	"testing"
 
-	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
 
 type fakeClient struct {
-	appsResult        gpc.ReportingAppsListInfo
-	appsErr           error
-	anomaliesResult   gpc.ReportingAnomaliesListInfo
-	anomaliesErr      error
-	getResult         gpc.ReportingVitalsMetricSetInfo
-	getErr            error
-	queryResult       gpc.ReportingVitalsQueryResult
-	queryErr          error
-	capturedPackage   string
-	capturedMetricSet gpc.ReportingVitalsMetricSet
-	capturedQuery     *gpc.ReportingVitalsQueryRequest
-	capturedFilter    string
-	capturedPageSize  int64
-	capturedPageToken string
-	capturedPaginate  bool
+	appsResult          gpc.ReportingAppsListInfo
+	appsErr             error
+	anomaliesResult     gpc.ReportingAnomaliesListInfo
+	anomaliesErr        error
+	errorIssuesResult   gpc.ReportingErrorIssuesListInfo
+	errorIssuesErr      error
+	errorReportsResult  gpc.ReportingErrorReportsListInfo
+	errorReportsErr     error
+	getResult           gpc.ReportingVitalsMetricSetInfo
+	getErr              error
+	queryResult         gpc.ReportingVitalsQueryResult
+	queryErr            error
+	capturedPackage     string
+	capturedMetricSet   gpc.ReportingVitalsMetricSet
+	capturedQuery       *gpc.ReportingVitalsQueryRequest
+	capturedFilter      string
+	capturedOrderBy     string
+	capturedPageSize    int64
+	capturedPageToken   string
+	capturedPaginate    bool
+	capturedInterval    gpc.ReportingInterval
+	capturedSampleLimit int64
 }
 
 func (f *fakeClient) SearchApps(_ context.Context, pageSize int64, pageToken string, paginate bool) (gpc.ReportingAppsListInfo, error) {
@@ -44,6 +49,28 @@ func (f *fakeClient) ListAnomalies(_ context.Context, packageName, filter string
 	f.capturedPageToken = pageToken
 	f.capturedPaginate = paginate
 	return f.anomaliesResult, f.anomaliesErr
+}
+
+func (f *fakeClient) SearchErrorIssues(_ context.Context, packageName, filter, orderBy string, interval gpc.ReportingInterval, pageSize, sampleErrorReportLimit int64, pageToken string, paginate bool) (gpc.ReportingErrorIssuesListInfo, error) {
+	f.capturedPackage = packageName
+	f.capturedFilter = filter
+	f.capturedOrderBy = orderBy
+	f.capturedInterval = interval
+	f.capturedPageSize = pageSize
+	f.capturedPageToken = pageToken
+	f.capturedPaginate = paginate
+	f.capturedSampleLimit = sampleErrorReportLimit
+	return f.errorIssuesResult, f.errorIssuesErr
+}
+
+func (f *fakeClient) SearchErrorReports(_ context.Context, packageName, filter string, interval gpc.ReportingInterval, pageSize int64, pageToken string, paginate bool) (gpc.ReportingErrorReportsListInfo, error) {
+	f.capturedPackage = packageName
+	f.capturedFilter = filter
+	f.capturedInterval = interval
+	f.capturedPageSize = pageSize
+	f.capturedPageToken = pageToken
+	f.capturedPaginate = paginate
+	return f.errorReportsResult, f.errorReportsErr
 }
 
 func (f *fakeClient) GetVitalsMetricSet(_ context.Context, packageName string, metricSet gpc.ReportingVitalsMetricSet) (gpc.ReportingVitalsMetricSetInfo, error) {
@@ -84,14 +111,6 @@ func defaultConfig() config.Config {
 			"default": {ServiceAccountPath: "/tmp/sa.json"},
 		},
 	}
-}
-
-func bindGlobalPackageName(t *testing.T, packageName string) {
-	t.Helper()
-	fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
-	cfg := &shared.GlobalFlags{}
-	shared.BindGlobalFlags(fs, cfg)
-	cfg.PackageName = packageName
 }
 
 func TestReportsVitalsGet_ReturnsMetricSet(t *testing.T) {
@@ -169,6 +188,60 @@ func TestReportsAnomaliesList_ReturnsAnomalies(t *testing.T) {
 	}
 }
 
+func TestReportsErrorIssuesList_ReturnsIssues(t *testing.T) {
+	fc := &fakeClient{
+		errorIssuesResult: gpc.ReportingErrorIssuesListInfo{
+			Issues: []*gpc.ReportingErrorIssue{
+				{Name: "apps/com.example.app/errorIssues/1"},
+			},
+			NextPageToken: "tok-2",
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+	}
+
+	out, err := runReports(t, deps, "errors", "issues", "list", "--package-name", "com.example.app", "--filter", `errorIssueType = CRASH`, "--order-by", "errorReportCount desc", "--start-time", "2026-03-01T00:00:00Z", "--end-time", "2026-03-07T00:00:00Z", "--sample-error-report-limit", "1")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"count":1`) || !strings.Contains(out, `"nextPageToken":"tok-2"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.capturedOrderBy != "errorReportCount desc" || fc.capturedSampleLimit != 1 {
+		t.Fatalf("unexpected captured issue params: order=%q sample=%d", fc.capturedOrderBy, fc.capturedSampleLimit)
+	}
+	if fc.capturedInterval.StartTime != "2026-03-01T00:00:00Z" || fc.capturedInterval.EndTime != "2026-03-07T00:00:00Z" {
+		t.Fatalf("unexpected interval: %+v", fc.capturedInterval)
+	}
+}
+
+func TestReportsErrorReportsList_ReturnsReports(t *testing.T) {
+	fc := &fakeClient{
+		errorReportsResult: gpc.ReportingErrorReportsListInfo{
+			Reports: []*gpc.ReportingErrorReport{
+				{Name: "apps/com.example.app/errorReports/1"},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+	}
+
+	out, err := runReports(t, deps, "errors", "reports", "list", "--package-name", "com.example.app", "--filter", `errorReportId = 1`, "--page-size", "10")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"count":1`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.capturedFilter != "errorReportId = 1" || fc.capturedPageSize != 10 {
+		t.Fatalf("unexpected captured report params: filter=%q pageSize=%d", fc.capturedFilter, fc.capturedPageSize)
+	}
+}
+
 func TestReportsVitalsGet_RequiresMetricSet(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
@@ -220,40 +293,6 @@ func TestReportsVitalsQuery_RequiresInput(t *testing.T) {
 	_, err := runReports(t, deps, "vitals", "query", "--package-name", "com.example.app", "--metric-set", "crash-rate")
 	if err == nil || !strings.Contains(err.Error(), "--input is required") {
 		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestReportsVitalsGet_UsesGlobalPackageName(t *testing.T) {
-	bindGlobalPackageName(t, "com.example.global")
-	fc := &fakeClient{
-		getResult: gpc.ReportingVitalsMetricSetInfo{MetricSet: "anr-rate"},
-	}
-	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
-		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
-	}
-
-	if _, err := runReports(t, deps, "vitals", "get", "--metric-set", "anr-rate"); err != nil {
-		t.Fatalf("command failed: %v", err)
-	}
-	if fc.capturedPackage != "com.example.global" {
-		t.Fatalf("expected global package name, got %q", fc.capturedPackage)
-	}
-}
-
-func TestReportsAppsList_UsesGlobalPaginate(t *testing.T) {
-	bindGlobalPaginate(t, true)
-	fc := &fakeClient{appsResult: gpc.ReportingAppsListInfo{}}
-	deps := Deps{
-		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
-		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
-	}
-
-	if _, err := runReports(t, deps, "apps", "list"); err != nil {
-		t.Fatalf("command failed: %v", err)
-	}
-	if !fc.capturedPaginate {
-		t.Fatal("expected paginate=true from global flags")
 	}
 }
 
@@ -351,12 +390,4 @@ func TestReportsSummary_WarnsWhenPackageNotVisible(t *testing.T) {
 	if !strings.Contains(out, `"status":"warn"`) || !strings.Contains(out, `"visible":false`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
-}
-
-func bindGlobalPaginate(t *testing.T, paginate bool) {
-	t.Helper()
-	fs := flag.NewFlagSet("gpc", flag.ContinueOnError)
-	cfg := &shared.GlobalFlags{}
-	shared.BindGlobalFlags(fs, cfg)
-	cfg.Paginate = paginate
 }

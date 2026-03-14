@@ -51,23 +51,31 @@ func (c *Client) ListOneTimeProducts(ctx context.Context, packageName string, pa
 }
 
 func (c *Client) GetOneTimeProduct(ctx context.Context, packageName, productID string) (OneTimeProductInfo, error) {
+	product, err := c.GetOneTimeProductResource(ctx, packageName, productID)
+	if err != nil {
+		return OneTimeProductInfo{}, err
+	}
+	return oneTimeProductInfoFromProduct(product), nil
+}
+
+func (c *Client) GetOneTimeProductResource(ctx context.Context, packageName, productID string) (*androidpublisher.OneTimeProduct, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
-		return OneTimeProductInfo{}, fmt.Errorf("package name is required")
+		return nil, fmt.Errorf("package name is required")
 	}
 	productID = strings.TrimSpace(productID)
 	if productID == "" {
-		return OneTimeProductInfo{}, fmt.Errorf("product id is required")
+		return nil, fmt.Errorf("product id is required")
 	}
 	if c == nil || c.service == nil {
-		return OneTimeProductInfo{}, ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 
 	product, err := c.service.Monetization.Onetimeproducts.Get(packageName, productID).Context(ctx).Do()
 	if err != nil {
-		return OneTimeProductInfo{}, mapGoogleAPIError(err)
+		return nil, mapGoogleAPIError(err)
 	}
-	return oneTimeProductInfoFromProduct(product), nil
+	return product, nil
 }
 
 func (c *Client) GetOneTimeProductDiagnostic(ctx context.Context, packageName, productID string) (OneTimeProductDiagnosticInfo, error) {

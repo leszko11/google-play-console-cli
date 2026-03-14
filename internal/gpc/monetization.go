@@ -88,3 +88,7 @@ func (c *Client) GetMonetizationRegions(ctx context.Context, packageName string)
 		Regions:        regions,
 	}, nil
 }
+
+func (c *Client) GetLatestRegionsVersion(ctx context.Context, packageName string) (string, error) {
+	return c.resolveRegionsVersion(ctx, packageName, "")
+}

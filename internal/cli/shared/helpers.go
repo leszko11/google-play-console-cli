@@ -15,6 +15,8 @@ import (
 
 var resolveOutputLookupEnv = os.Getenv
 var resolveOutputDetectTTY = detectStdoutTTY
+var resolvePackageLookupEnv = os.Getenv
+var resolveProfileLookupEnv = os.Getenv
 var resolveCredentialsShouldBypassKeychain = authresolver.ShouldBypassKeychain
 var resolveCredentialsLoadProfileCredential = authresolver.LoadProfileCredential
 var resolveCredentialsIsCredentialNotFound = authresolver.IsCredentialNotFound
@@ -34,6 +36,16 @@ func ResolvePackageName(localValue string) (string, error) {
 		return pkg, nil
 	}
 	if pkg := strings.TrimSpace(ActiveGlobalFlags().PackageName); pkg != "" {
+		return pkg, nil
+	}
+	if pkg := strings.TrimSpace(resolvePackageLookupEnv(EnvPackageName)); pkg != "" {
+		return pkg, nil
+	}
+	project, err := config.LoadProject()
+	if err != nil {
+		return "", err
+	}
+	if pkg := strings.TrimSpace(project.Config.PackageName); pkg != "" {
 		return pkg, nil
 	}
 	return "", UsageErrorf("--package-name is required")
@@ -83,6 +95,12 @@ func ResolveOutput(localValue string) string {
 	if out := strings.TrimSpace(resolveOutputLookupEnv(EnvDefaultOutput)); out != "" {
 		return strings.ToLower(out)
 	}
+	project, err := config.LoadProject()
+	if err == nil {
+		if out := strings.TrimSpace(project.Config.Output); out != "" {
+			return strings.ToLower(out)
+		}
+	}
 	if resolveOutputDetectTTY() {
 		return "table"
 	}
@@ -92,6 +110,15 @@ func ResolveOutput(localValue string) string {
 func ResolveProfileName(cfg config.Config) string {
 	if profile := strings.TrimSpace(ActiveGlobalFlags().Profile); profile != "" {
 		return profile
+	}
+	if profile := strings.TrimSpace(resolveProfileLookupEnv(EnvProfile)); profile != "" {
+		return profile
+	}
+	project, err := config.LoadProject()
+	if err == nil {
+		if profile := strings.TrimSpace(project.Config.Profile); profile != "" {
+			return profile
+		}
 	}
 	return strings.TrimSpace(cfg.ActiveProfile)
 }
@@ -182,6 +209,13 @@ func ResolveServiceAccountPath(cfg config.Config, lookupEnv func(string) string)
 func WriteJSON(out io.Writer, v any) error {
 	if out == nil {
 		out = os.Stdout
+	}
+	if fields := strings.TrimSpace(ActiveGlobalFlags().Fields); fields != "" {
+		projected, err := ProjectFields(v, fields)
+		if err != nil {
+			return UsageErrorf("%v", err)
+		}
+		v = projected
 	}
 	b, err := RenderJSON(v, ActiveGlobalFlags().Pretty)
 	if err != nil {

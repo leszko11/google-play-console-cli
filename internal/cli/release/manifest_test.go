@@ -1,6 +1,7 @@
 package release
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,13 @@ func writeManifestFile(t *testing.T, name, contents string) string {
 		t.Fatalf("write manifest: %v", err)
 	}
 	return path
+}
+
+// jsonEscapePath returns a path with backslashes escaped for embedding in JSON strings.
+func jsonEscapePath(s string) string {
+	b, _ := json.Marshal(s)
+	// Strip surrounding quotes from the marshalled string.
+	return string(b[1 : len(b)-1])
 }
 
 func writeAssetFile(t *testing.T, name string) string {
@@ -47,7 +55,7 @@ func TestLoadFullManifestYAML(t *testing.T) {
 
 func TestLoadFullManifestRejectsUnsupportedArtifact(t *testing.T) {
 	artifact := writeAssetFile(t, "app.zip")
-	path := writeManifestFile(t, "release.json", `{"artifact":"`+artifact+`","track":"internal","status":"completed"}`)
+	path := writeManifestFile(t, "release.json", `{"artifact":"`+jsonEscapePath(artifact)+`","track":"internal","status":"completed"}`)
 
 	_, err := loadFullManifest(path)
 	if err == nil || !strings.Contains(err.Error(), "artifact must end with .aab or .apk") {
@@ -57,7 +65,7 @@ func TestLoadFullManifestRejectsUnsupportedArtifact(t *testing.T) {
 
 func TestLoadFullManifestRejectsMissingTrack(t *testing.T) {
 	artifact := writeAssetFile(t, "app.aab")
-	path := writeManifestFile(t, "release.json", `{"artifact":"`+artifact+`","status":"completed"}`)
+	path := writeManifestFile(t, "release.json", `{"artifact":"`+jsonEscapePath(artifact)+`","status":"completed"}`)
 
 	_, err := loadFullManifest(path)
 	if err == nil || !strings.Contains(err.Error(), "--track is required") {

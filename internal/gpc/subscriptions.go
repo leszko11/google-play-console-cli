@@ -78,6 +78,10 @@ func (c *Client) GetSubscriptionRaw(ctx context.Context, packageName, productID 
 	return subscription, nil
 }
 
+func (c *Client) GetSubscriptionResource(ctx context.Context, packageName, productID string) (*androidpublisher.Subscription, error) {
+	return c.GetSubscriptionRaw(ctx, packageName, productID)
+}
+
 func (c *Client) GetSubscriptionDiagnostic(ctx context.Context, packageName, productID string) (SubscriptionDiagnosticInfo, error) {
 	subscription, err := c.GetSubscriptionRaw(ctx, packageName, productID)
 	if err != nil {

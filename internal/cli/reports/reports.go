@@ -20,6 +20,8 @@ import (
 type Client interface {
 	SearchApps(ctx context.Context, pageSize int64, pageToken string, paginate bool) (gpc.ReportingAppsListInfo, error)
 	ListAnomalies(ctx context.Context, packageName, filter string, pageSize int64, pageToken string, paginate bool) (gpc.ReportingAnomaliesListInfo, error)
+	SearchErrorIssues(ctx context.Context, packageName, filter, orderBy string, interval gpc.ReportingInterval, pageSize, sampleErrorReportLimit int64, pageToken string, paginate bool) (gpc.ReportingErrorIssuesListInfo, error)
+	SearchErrorReports(ctx context.Context, packageName, filter string, interval gpc.ReportingInterval, pageSize int64, pageToken string, paginate bool) (gpc.ReportingErrorReportsListInfo, error)
 	GetVitalsMetricSet(ctx context.Context, packageName string, metricSet gpc.ReportingVitalsMetricSet) (gpc.ReportingVitalsMetricSetInfo, error)
 	QueryVitalsMetricSet(ctx context.Context, packageName string, metricSet gpc.ReportingVitalsMetricSet, request *gpc.ReportingVitalsQueryRequest) (gpc.ReportingVitalsQueryResult, error)
 }
@@ -70,6 +72,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newAppsCommand(deps),
 			newAnomaliesCommand(deps),
+			newErrorsCommand(deps),
 			newSummaryCommand(deps),
 			newVitalsCommand(deps),
 		},
@@ -165,6 +168,133 @@ func newAnomaliesCommand(deps Deps) *ffcli.Command {
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
 			newAnomaliesListCommand(deps),
+		},
+	}
+}
+
+func newErrorsCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "errors",
+		ShortHelp: "Reporting error issue and report commands",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newErrorsIssuesCommand(deps),
+			newErrorsReportsCommand(deps),
+		},
+	}
+}
+
+func newErrorsIssuesCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "issues",
+		ShortHelp: "Grouped error issue commands",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newErrorsIssuesListCommand(deps),
+		},
+	}
+}
+
+func newErrorsIssuesListCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, filter, orderBy, pageToken, startTime, endTime string
+	var pageSize, sampleErrorReportLimit int64
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&filter, "filter", "", "Error issue filter expression")
+	fs.StringVar(&orderBy, "order-by", "", "Sort order (for example: errorReportCount desc)")
+	fs.StringVar(&startTime, "start-time", "", "RFC3339 interval start time")
+	fs.StringVar(&endTime, "end-time", "", "RFC3339 interval end time")
+	fs.Int64Var(&pageSize, "page-size", 0, "Maximum error issues per page")
+	fs.StringVar(&pageToken, "page-token", "", "Page token for the next page")
+	fs.Int64Var(&sampleErrorReportLimit, "sample-error-report-limit", 0, "Sample error reports per issue")
+
+	return &ffcli.Command{
+		Name:      "list",
+		ShortHelp: "Search grouped error issues for an app",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			if pageSize < 0 {
+				return shared.UsageErrorf("--page-size must be greater than or equal to zero")
+			}
+			if sampleErrorReportLimit < 0 {
+				return shared.UsageErrorf("--sample-error-report-limit must be greater than or equal to zero")
+			}
+			interval, err := parseInterval(startTime, endTime)
+			if err != nil {
+				return err
+			}
+			result, err := client.SearchErrorIssues(requestCtx, pkg, filter, orderBy, interval, pageSize, sampleErrorReportLimit, pageToken, shared.ActiveGlobalFlags().Paginate)
+			if err != nil {
+				return fmt.Errorf("failed to search error issues: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":   pkg,
+				"issues":        result.Issues,
+				"count":         len(result.Issues),
+				"nextPageToken": result.NextPageToken,
+			})
+		},
+	}
+}
+
+func newErrorsReportsCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "reports",
+		ShortHelp: "Raw error report commands",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newErrorsReportsListCommand(deps),
+		},
+	}
+}
+
+func newErrorsReportsListCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, filter, pageToken, startTime, endTime string
+	var pageSize int64
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&filter, "filter", "", "Error report filter expression")
+	fs.StringVar(&startTime, "start-time", "", "RFC3339 interval start time")
+	fs.StringVar(&endTime, "end-time", "", "RFC3339 interval end time")
+	fs.Int64Var(&pageSize, "page-size", 0, "Maximum error reports per page")
+	fs.StringVar(&pageToken, "page-token", "", "Page token for the next page")
+
+	return &ffcli.Command{
+		Name:      "list",
+		ShortHelp: "Search raw error reports for an app",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			if pageSize < 0 {
+				return shared.UsageErrorf("--page-size must be greater than or equal to zero")
+			}
+			interval, err := parseInterval(startTime, endTime)
+			if err != nil {
+				return err
+			}
+			result, err := client.SearchErrorReports(requestCtx, pkg, filter, interval, pageSize, pageToken, shared.ActiveGlobalFlags().Paginate)
+			if err != nil {
+				return fmt.Errorf("failed to search error reports: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":   pkg,
+				"reports":       result.Reports,
+				"count":         len(result.Reports),
+				"nextPageToken": result.NextPageToken,
+			})
 		},
 	}
 }
@@ -424,6 +554,24 @@ func readSummaryQueryPayload(metricSet gpc.ReportingVitalsMetricSet, path string
 		return nil, err
 	}
 	return payload, nil
+}
+
+func parseInterval(startTime, endTime string) (gpc.ReportingInterval, error) {
+	interval := gpc.ReportingInterval{
+		StartTime: strings.TrimSpace(startTime),
+		EndTime:   strings.TrimSpace(endTime),
+	}
+	if interval.StartTime != "" {
+		if _, err := time.Parse(time.RFC3339, interval.StartTime); err != nil {
+			return gpc.ReportingInterval{}, shared.UsageErrorf("--start-time must be RFC3339: %v", err)
+		}
+	}
+	if interval.EndTime != "" {
+		if _, err := time.Parse(time.RFC3339, interval.EndTime); err != nil {
+			return gpc.ReportingInterval{}, shared.UsageErrorf("--end-time must be RFC3339: %v", err)
+		}
+	}
+	return interval, nil
 }
 
 func defaultSummaryQuery(metricSet gpc.ReportingVitalsMetricSet) (*gpc.ReportingVitalsQueryRequest, error) {

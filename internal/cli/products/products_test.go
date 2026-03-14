@@ -33,6 +33,7 @@ type fakeClient struct {
 	update         gpc.OneTimeProductInfo
 	updateErr      error
 	deleteErr      error
+	deleteFn       func(packageName, productID string) error
 
 	createFn      func(packageName string, product *androidpublisher.OneTimeProduct) (gpc.OneTimeProductInfo, error)
 	updateFn      func(packageName, productID string, product *androidpublisher.OneTimeProduct, updateMask string) (gpc.OneTimeProductInfo, error)
@@ -122,7 +123,12 @@ func (f fakeClient) UpdateOneTimeProduct(_ context.Context, packageName, product
 	return f.update, f.updateErr
 }
 
-func (f fakeClient) DeleteOneTimeProduct(_ context.Context, _, _ string) error { return f.deleteErr }
+func (f fakeClient) DeleteOneTimeProduct(_ context.Context, packageName, productID string) error {
+	if f.deleteFn != nil {
+		return f.deleteFn(packageName, productID)
+	}
+	return f.deleteErr
+}
 func (f fakeClient) ListOneTimeProductOffers(_ context.Context, _, _, _ string, pageSize int64, pageToken string, paginate bool) (gpc.OneTimeProductOffersListInfo, error) {
 	if f.capture != nil {
 		f.capture.offersPageSize = pageSize
@@ -784,6 +790,50 @@ func TestProductsOffersBatchDelete_ReturnsDeleted(t *testing.T) {
 		t.Fatalf("command failed: %v", err)
 	}
 	if !strings.Contains(out, `"status":"deleted"`) || !strings.Contains(out, `"deletedCount":2`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestProductsSync_UpsertsAndDeletes(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "coins_100.json"), []byte(`{"productId":"coins_100","listings":[{"languageCode":"en-US","title":"Coins","benefits":["100 coins"]}]}`), 0o600); err != nil {
+		t.Fatalf("write product: %v", err)
+	}
+	created := []string{}
+	deleted := []string{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				list: gpc.OneTimeProductsListInfo{
+					Products: []gpc.OneTimeProductInfo{
+						{ProductID: "coins_100"},
+						{ProductID: "legacy_pack"},
+					},
+				},
+				createFn: func(packageName string, product *androidpublisher.OneTimeProduct) (gpc.OneTimeProductInfo, error) {
+					created = append(created, product.ProductId)
+					return gpc.OneTimeProductInfo{ProductID: product.ProductId}, nil
+				},
+				deleteFn: func(packageName, productID string) error {
+					deleted = append(deleted, productID)
+					return nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runProducts(t, deps, "sync", "--package-name", "com.example.app", "--dir", dir, "--delete-missing", "--confirm")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if len(created) != 1 || created[0] != "coins_100" {
+		t.Fatalf("unexpected created ids: %+v", created)
+	}
+	if len(deleted) != 1 || deleted[0] != "legacy_pack" {
+		t.Fatalf("unexpected deleted ids: %+v", deleted)
+	}
+	if !strings.Contains(out, `"status":"committed"`) || !strings.Contains(out, `"delete legacy_pack"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }

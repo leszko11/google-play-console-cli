@@ -56,6 +56,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newListCommand(deps),
 			newGetCommand(deps),
+			newSyncCommand(deps),
 			newBatchGetCommand(deps),
 			newBatchUpdateCommand(deps),
 			newBatchDeleteCommand(deps),

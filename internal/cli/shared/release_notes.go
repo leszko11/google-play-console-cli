@@ -8,6 +8,7 @@ import (
 
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	notes "github.com/leszko11/google-play-console-cli/internal/release/notes"
+	"github.com/leszko11/google-play-console-cli/internal/validate"
 )
 
 func ParseReleaseNotesFile(path string) ([]gpc.LocalizedText, error) {
@@ -122,6 +123,9 @@ func normalizeReleaseNotes(notes []gpc.LocalizedText) ([]gpc.LocalizedText, erro
 		text := strings.TrimSpace(note.Text)
 		if text == "" {
 			return nil, UsageErrorf("release note text must not be empty for locale %q", locale)
+		}
+		if err := validate.ReleaseNotes(text); err != nil {
+			return nil, UsageErrorf("%s for locale %q", err, locale)
 		}
 		localeKey := strings.ToLower(locale)
 		if _, ok := seenLocales[localeKey]; ok {

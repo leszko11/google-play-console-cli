@@ -8,6 +8,7 @@ import (
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
+	"github.com/leszko11/google-play-console-cli/internal/validate"
 )
 
 const (
@@ -100,6 +101,12 @@ func normalizeFullManifest(raw rawFullManifest) (fullManifest, error) {
 	if raw.UpdatePriority < 0 || raw.UpdatePriority > 5 {
 		return fullManifest{}, shared.UsageErrorf("--update-priority must be between 0 and 5")
 	}
+	raw.ReleaseName = strings.TrimSpace(raw.ReleaseName)
+	if raw.ReleaseName != "" {
+		if err := validate.ReleaseName(raw.ReleaseName); err != nil {
+			return fullManifest{}, shared.UsageErrorf("%s", err)
+		}
+	}
 
 	notes := make([]gpc.LocalizedText, 0, len(raw.ReleaseNotes))
 	for locale, text := range raw.ReleaseNotes {
@@ -107,6 +114,9 @@ func normalizeFullManifest(raw rawFullManifest) (fullManifest, error) {
 		text = strings.TrimSpace(text)
 		if locale == "" || text == "" {
 			return fullManifest{}, shared.UsageErrorf("releaseNotes entries must include non-empty locale and text")
+		}
+		if err := validate.ReleaseNotes(text); err != nil {
+			return fullManifest{}, shared.UsageErrorf("%s for locale %q", err, locale)
 		}
 		notes = append(notes, gpc.LocalizedText{Language: locale, Text: text})
 	}
@@ -117,7 +127,7 @@ func normalizeFullManifest(raw rawFullManifest) (fullManifest, error) {
 		ArtifactPath:   raw.ArtifactPath,
 		Track:          raw.Track,
 		Status:         raw.Status,
-		ReleaseName:    strings.TrimSpace(raw.ReleaseName),
+		ReleaseName:    raw.ReleaseName,
 		UserFraction:   userFraction,
 		MappingFile:    raw.MappingFile,
 		MappingType:    raw.MappingType,

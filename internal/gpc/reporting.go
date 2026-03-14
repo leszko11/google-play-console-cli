@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"google.golang.org/api/option"
 	playdeveloperreporting "google.golang.org/api/playdeveloperreporting/v1beta1"
@@ -44,6 +45,8 @@ type ReportingTimelineSpec = playdeveloperreporting.GooglePlayDeveloperReporting
 type ReportingMetricsRow = playdeveloperreporting.GooglePlayDeveloperReportingV1beta1MetricsRow
 type ReportingApp = playdeveloperreporting.GooglePlayDeveloperReportingV1beta1App
 type ReportingAnomaly = playdeveloperreporting.GooglePlayDeveloperReportingV1beta1Anomaly
+type ReportingErrorIssue = playdeveloperreporting.GooglePlayDeveloperReportingV1beta1ErrorIssue
+type ReportingErrorReport = playdeveloperreporting.GooglePlayDeveloperReportingV1beta1ErrorReport
 
 type ReportingAppsListInfo struct {
 	Apps          []*ReportingApp `json:"apps,omitempty"`
@@ -53,6 +56,21 @@ type ReportingAppsListInfo struct {
 type ReportingAnomaliesListInfo struct {
 	Anomalies     []*ReportingAnomaly `json:"anomalies,omitempty"`
 	NextPageToken string              `json:"nextPageToken,omitempty"`
+}
+
+type ReportingInterval struct {
+	StartTime string `json:"startTime,omitempty"`
+	EndTime   string `json:"endTime,omitempty"`
+}
+
+type ReportingErrorIssuesListInfo struct {
+	Issues        []*ReportingErrorIssue `json:"issues,omitempty"`
+	NextPageToken string                 `json:"nextPageToken,omitempty"`
+}
+
+type ReportingErrorReportsListInfo struct {
+	Reports       []*ReportingErrorReport `json:"reports,omitempty"`
+	NextPageToken string                  `json:"nextPageToken,omitempty"`
 }
 
 type ReportingVitalsMetricSetInfo struct {
@@ -200,6 +218,124 @@ func (c *ReportingClient) ListAnomalies(ctx context.Context, packageName, filter
 		}
 		if page.NextPageToken == nextToken {
 			return ReportingAnomaliesListInfo{}, fmt.Errorf("pagination token did not advance")
+		}
+		nextToken = page.NextPageToken
+	}
+}
+
+func (c *ReportingClient) SearchErrorIssues(ctx context.Context, packageName, filter, orderBy string, interval ReportingInterval, pageSize, sampleErrorReportLimit int64, pageToken string, paginate bool) (ReportingErrorIssuesListInfo, error) {
+	if c == nil || c.reporting == nil {
+		return ReportingErrorIssuesListInfo{}, errors.New("playdeveloperreporting service is not configured")
+	}
+	if pageSize < 0 {
+		return ReportingErrorIssuesListInfo{}, fmt.Errorf("page size must be greater than or equal to zero")
+	}
+	if sampleErrorReportLimit < 0 {
+		return ReportingErrorIssuesListInfo{}, fmt.Errorf("sample error report limit must be greater than or equal to zero")
+	}
+
+	parent, err := reportingAppParent(packageName)
+	if err != nil {
+		return ReportingErrorIssuesListInfo{}, err
+	}
+	filter = strings.TrimSpace(filter)
+	orderBy = strings.TrimSpace(orderBy)
+	pageToken = strings.TrimSpace(pageToken)
+
+	call := c.reporting.Vitals.Errors.Issues.Search(parent).PageSize(pageSize).PageToken(pageToken).SampleErrorReportLimit(sampleErrorReportLimit).Context(ctx)
+	if filter != "" {
+		call.Filter(filter)
+	}
+	if orderBy != "" {
+		call.OrderBy(orderBy)
+	}
+	applyReportingIssuesInterval(call, interval)
+
+	if !paginate {
+		resp, err := call.Do()
+		if err != nil {
+			return ReportingErrorIssuesListInfo{}, mapReportingGoogleAPIError(err)
+		}
+		return reportingErrorIssuesListInfoFromResponse(resp), nil
+	}
+
+	result := ReportingErrorIssuesListInfo{Issues: make([]*ReportingErrorIssue, 0)}
+	nextToken := pageToken
+	for {
+		call := c.reporting.Vitals.Errors.Issues.Search(parent).PageSize(pageSize).PageToken(nextToken).SampleErrorReportLimit(sampleErrorReportLimit).Context(ctx)
+		if filter != "" {
+			call.Filter(filter)
+		}
+		if orderBy != "" {
+			call.OrderBy(orderBy)
+		}
+		applyReportingIssuesInterval(call, interval)
+		resp, err := call.Do()
+		if err != nil {
+			return ReportingErrorIssuesListInfo{}, mapReportingGoogleAPIError(err)
+		}
+		page := reportingErrorIssuesListInfoFromResponse(resp)
+		result.Issues = append(result.Issues, page.Issues...)
+		if page.NextPageToken == "" {
+			result.NextPageToken = ""
+			return result, nil
+		}
+		if page.NextPageToken == nextToken {
+			return ReportingErrorIssuesListInfo{}, fmt.Errorf("pagination token did not advance")
+		}
+		nextToken = page.NextPageToken
+	}
+}
+
+func (c *ReportingClient) SearchErrorReports(ctx context.Context, packageName, filter string, interval ReportingInterval, pageSize int64, pageToken string, paginate bool) (ReportingErrorReportsListInfo, error) {
+	if c == nil || c.reporting == nil {
+		return ReportingErrorReportsListInfo{}, errors.New("playdeveloperreporting service is not configured")
+	}
+	if pageSize < 0 {
+		return ReportingErrorReportsListInfo{}, fmt.Errorf("page size must be greater than or equal to zero")
+	}
+
+	parent, err := reportingAppParent(packageName)
+	if err != nil {
+		return ReportingErrorReportsListInfo{}, err
+	}
+	filter = strings.TrimSpace(filter)
+	pageToken = strings.TrimSpace(pageToken)
+
+	call := c.reporting.Vitals.Errors.Reports.Search(parent).PageSize(pageSize).PageToken(pageToken).Context(ctx)
+	if filter != "" {
+		call.Filter(filter)
+	}
+	applyReportingReportsInterval(call, interval)
+
+	if !paginate {
+		resp, err := call.Do()
+		if err != nil {
+			return ReportingErrorReportsListInfo{}, mapReportingGoogleAPIError(err)
+		}
+		return reportingErrorReportsListInfoFromResponse(resp), nil
+	}
+
+	result := ReportingErrorReportsListInfo{Reports: make([]*ReportingErrorReport, 0)}
+	nextToken := pageToken
+	for {
+		call := c.reporting.Vitals.Errors.Reports.Search(parent).PageSize(pageSize).PageToken(nextToken).Context(ctx)
+		if filter != "" {
+			call.Filter(filter)
+		}
+		applyReportingReportsInterval(call, interval)
+		resp, err := call.Do()
+		if err != nil {
+			return ReportingErrorReportsListInfo{}, mapReportingGoogleAPIError(err)
+		}
+		page := reportingErrorReportsListInfoFromResponse(resp)
+		result.Reports = append(result.Reports, page.Reports...)
+		if page.NextPageToken == "" {
+			result.NextPageToken = ""
+			return result, nil
+		}
+		if page.NextPageToken == nextToken {
+			return ReportingErrorReportsListInfo{}, fmt.Errorf("pagination token did not advance")
 		}
 		nextToken = page.NextPageToken
 	}
@@ -471,4 +607,92 @@ func reportingAnomaliesListInfoFromResponse(resp *playdeveloperreporting.GoogleP
 		Anomalies:     resp.Anomalies,
 		NextPageToken: resp.NextPageToken,
 	}
+}
+
+func reportingErrorIssuesListInfoFromResponse(resp *playdeveloperreporting.GooglePlayDeveloperReportingV1beta1SearchErrorIssuesResponse) ReportingErrorIssuesListInfo {
+	if resp == nil {
+		return ReportingErrorIssuesListInfo{}
+	}
+	return ReportingErrorIssuesListInfo{
+		Issues:        resp.ErrorIssues,
+		NextPageToken: resp.NextPageToken,
+	}
+}
+
+func reportingErrorReportsListInfoFromResponse(resp *playdeveloperreporting.GooglePlayDeveloperReportingV1beta1SearchErrorReportsResponse) ReportingErrorReportsListInfo {
+	if resp == nil {
+		return ReportingErrorReportsListInfo{}
+	}
+	return ReportingErrorReportsListInfo{
+		Reports:       resp.ErrorReports,
+		NextPageToken: resp.NextPageToken,
+	}
+}
+
+func applyReportingIssuesInterval(call *playdeveloperreporting.VitalsErrorsIssuesSearchCall, interval ReportingInterval) {
+	if call == nil {
+		return
+	}
+	start := strings.TrimSpace(interval.StartTime)
+	if start != "" {
+		if parsed, err := parseReportingIntervalTime(start); err == nil {
+			call.IntervalStartTimeYear(int64(parsed.Year()))
+			call.IntervalStartTimeMonth(int64(parsed.Month()))
+			call.IntervalStartTimeDay(int64(parsed.Day()))
+			call.IntervalStartTimeHours(int64(parsed.Hour()))
+			call.IntervalStartTimeMinutes(int64(parsed.Minute()))
+			call.IntervalStartTimeSeconds(int64(parsed.Second()))
+			call.IntervalStartTimeNanos(int64(parsed.Nanosecond()))
+			call.IntervalStartTimeTimeZoneId(parsed.Location().String())
+		}
+	}
+	end := strings.TrimSpace(interval.EndTime)
+	if end != "" {
+		if parsed, err := parseReportingIntervalTime(end); err == nil {
+			call.IntervalEndTimeYear(int64(parsed.Year()))
+			call.IntervalEndTimeMonth(int64(parsed.Month()))
+			call.IntervalEndTimeDay(int64(parsed.Day()))
+			call.IntervalEndTimeHours(int64(parsed.Hour()))
+			call.IntervalEndTimeMinutes(int64(parsed.Minute()))
+			call.IntervalEndTimeSeconds(int64(parsed.Second()))
+			call.IntervalEndTimeNanos(int64(parsed.Nanosecond()))
+			call.IntervalEndTimeTimeZoneId(parsed.Location().String())
+		}
+	}
+}
+
+func applyReportingReportsInterval(call *playdeveloperreporting.VitalsErrorsReportsSearchCall, interval ReportingInterval) {
+	if call == nil {
+		return
+	}
+	start := strings.TrimSpace(interval.StartTime)
+	if start != "" {
+		if parsed, err := parseReportingIntervalTime(start); err == nil {
+			call.IntervalStartTimeYear(int64(parsed.Year()))
+			call.IntervalStartTimeMonth(int64(parsed.Month()))
+			call.IntervalStartTimeDay(int64(parsed.Day()))
+			call.IntervalStartTimeHours(int64(parsed.Hour()))
+			call.IntervalStartTimeMinutes(int64(parsed.Minute()))
+			call.IntervalStartTimeSeconds(int64(parsed.Second()))
+			call.IntervalStartTimeNanos(int64(parsed.Nanosecond()))
+			call.IntervalStartTimeTimeZoneId(parsed.Location().String())
+		}
+	}
+	end := strings.TrimSpace(interval.EndTime)
+	if end != "" {
+		if parsed, err := parseReportingIntervalTime(end); err == nil {
+			call.IntervalEndTimeYear(int64(parsed.Year()))
+			call.IntervalEndTimeMonth(int64(parsed.Month()))
+			call.IntervalEndTimeDay(int64(parsed.Day()))
+			call.IntervalEndTimeHours(int64(parsed.Hour()))
+			call.IntervalEndTimeMinutes(int64(parsed.Minute()))
+			call.IntervalEndTimeSeconds(int64(parsed.Second()))
+			call.IntervalEndTimeNanos(int64(parsed.Nanosecond()))
+			call.IntervalEndTimeTimeZoneId(parsed.Location().String())
+		}
+	}
+}
+
+func parseReportingIntervalTime(raw string) (time.Time, error) {
+	return time.Parse(time.RFC3339, strings.TrimSpace(raw))
 }

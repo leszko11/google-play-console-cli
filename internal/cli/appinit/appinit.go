@@ -16,6 +16,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
+	"google.golang.org/api/androidpublisher/v3"
 )
 
 const (
@@ -31,6 +32,14 @@ type Client interface {
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	ValidateEdit(ctx context.Context, packageName, editID string) error
 	CommitEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
+	GetAppDetails(ctx context.Context, packageName, editID string) (gpc.AppDetailsInfo, error)
+	ListImages(ctx context.Context, packageName, editID, language, imageType string) ([]gpc.ImageInfo, error)
+	ListTracks(ctx context.Context, packageName, editID string) ([]gpc.TrackInfo, error)
+	ListOneTimeProducts(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.OneTimeProductsListInfo, error)
+	GetOneTimeProductResource(ctx context.Context, packageName, productID string) (*androidpublisher.OneTimeProduct, error)
+	ListSubscriptions(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionsListInfo, error)
+	GetSubscriptionResource(ctx context.Context, packageName, productID string) (*androidpublisher.Subscription, error)
+	GetLatestRegionsVersion(ctx context.Context, packageName string) (string, error)
 	UpdateAppDetails(ctx context.Context, packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
 }
 
@@ -104,6 +113,9 @@ func NewCommand(deps Deps) *ffcli.Command {
 		ShortHelp: "Bootstrap app store presence from a manifest",
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newExportCommand(deps),
+		},
 		Exec: func(ctx context.Context, _ []string) error {
 			opts, manifest, err := validateOptions(opts)
 			if err != nil {
@@ -152,6 +164,10 @@ func validateOptions(opts options) (options, appInitManifest, error) {
 		return options{}, appInitManifest{}, err
 	}
 	opts.PackageName = pkg
+	opts.ManifestPath, err = shared.ResolveProjectPath(opts.ManifestPath, func(cfg config.ProjectConfig) string { return cfg.AppInitManifest })
+	if err != nil {
+		return options{}, appInitManifest{}, err
+	}
 	opts.ManifestPath = strings.TrimSpace(opts.ManifestPath)
 	if opts.ManifestPath == "" {
 		return options{}, appInitManifest{}, shared.UsageErrorf("--manifest is required")
