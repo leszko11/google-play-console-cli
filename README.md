@@ -81,6 +81,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - Account users management (`users list/create/update/delete`)
 - Per-app grants management (`grants create/update/delete`)
 - Internal app sharing upload (`internal-sharing upload`)
+- Generic webhook delivery for CI notifications (`notify webhook`)
 - Read-only listing and track diff previews (`diff`)
 - CI quality gates for format, lint, test, and build
 
@@ -166,6 +167,9 @@ gpc reports anomalies list --package-name com.example.app --filter 'activeBetwee
 # Search reporting error issues and reports
 gpc reports errors issues list --package-name com.example.app --filter 'issueType = "CRASH"' --start-time 2026-03-01T00:00:00Z
 gpc reports errors reports list --package-name com.example.app --filter 'issueType = "CRASH"' --start-time 2026-03-01T00:00:00Z
+
+# Deliver a raw JSON summary to a webhook endpoint with event metadata
+gpc notify webhook --url https://hooks.example.com/deploy --event release.completed --input /path/to/release-summary.json
 
 # Summarize reporting visibility, anomaly count, and vitals freshness
 gpc reports summary --package-name com.example.app
@@ -578,6 +582,7 @@ gpc rollback --help
 gpc status --help
 gpc reviews --help
 gpc reports --help
+gpc notify --help
 gpc orders --help
 gpc external-transactions --help
 gpc device-tier-configs --help

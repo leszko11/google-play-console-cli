@@ -178,6 +178,8 @@ make generate-command-docs
 - `gpc monetization regions`
 - `gpc monetization setup`
 - `gpc monetization sync`
+- `gpc notify`
+- `gpc notify webhook`
 - `gpc products`
 - `gpc products list`
 - `gpc products get`
@@ -288,6 +290,7 @@ SUBCOMMANDS
   generated-apks         List and download APKs generated from bundles
   subscriptions          Manage monetization subscriptions
   monetization           Monetization workflows
+  notify                 Notification delivery helpers
   products               Manage monetization one-time products
   iap                    Manage legacy in-app products
   listing                Store listing workflows
@@ -2871,6 +2874,36 @@ FLAGS
   -dry-run=false        Validate manifest and show planned sync actions without applying changes
   -manifest string      Path to monetization manifest (.json/.yaml/.yml)
   -package-name string  Package name
+```
+
+## `gpc notify --help`
+
+```text
+DESCRIPTION
+  Notification delivery helpers
+
+USAGE
+  notify
+
+SUBCOMMANDS
+  webhook  POST a JSON payload to a webhook endpoint
+```
+
+## `gpc notify webhook --help`
+
+```text
+DESCRIPTION
+  POST a JSON payload to a webhook endpoint
+
+USAGE
+  webhook
+
+FLAGS
+  -event string      Event name metadata
+  -input string      Path to JSON payload file (use - for stdin)
+  -retry-attempts 0  Additional retry attempts for network, 429, or 5xx failures
+  -retry-delay 1s    Delay between retry attempts
+  -url string        Webhook URL
 ```
 
 ## `gpc products --help`
