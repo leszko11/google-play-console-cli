@@ -81,6 +81,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - Account users management (`users list/create/update/delete`)
 - Per-app grants management (`grants create/update/delete`)
 - Internal app sharing upload (`internal-sharing upload`)
+- Read-only listing and track diff previews (`diff`)
 - CI quality gates for format, lint, test, and build
 
 ## Build
@@ -174,6 +175,9 @@ gpc reviews triage --package-name com.example.app
 
 # Export the current Play store state into local round-trip files
 gpc appinit export --package-name com.example.app --dir ./store --write-project-config
+
+# Preview listing drift before syncing local metadata
+gpc diff listing --package-name com.example.app --dir ./store/listing --delete-missing
 
 # Write the app's Data Safety declaration from the exported Play CSV template
 gpc apps data-safety --package-name com.example.app --input /path/to/data-safety.csv
@@ -389,6 +393,9 @@ gpc tracks get --package-name com.example.app --edit-id <edit-id> --track produc
 gpc tracks promote --package-name com.example.app --edit-id <edit-id> --from-track internal --to-track production
 gpc tracks update --package-name com.example.app --edit-id <edit-id> --track alpha --status draft --version-codes 123456789 --release-notes-file /path/to/release-notes.txt
 
+# Preview a draft track release against the live track before updating it
+gpc diff track --package-name com.example.app --track production --status completed --version-codes 123456789 --release-notes-file /path/to/release-notes.json
+
 # List/upload binaries in an edit
 gpc bundles list --package-name com.example.app --edit-id <edit-id>
 gpc bundles upload --package-name com.example.app --edit-id <edit-id> --file /path/to/app.aab
@@ -558,6 +565,7 @@ gpc appinit --help
 gpc apps --help
 gpc changelog --help
 gpc edits --help
+gpc diff --help
 gpc tracks --help
 gpc bundles --help
 gpc apks --help

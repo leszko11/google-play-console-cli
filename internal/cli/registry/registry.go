@@ -12,6 +12,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/deobfuscation"
 	"github.com/leszko11/google-play-console-cli/internal/cli/deploy"
 	"github.com/leszko11/google-play-console-cli/internal/cli/devicetierconfigs"
+	"github.com/leszko11/google-play-console-cli/internal/cli/diff"
 	"github.com/leszko11/google-play-console-cli/internal/cli/doctor"
 	"github.com/leszko11/google-play-console-cli/internal/cli/e2e"
 	"github.com/leszko11/google-play-console-cli/internal/cli/edits"
@@ -58,6 +59,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		bundles.NewCommand(bundles.Deps{}),
 		deobfuscation.NewCommand(deobfuscation.Deps{}),
 		deploy.NewCommand(deploy.Deps{}),
+		diff.NewCommand(diff.Deps{}),
 		doctor.NewCommand(doctor.Deps{}),
 		e2e.NewCommand(e2e.Deps{}),
 		release.NewCommand(release.Deps{}),
