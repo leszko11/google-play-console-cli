@@ -26,13 +26,19 @@ type Client interface {
 	QueryVitalsMetricSet(ctx context.Context, packageName string, metricSet gpc.ReportingVitalsMetricSet, request *gpc.ReportingVitalsQueryRequest) (gpc.ReportingVitalsQueryResult, error)
 }
 
+type FinancialClient interface {
+	ListObjects(ctx context.Context, bucket, prefix string, pageSize int64, pageToken string) (FinancialObjectList, error)
+	DownloadObject(ctx context.Context, bucket, objectName string) (FinancialObjectDownload, error)
+}
+
 type Deps struct {
-	LoadConfig func() (config.Config, error)
-	NewClient  func(context.Context, gpc.CredentialInput) (Client, error)
-	LookupEnv  func(string) string
-	Stdin      io.Reader
-	Stdout     io.Writer
-	Stderr     io.Writer
+	LoadConfig         func() (config.Config, error)
+	NewClient          func(context.Context, gpc.CredentialInput) (Client, error)
+	NewFinancialClient func(context.Context, gpc.CredentialInput) (FinancialClient, error)
+	LookupEnv          func(string) string
+	Stdin              io.Reader
+	Stdout             io.Writer
+	Stderr             io.Writer
 }
 
 type summaryAppInfo struct {
@@ -73,6 +79,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newAppsCommand(deps),
 			newAnomaliesCommand(deps),
 			newErrorsCommand(deps),
+			newFinancialCommand(deps),
 			newSummaryCommand(deps),
 			newVitalsCommand(deps),
 		},
@@ -86,6 +93,11 @@ func withDefaults(deps Deps) Deps {
 	if deps.NewClient == nil {
 		deps.NewClient = func(ctx context.Context, creds gpc.CredentialInput) (Client, error) {
 			return gpc.NewReportingClient(ctx, creds)
+		}
+	}
+	if deps.NewFinancialClient == nil {
+		deps.NewFinancialClient = func(ctx context.Context, creds gpc.CredentialInput) (FinancialClient, error) {
+			return NewFinancialClient(ctx, creds)
 		}
 	}
 	if deps.LookupEnv == nil {

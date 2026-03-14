@@ -63,6 +63,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - Review triage summary (`reviews triage`)
 - Google Play Developer Reporting app discovery, anomalies, vitals, and error search queries (`reports apps list`, `reports anomalies list`, `reports vitals get/query`, `reports errors issues list`, `reports errors reports list`)
 - Reporting operator summary (`reports summary`)
+- Financial report object discovery and CSV normalization from Cloud Storage (`reports financial list/get`)
 - Orders API support (`orders get/batch-get/refund`)
 - External transactions API support (`external-transactions get/create/refund`)
 - Device tier config support (`device-tier-configs list/get/create`)
@@ -161,6 +162,12 @@ gpc reports vitals query --package-name com.example.app --metric-set crash-rate 
 
 # List reporting-accessible apps
 gpc reports apps list --page-size 100
+
+# List available financial report objects in Cloud Storage
+gpc reports financial list --bucket play_financial_reports --prefix earnings/
+
+# Download a financial report CSV from gs:// and normalize it to JSON/table/csv/tsv
+gpc reports financial get --gcs-uri gs://play_financial_reports/earnings/earnings_2026-03.csv --output json
 
 # List anomalies for one app
 gpc reports anomalies list --package-name com.example.app --filter 'activeBetween("2026-03-01T00:00:00Z", UNBOUNDED)'
