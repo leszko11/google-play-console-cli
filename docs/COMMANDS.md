@@ -245,6 +245,7 @@ make generate-command-docs
 - `gpc completion bash`
 - `gpc completion zsh`
 - `gpc completion fish`
+- `gpc completion values`
 
 ## `gpc --help`
 
@@ -3868,9 +3869,10 @@ USAGE
   completion
 
 SUBCOMMANDS
-  bash  Print bash completion script
-  zsh   Print zsh completion script
-  fish  Print fish completion script
+  bash    Print bash completion script
+  zsh     Print zsh completion script
+  fish    Print fish completion script
+  values  Print dynamic completion values
 ```
 
 ## `gpc completion bash --help`
@@ -3901,4 +3903,10 @@ DESCRIPTION
 
 USAGE
   fish
+```
+
+## `gpc completion values --help`
+
+```text
+
 ```
