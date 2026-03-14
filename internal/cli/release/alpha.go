@@ -104,8 +104,14 @@ func newAlphaCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 
+			spinner := shared.NewSpinner(deps.Stderr, "Running alpha release flow")
 			result, err := runAlpha(ctx, deps, opts)
 			_ = shared.WriteJSON(deps.Stdout, result)
+			if err != nil {
+				spinner.Fail("Alpha release flow failed")
+				return err
+			}
+			spinner.Success("Alpha release flow finished")
 			return err
 		},
 	}

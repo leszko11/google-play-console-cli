@@ -67,7 +67,14 @@ func newFullCommand(deps Deps) *ffcli.Command {
 			}
 			defer cancel()
 
-			return runFull(ctx, requestCtx, client, deps.Stdout, opts, manifest)
+			spinner := shared.NewSpinner(deps.Stderr, "Running full release flow")
+			err = runFull(ctx, requestCtx, client, deps.Stdout, opts, manifest)
+			if err != nil {
+				spinner.Fail("Full release flow failed")
+				return err
+			}
+			spinner.Success("Full release flow finished")
+			return nil
 		},
 	}
 }

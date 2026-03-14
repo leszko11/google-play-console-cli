@@ -119,10 +119,13 @@ func newUploadCommand(deps Deps) *ffcli.Command {
 			if apkPath == "" {
 				return fmt.Errorf("--file is required")
 			}
+			spinner := shared.NewSpinner(deps.Stderr, "Uploading APK")
 			apk, err := client.UploadAPK(requestCtx, pkg, eid, apkPath)
 			if err != nil {
+				spinner.Fail("APK upload failed")
 				return fmt.Errorf("failed to upload apk: %w", err)
 			}
+			spinner.Success("APK uploaded")
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      eid,

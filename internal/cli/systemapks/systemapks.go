@@ -231,14 +231,18 @@ func newDownloadCommand(deps Deps) *ffcli.Command {
 				return fmt.Errorf("--output is required")
 			}
 
+			spinner := shared.NewSpinner(deps.Stderr, "Downloading system APK variant")
 			raw, err := client.DownloadSystemAPKVariant(requestCtx, pkg, versionCode, variantID)
 			if err != nil {
+				spinner.Fail("System APK download failed")
 				return fmt.Errorf("failed to download system apk variant: %w", err)
 			}
 
 			if err := writeDownload(outputPath, raw); err != nil {
+				spinner.Fail("System APK download failed")
 				return err
 			}
+			spinner.Success("System APK variant downloaded")
 
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,

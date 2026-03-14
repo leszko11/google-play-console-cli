@@ -91,6 +91,7 @@ func newUploadCommand(deps Deps) *ffcli.Command {
 				artifactType string
 				artifact     gpc.InternalSharingArtifactInfo
 			)
+			spinner := shared.NewSpinner(deps.Stderr, "Uploading internal sharing artifact")
 
 			if apkPath != "" {
 				if err := validateReadableFile(apkPath, "--apk"); err != nil {
@@ -106,8 +107,10 @@ func newUploadCommand(deps Deps) *ffcli.Command {
 				artifactType = "aab"
 			}
 			if err != nil {
+				spinner.Fail("Internal sharing upload failed")
 				return fmt.Errorf("failed to upload internal sharing artifact: %w", err)
 			}
+			spinner.Success("Internal sharing artifact uploaded")
 
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName":  pkg,
