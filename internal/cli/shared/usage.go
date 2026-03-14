@@ -11,10 +11,15 @@ import (
 
 type UsageError struct {
 	Message string
+	Cause   error
 }
 
 func (e UsageError) Error() string {
 	return e.Message
+}
+
+func (e UsageError) Unwrap() error {
+	return e.Cause
 }
 
 func NewUsageError(message string) error {
@@ -23,6 +28,13 @@ func NewUsageError(message string) error {
 
 func UsageErrorf(format string, args ...any) error {
 	return UsageError{Message: fmt.Sprintf(format, args...)}
+}
+
+func WrapUsageError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return UsageError{Message: err.Error(), Cause: err}
 }
 
 func IsUsageError(err error) bool {

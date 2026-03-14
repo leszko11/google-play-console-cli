@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -120,9 +121,14 @@ func TestResolveOutput_NonTTYFallback(t *testing.T) {
 
 func TestResolveServiceAccountPath_Precedence(t *testing.T) {
 	prev := boundGlobalFlags
-	defer func() { boundGlobalFlags = prev }()
+	prevBypass := resolveCredentialsShouldBypassKeychain
+	defer func() {
+		boundGlobalFlags = prev
+		resolveCredentialsShouldBypassKeychain = prevBypass
+	}()
 
 	boundGlobalFlags = &GlobalFlags{ServiceAccount: "/tmp/flag.json"}
+	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return true }
 
 	cfg := config.Config{
 		ActiveProfile: "default",
@@ -148,6 +154,9 @@ func TestResolveServiceAccountPath_RequiresSource(t *testing.T) {
 	_, err := ResolveServiceAccountPath(config.Config{}, func(string) string { return "" })
 	if err == nil {
 		t.Fatal("expected error")
+	}
+	if !errors.Is(err, gpc.ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "no service account configured") {
 		t.Fatalf("unexpected error: %v", err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -174,7 +175,7 @@ func ResolveCredentials(cfg config.Config, lookupEnv func(string) string) (Resol
 	})
 	if err != nil {
 		if errors.Is(err, authresolver.ErrNoCredentialSources) {
-			return ResolvedCredentials{}, UsageErrorf("no service account configured")
+			return ResolvedCredentials{}, fmt.Errorf("%w: no service account configured", gpc.ErrInvalidCredentials)
 		}
 		if errors.Is(err, authresolver.ErrMultipleSources) {
 			return ResolvedCredentials{}, UsageErrorf("%v", err)

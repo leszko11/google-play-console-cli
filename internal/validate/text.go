@@ -5,6 +5,14 @@ import (
 	"unicode/utf8"
 )
 
+type ValidationError struct {
+	Message string
+}
+
+func (e ValidationError) Error() string {
+	return e.Message
+}
+
 const (
 	maxTitleChars            = 30
 	maxShortDescriptionChars = 80
@@ -36,7 +44,7 @@ func ReleaseName(text string) error {
 func maxRunes(label, text string, limit int) error {
 	count := utf8.RuneCountInString(text)
 	if count > limit {
-		return fmt.Errorf("%s too long: %d characters (max %d)", label, count, limit)
+		return ValidationError{Message: fmt.Sprintf("%s too long: %d characters (max %d)", label, count, limit)}
 	}
 	return nil
 }

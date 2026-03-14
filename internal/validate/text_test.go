@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -11,6 +12,10 @@ func TestTitleLength(t *testing.T) {
 	}
 	if err := Title(strings.Repeat("a", 31)); err == nil || err.Error() != "title too long: 31 characters (max 30)" {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	var validationErr ValidationError
+	if err := Title(strings.Repeat("a", 31)); !errors.As(err, &validationErr) {
+		t.Fatalf("expected ValidationError, got %T", err)
 	}
 }
 

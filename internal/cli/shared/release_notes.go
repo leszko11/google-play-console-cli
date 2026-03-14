@@ -2,6 +2,7 @@ package shared
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -125,7 +126,7 @@ func normalizeReleaseNotes(notes []gpc.LocalizedText) ([]gpc.LocalizedText, erro
 			return nil, UsageErrorf("release note text must not be empty for locale %q", locale)
 		}
 		if err := validate.ReleaseNotes(text); err != nil {
-			return nil, UsageErrorf("%s for locale %q", err, locale)
+			return nil, WrapUsageError(fmt.Errorf("%w for locale %q", err, locale))
 		}
 		localeKey := strings.ToLower(locale)
 		if _, ok := seenLocales[localeKey]; ok {
