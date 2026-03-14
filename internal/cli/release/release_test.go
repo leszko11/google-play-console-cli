@@ -31,6 +31,7 @@ type fakeReleaseClient struct {
 	getTrackInfo    gpc.TrackInfo
 	getTrackErr     error
 
+	commitCalls   int
 	deleteCalls   int
 	createCalls   int
 	lastTrack     gpc.TrackUpdate
@@ -65,6 +66,7 @@ func (f *fakeReleaseClient) CommitEdit(_ context.Context, _, _ string) (gpc.Edit
 	if f.commitEditErr != nil {
 		return gpc.EditInfo{}, f.commitEditErr
 	}
+	f.commitCalls++
 	return gpc.EditInfo{ID: "committed"}, nil
 }
 
@@ -105,6 +107,30 @@ func (f *fakeReleaseClient) GetTrack(_ context.Context, _, _, _ string) (gpc.Tra
 	return f.getTrackInfo, nil
 }
 
+type fakeReleaseReportingClient struct {
+	queryResults    []gpc.ReportingVitalsQueryResult
+	queryErr        error
+	queryCalls      int
+	capturedPackage []string
+	capturedMetrics []gpc.ReportingVitalsMetricSet
+}
+
+func (f *fakeReleaseReportingClient) QueryVitalsMetricSet(_ context.Context, packageName string, metricSet gpc.ReportingVitalsMetricSet, _ *gpc.ReportingVitalsQueryRequest) (gpc.ReportingVitalsQueryResult, error) {
+	f.queryCalls++
+	f.capturedPackage = append(f.capturedPackage, packageName)
+	f.capturedMetrics = append(f.capturedMetrics, metricSet)
+	if f.queryErr != nil {
+		return gpc.ReportingVitalsQueryResult{}, f.queryErr
+	}
+	if len(f.queryResults) == 0 {
+		return gpc.ReportingVitalsQueryResult{}, nil
+	}
+	if f.queryCalls <= len(f.queryResults) {
+		return f.queryResults[f.queryCalls-1], nil
+	}
+	return f.queryResults[len(f.queryResults)-1], nil
+}
+
 func baseReleaseDeps(t *testing.T, client *fakeReleaseClient) Deps {
 	t.Helper()
 	return Deps{
@@ -118,6 +144,9 @@ func baseReleaseDeps(t *testing.T, client *fakeReleaseClient) Deps {
 		},
 		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
 			return client, nil
+		},
+		NewReportingClient: func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
+			return &fakeReleaseReportingClient{}, nil
 		},
 		LookupEnv: func(key string) string {
 			if key == "GPC_BYPASS_KEYCHAIN" {
@@ -139,6 +168,9 @@ func baseReleaseDeps(t *testing.T, client *fakeReleaseClient) Deps {
 		},
 		Now: func() time.Time {
 			return time.Unix(1_750_000_000, 0)
+		},
+		Sleep: func(_ context.Context, _ time.Duration) error {
+			return nil
 		},
 	}
 }

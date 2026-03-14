@@ -1668,11 +1668,14 @@ USAGE
   full
 
 FLAGS
-  -allow-production=false  Allow track=production
-  -confirm=false           Confirm committing release (required unless --dry-run)
-  -dry-run=false           Run all steps but delete edit instead of committing
-  -manifest string         Path to release manifest (.json/.yaml/.yml)
-  -package-name string     Target package name
+  -allow-production=false         Allow track=production
+  -auto-halt-on-regression=false  Halt an in-progress rollout if monitored vitals cross the configured thresholds
+  -confirm=false                  Confirm committing release (required unless --dry-run)
+  -dry-run=false                  Run all steps but delete edit instead of committing
+  -manifest string                Path to release manifest (.json/.yaml/.yml)
+  -package-name string            Target package name
+  -vitals-gate string             Comma-separated vitals thresholds (for example: crashRate<2.0,anrRate<0.5)
+  -vitals-wait 0s                 Monitor vitals after commit for the given duration
 ```
 
 ## `gpc release promote --help`

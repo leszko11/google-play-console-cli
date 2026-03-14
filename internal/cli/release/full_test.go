@@ -10,6 +10,7 @@ import (
 
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
+	playdeveloperreporting "google.golang.org/api/playdeveloperreporting/v1beta1"
 )
 
 func (f *fakeReleaseClient) UploadAPK(_ context.Context, _, _, _ string) (gpc.APKInfo, error) {
@@ -122,5 +123,103 @@ func TestReleaseFullRejectsMissingManifest(t *testing.T) {
 	_, err := runFullCommand(t, deps, "full", "--package-name", "com.example.app", "--confirm")
 	if err == nil || !strings.Contains(err.Error(), "--manifest is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReleaseFullBlocksCommitWhenVitalsGateFails(t *testing.T) {
+	client := &fakeReleaseClient{}
+	reporting := &fakeReleaseReportingClient{
+		queryResults: []gpc.ReportingVitalsQueryResult{
+			{
+				MetricSet: "crash-rate",
+				Rows: []*gpc.ReportingMetricsRow{
+					metricsRow("crashRate", "2.4"),
+				},
+			},
+			{
+				MetricSet: "anr-rate",
+				Rows: []*gpc.ReportingMetricsRow{
+					metricsRow("anrRate", "0.3"),
+				},
+			},
+		},
+	}
+	deps := baseReleaseDeps(t, client)
+	deps.NewReportingClient = func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
+		return reporting, nil
+	}
+	artifact := writeReleaseAsset(t, "app.aab")
+	mapping := writeReleaseAsset(t, "mapping.txt")
+	manifest := writeReleaseManifest(t, artifact, mapping)
+
+	out, err := runFullCommand(t, deps, "full", "--package-name", "com.example.app", "--manifest", manifest, "--confirm", "--vitals-gate", "crashRate<2.0,anrRate<0.5")
+	if err == nil || !strings.Contains(err.Error(), "vitals gate failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, `"status":"failed"`) || !strings.Contains(out, `"vitalsGate":{"status":"blocked"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if client.commitCalls != 0 {
+		t.Fatalf("expected commit to be blocked, got %d commits", client.commitCalls)
+	}
+	if reporting.queryCalls != 2 {
+		t.Fatalf("expected 2 vitals queries, got %d", reporting.queryCalls)
+	}
+}
+
+func TestReleaseFullAutoHaltsRegressionDuringWait(t *testing.T) {
+	client := &fakeReleaseClient{}
+	reporting := &fakeReleaseReportingClient{
+		queryResults: []gpc.ReportingVitalsQueryResult{
+			{
+				MetricSet: "crash-rate",
+				Rows: []*gpc.ReportingMetricsRow{
+					metricsRow("crashRate", "1.4"),
+				},
+			},
+			{
+				MetricSet: "crash-rate",
+				Rows: []*gpc.ReportingMetricsRow{
+					metricsRow("crashRate", "2.6"),
+				},
+			},
+		},
+	}
+	deps := baseReleaseDeps(t, client)
+	deps.NewReportingClient = func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
+		return reporting, nil
+	}
+	artifact := writeReleaseAsset(t, "app.aab")
+	manifest := writeManifestFile(t, "release.yaml", "artifact: "+artifact+"\ntrack: internal\nstatus: inProgress\nuserFraction: 0.1\n")
+
+	out, err := runFullCommand(t, deps, "full", "--package-name", "com.example.app", "--manifest", manifest, "--confirm", "--vitals-gate", "crashRate<2.0", "--vitals-wait", "10m", "--auto-halt-on-regression")
+	if err == nil || !strings.Contains(err.Error(), "vitals regression detected") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, `"status":"halted"`) || !strings.Contains(out, `"halted":true`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if client.createCalls != 2 {
+		t.Fatalf("expected rollout halt edit, got %d create calls", client.createCalls)
+	}
+	if client.commitCalls != 2 {
+		t.Fatalf("expected release commit and halt commit, got %d commits", client.commitCalls)
+	}
+	if client.lastTrack.Status != "halted" {
+		t.Fatalf("expected halted track update, got %+v", client.lastTrack)
+	}
+}
+
+func metricsRow(metric, value string) *gpc.ReportingMetricsRow {
+	return &gpc.ReportingMetricsRow{
+		AggregationPeriod: "FULL_RANGE",
+		Metrics: []*playdeveloperreporting.GooglePlayDeveloperReportingV1beta1MetricValue{
+			{
+				Metric: metric,
+				DecimalValue: &playdeveloperreporting.GoogleTypeDecimal{
+					Value: value,
+				},
+			},
+		},
 	}
 }
