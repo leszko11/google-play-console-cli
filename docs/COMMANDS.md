@@ -122,6 +122,9 @@ make generate-command-docs
 - `gpc reports errors issues list`
 - `gpc reports errors reports`
 - `gpc reports errors reports list`
+- `gpc reports financial`
+- `gpc reports financial list`
+- `gpc reports financial get`
 - `gpc reports summary`
 - `gpc reports vitals`
 - `gpc reports vitals get`
@@ -1819,6 +1822,7 @@ SUBCOMMANDS
   apps       Reporting app discovery commands
   anomalies  Reporting anomaly commands
   errors     Reporting error issue and report commands
+  financial  Financial report commands backed by Cloud Storage
   summary    Summarize reporting visibility, anomalies, and vitals freshness for an app
   vitals     Vitals metric set reporting commands
 ```
@@ -1997,6 +2001,53 @@ FLAGS
   -page-size 0          Maximum error reports per page
   -page-token string    Page token for the next page
   -start-time string    RFC3339 interval start time
+```
+
+## `gpc reports financial --help`
+
+```text
+DESCRIPTION
+  Financial report commands backed by Cloud Storage
+
+USAGE
+  financial
+
+SUBCOMMANDS
+  list  List Cloud Storage financial report objects
+  get   Download and normalize a financial report CSV from Cloud Storage
+```
+
+## `gpc reports financial list --help`
+
+```text
+DESCRIPTION
+  List Cloud Storage financial report objects
+
+USAGE
+  list
+
+FLAGS
+  -bucket string      Cloud Storage bucket containing financial reports
+  -output string      Output format: json, table, csv, tsv
+  -page-size 0        Maximum objects per page
+  -page-token string  Page token for the next page
+  -prefix string      Optional object prefix filter
+```
+
+## `gpc reports financial get --help`
+
+```text
+DESCRIPTION
+  Download and normalize a financial report CSV from Cloud Storage
+
+USAGE
+  get
+
+FLAGS
+  -bucket string   Cloud Storage bucket containing the report
+  -gcs-uri string  Cloud Storage object URI in the form gs://bucket/object.csv
+  -object string   Cloud Storage object name
+  -output string   Output format: json, table, csv, tsv
 ```
 
 ## `gpc reports summary --help`
