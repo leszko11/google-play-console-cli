@@ -245,6 +245,8 @@ make generate-command-docs
 - `gpc users create`
 - `gpc users update`
 - `gpc users delete`
+- `gpc workflow`
+- `gpc workflow run`
 - `gpc grants`
 - `gpc grants create`
 - `gpc grants update`
@@ -301,6 +303,7 @@ SUBCOMMANDS
   listing                Store listing workflows
   purchases              Manage one-time and subscription purchases
   users                  Manage Play Console account users
+  workflow               Run declarative gpc workflows from .gpc/workflow.yml
   grants                 Manage per-app user grants
   internal-sharing       Upload artifacts for internal app sharing
   completion             Generate shell completion script
@@ -3951,6 +3954,36 @@ FLAGS
   -developer-id string  Developer account ID (numeric or developers/<id>)
   -name string          User resource name (developers/<developer-id>/users/<email>)
   -user-email string    User email for resource name synthesis
+```
+
+## `gpc workflow --help`
+
+```text
+DESCRIPTION
+  Run declarative gpc workflows from .gpc/workflow.yml
+
+USAGE
+  workflow
+
+SUBCOMMANDS
+  run  Execute or plan a workflow manifest
+```
+
+## `gpc workflow run --help`
+
+```text
+DESCRIPTION
+  Execute or plan a workflow manifest
+
+USAGE
+  run
+
+FLAGS
+  -confirm=false  Execute the workflow steps
+  -dry-run=false  Plan the workflow without running any steps
+  -file string    Workflow file path (defaults to nearest .gpc/workflow.yml or .gpc/workflow.yaml)
+  -output string  Output format: json or table
+  -var value      Workflow variable override in key=value form (repeatable)
 ```
 
 ## `gpc grants --help`
