@@ -90,6 +90,9 @@ make generate-command-docs
 - `gpc deobfuscation`
 - `gpc deobfuscation upload`
 - `gpc deploy`
+- `gpc diff`
+- `gpc diff listing`
+- `gpc diff track`
 - `gpc doctor`
 - `gpc e2e`
 - `gpc e2e fixtures`
@@ -270,6 +273,7 @@ SUBCOMMANDS
   bundles                Manage Android App Bundles in an edit
   deobfuscation          Manage deobfuscation files in an edit
   deploy                 Upload artifact and publish to a track in one flow
+  diff                   Compare live Play state against local listing or track drafts
   doctor                 Run read-only diagnostics for auth, package access, and e2e fixtures
   e2e                    E2E fixture and smoke-testing helpers
   release                Release workflows for staged Google Play deploys
@@ -1467,6 +1471,59 @@ FLAGS
   -track string                Track name (e.g. internal, production)
   -update-priority 0           In-app update priority (0-5)
   -user-fraction -1            Rollout user fraction (0-1)
+```
+
+## `gpc diff --help`
+
+```text
+DESCRIPTION
+  Compare live Play state against local listing or track drafts
+
+USAGE
+  diff
+
+SUBCOMMANDS
+  listing  Compare live listings against a local listing directory
+  track    Compare a draft track release against the live track
+```
+
+## `gpc diff listing --help`
+
+```text
+DESCRIPTION
+  Compare live listings against a local listing directory
+
+USAGE
+  listing
+
+FLAGS
+  -delete-missing=false  Mark remote-only locales as deletions
+  -dir string            Listings directory root
+  -output string         Output format: json or table
+  -package-name string   Package name
+```
+
+## `gpc diff track --help`
+
+```text
+DESCRIPTION
+  Compare a draft track release against the live track
+
+USAGE
+  track
+
+FLAGS
+  -output string               Output format: json or table
+  -package-name string         Package name
+  -release-name string         Release name
+  -release-notes-file string   Path to release notes file (JSON object/array, tagged blocks, or plain text)
+  -release-notes-locale en-US  Release notes locale (BCP-47)
+  -release-notes-text string   Release notes text
+  -status string               Release status (draft, inProgress, halted, completed)
+  -track string                Track name (e.g. production, internal)
+  -update-priority 0           In-app update priority (0-5)
+  -user-fraction -1            Rollout user fraction (0-1)
+  -version-codes string        Comma-separated version codes
 ```
 
 ## `gpc doctor --help`
