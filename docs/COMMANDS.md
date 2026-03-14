@@ -110,6 +110,9 @@ make generate-command-docs
 - `gpc reports anomalies`
 - `gpc reports anomalies list`
 - `gpc reports errors`
+- `gpc reports errors counts`
+- `gpc reports errors counts get`
+- `gpc reports errors counts query`
 - `gpc reports errors issues`
 - `gpc reports errors issues list`
 - `gpc reports errors reports`
@@ -1783,8 +1786,50 @@ USAGE
   errors
 
 SUBCOMMANDS
+  counts   Error count metric set commands
   issues   Grouped error issue commands
   reports  Raw error report commands
+```
+
+## `gpc reports errors counts --help`
+
+```text
+DESCRIPTION
+  Error count metric set commands
+
+USAGE
+  counts
+
+SUBCOMMANDS
+  get    Get error count metric set freshness metadata
+  query  Query error count metric set rows
+```
+
+## `gpc reports errors counts get --help`
+
+```text
+DESCRIPTION
+  Get error count metric set freshness metadata
+
+USAGE
+  get
+
+FLAGS
+  -package-name string  Package name
+```
+
+## `gpc reports errors counts query --help`
+
+```text
+DESCRIPTION
+  Query error count metric set rows
+
+USAGE
+  query
+
+FLAGS
+  -input string         Path to error count query JSON payload (use - for stdin)
+  -package-name string  Package name
 ```
 
 ## `gpc reports errors issues --help`

@@ -242,6 +242,60 @@ func TestReportsErrorReportsList_ReturnsReports(t *testing.T) {
 	}
 }
 
+func TestReportsErrorCountsGet_ReturnsMetricSet(t *testing.T) {
+	fc := &fakeClient{
+		getResult: gpc.ReportingVitalsMetricSetInfo{
+			MetricSet:    "error-counts",
+			ResourceName: "apps/com.example.app/errorCountMetricSet",
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+	}
+
+	out, err := runReports(t, deps, "errors", "counts", "get", "--package-name", "com.example.app")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"metricSet":"error-counts"`) || !strings.Contains(out, `"resourceName":"apps/com.example.app/errorCountMetricSet"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.capturedPackage != "com.example.app" || fc.capturedMetricSet != gpc.ReportingVitalsMetricSetErrorCounts {
+		t.Fatalf("unexpected captured call: package=%q metricSet=%q", fc.capturedPackage, fc.capturedMetricSet)
+	}
+}
+
+func TestReportsErrorCountsQuery_ReturnsRows(t *testing.T) {
+	fc := &fakeClient{
+		queryResult: gpc.ReportingVitalsQueryResult{
+			MetricSet:     "error-counts",
+			ResourceName:  "apps/com.example.app/errorCountMetricSet",
+			Rows:          []*gpc.ReportingMetricsRow{{AggregationPeriod: "DAILY"}},
+			NextPageToken: "tok-2",
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+		Stdin:      strings.NewReader(`{"metrics":["errorCount"],"timelineSpec":{"aggregationPeriod":"DAILY"}}`),
+	}
+
+	out, err := runReports(t, deps, "errors", "counts", "query", "--package-name", "com.example.app", "--input", "-")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, `"metricSet":"error-counts"`) || !strings.Contains(out, `"rowCount":1`) || !strings.Contains(out, `"nextPageToken":"tok-2"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if fc.capturedMetricSet != gpc.ReportingVitalsMetricSetErrorCounts || fc.capturedQuery == nil {
+		t.Fatalf("unexpected captured query: metricSet=%q payload=%v", fc.capturedMetricSet, fc.capturedQuery)
+	}
+	if len(fc.capturedQuery.Metrics) != 1 || fc.capturedQuery.Metrics[0] != "errorCount" {
+		t.Fatalf("unexpected captured metrics: %#v", fc.capturedQuery.Metrics)
+	}
+}
+
 func TestReportsVitalsGet_RequiresMetricSet(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },

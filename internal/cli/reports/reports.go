@@ -178,8 +178,90 @@ func newErrorsCommand(deps Deps) *ffcli.Command {
 		ShortHelp: "Reporting error issue and report commands",
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
+			newErrorsCountsCommand(deps),
 			newErrorsIssuesCommand(deps),
 			newErrorsReportsCommand(deps),
+		},
+	}
+}
+
+func newErrorsCountsCommand(deps Deps) *ffcli.Command {
+	return &ffcli.Command{
+		Name:      "counts",
+		ShortHelp: "Error count metric set commands",
+		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newErrorsCountsGetCommand(deps),
+			newErrorsCountsQueryCommand(deps),
+		},
+	}
+}
+
+func newErrorsCountsGetCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("get", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+
+	return &ffcli.Command{
+		Name:      "get",
+		ShortHelp: "Get error count metric set freshness metadata",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			result, err := client.GetVitalsMetricSet(requestCtx, pkg, gpc.ReportingVitalsMetricSetErrorCounts)
+			if err != nil {
+				return fmt.Errorf("failed to get error count metric set: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"metricSet":   result,
+			})
+		},
+	}
+}
+
+func newErrorsCountsQueryCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("query", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, inputPath string
+	fs.StringVar(&packageName, "package-name", "", "Package name")
+	fs.StringVar(&inputPath, "input", "", "Path to error count query JSON payload (use - for stdin)")
+
+	return &ffcli.Command{
+		Name:      "query",
+		ShortHelp: "Query error count metric set rows",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			payload, err := readVitalsQueryPayload(inputPath, deps.Stdin)
+			if err != nil {
+				return err
+			}
+			result, err := client.QueryVitalsMetricSet(requestCtx, pkg, gpc.ReportingVitalsMetricSetErrorCounts, payload)
+			if err != nil {
+				return fmt.Errorf("failed to query error count metric set: %w", err)
+			}
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName":   pkg,
+				"metricSet":     result.MetricSet,
+				"resourceName":  result.ResourceName,
+				"rows":          result.Rows,
+				"rowCount":      len(result.Rows),
+				"nextPageToken": result.NextPageToken,
+			})
 		},
 	}
 }
