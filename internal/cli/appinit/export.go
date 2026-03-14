@@ -55,6 +55,14 @@ type exportOptions struct {
 	WriteProjectConfig bool
 }
 
+type bootstrapOptions struct {
+	PackageName        string
+	Dir                string
+	Tracks             string
+	SkipImages         bool
+	WriteProjectConfig bool
+}
+
 type exportResult struct {
 	PackageName string            `json:"packageName"`
 	Dir         string            `json:"dir"`
@@ -110,6 +118,52 @@ func newExportCommand(deps Deps) *ffcli.Command {
 			}
 			defer cancel()
 			return runExport(ctx, requestCtx, client, deps.Stdout, opts, sections, tracks)
+		},
+	}
+}
+
+func NewBootstrapCommand(deps Deps) *ffcli.Command {
+	deps = withDefaults(deps)
+
+	fs := flag.NewFlagSet("bootstrap", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+
+	var opts bootstrapOptions
+	fs.StringVar(&opts.PackageName, "package-name", "", "Package name")
+	fs.StringVar(&opts.Dir, "dir", "", "Bootstrap directory")
+	fs.StringVar(&opts.Tracks, "tracks", "", "Comma-separated tracks to export changelogs from")
+	fs.BoolVar(&opts.SkipImages, "skip-images", false, "Skip downloading listing images")
+	fs.BoolVar(&opts.WriteProjectConfig, "write-project-config", false, "Write .gpc.yaml with project-local defaults")
+
+	return &ffcli.Command{
+		Name:      "bootstrap",
+		ShortHelp: "Export current Play state into a local bootstrap workspace",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			exportOpts := exportOptions{
+				PackageName:        strings.TrimSpace(opts.PackageName),
+				Dir:                strings.TrimSpace(opts.Dir),
+				Include:            "app-details,listing,changelog",
+				Tracks:             strings.TrimSpace(opts.Tracks),
+				Layout:             "gpc",
+				SkipImages:         opts.SkipImages,
+				WriteProjectConfig: opts.WriteProjectConfig,
+			}
+			exportOpts, sections, tracks, err := validateExportOptions(exportOpts)
+			if err != nil {
+				return err
+			}
+			client, requestCtx, cancel, err := shared.BuildClient[Client](ctx, shared.BuildClientDeps[Client]{
+				LoadConfig: deps.LoadConfig,
+				LookupEnv:  deps.LookupEnv,
+				NewClient:  deps.NewClient,
+			})
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			return runExport(ctx, requestCtx, client, deps.Stdout, exportOpts, sections, tracks)
 		},
 	}
 }

@@ -71,6 +71,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - App recovery action support (`app-recoveries list/create/add-targeting/cancel/deploy`)
 - App bootstrap workflow (`appinit`)
 - App store export/bootstrap workflow (`appinit export`)
+- Top-level local bootstrap export workflow (`bootstrap`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Manifest-driven monetization setup workflow (`monetization setup`)
 - Monetization one-time product commands (`products ...`)
@@ -551,6 +552,7 @@ When CLI output includes `access denied` or `missing Play Console permissions`:
 ```bash
 gpc --help
 gpc auth --help
+gpc bootstrap --help
 gpc appinit --help
 gpc apps --help
 gpc changelog --help
