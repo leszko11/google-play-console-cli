@@ -6,6 +6,7 @@ Files:
 
 - `paths.txt`: normalized endpoint list for quick grep/review
 - `COVERAGE.md`: generated implemented-vs-missing endpoint report based on live `internal/gpc` service usage
+- `deferred_method_ids.txt`: live discovery method IDs that are intentionally deferred from implementation
 
 ## Regenerate `paths.txt`
 
@@ -32,6 +33,18 @@ Generate the coverage report:
 
 ```bash
 python3 scripts/generate-openapi-coverage.py
+```
+
+Check live discovery drift:
+
+```bash
+python3 scripts/check-openapi-drift.py --fetch
+```
+
+Offline drift check from a saved discovery document:
+
+```bash
+python3 scripts/check-openapi-drift.py --source /path/to/androidpublisher-v3-discovery.json
 ```
 
 ## Format

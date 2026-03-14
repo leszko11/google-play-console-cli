@@ -5,7 +5,7 @@ DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -X 'github.com/leszko11/google-play-console-cli/cmd.Version=$(VERSION)' -X 'github.com/leszko11/google-play-console-cli/cmd.Commit=$(COMMIT)' -X 'github.com/leszko11/google-play-console-cli/cmd.Date=$(DATE)'
 GO_BUILD := go build -ldflags "$(LDFLAGS)"
 
-.PHONY: build test lint format coverage benchmark generate-command-docs check-command-docs generate-llms-txt check-llms-txt generate-openapi-paths generate-openapi-coverage check-openapi-coverage dev
+.PHONY: build test lint format coverage benchmark generate-command-docs check-command-docs generate-llms-txt check-llms-txt generate-openapi-paths generate-openapi-coverage check-openapi-coverage check-openapi-drift dev
 
 build:
 	$(GO_BUILD) -o build/$(BINARY_NAME) .
@@ -46,5 +46,8 @@ generate-openapi-coverage:
 
 check-openapi-coverage:
 	python3 scripts/check-openapi-coverage.py
+
+check-openapi-drift:
+	python3 scripts/check-openapi-drift.py --fetch
 
 dev: format check-command-docs check-llms-txt check-openapi-coverage lint test build

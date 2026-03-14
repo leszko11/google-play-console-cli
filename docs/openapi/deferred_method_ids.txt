@@ -1,0 +1,4 @@
+# Android Publisher discovery method IDs intentionally deferred from implementation.
+# One method ID per line. Comments may follow after '#'.
+
+androidpublisher.applications.tracks.releases.list  # New app-level release listing endpoint; existing edit-track/status flows cover current needs.
