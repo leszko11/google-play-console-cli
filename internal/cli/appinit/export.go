@@ -117,7 +117,14 @@ func newExportCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 			defer cancel()
-			return runExport(ctx, requestCtx, client, deps.Stdout, opts, sections, tracks)
+			spinner := shared.NewSpinner(deps.Stderr, "Exporting Play state")
+			err = runExport(ctx, requestCtx, client, deps.Stdout, opts, sections, tracks)
+			if err != nil {
+				spinner.Fail("Play state export failed")
+				return err
+			}
+			spinner.Success("Play state exported")
+			return nil
 		},
 	}
 }
@@ -163,7 +170,14 @@ func NewBootstrapCommand(deps Deps) *ffcli.Command {
 				return err
 			}
 			defer cancel()
-			return runExport(ctx, requestCtx, client, deps.Stdout, exportOpts, sections, tracks)
+			spinner := shared.NewSpinner(deps.Stderr, "Bootstrapping local Play workspace")
+			err = runExport(ctx, requestCtx, client, deps.Stdout, exportOpts, sections, tracks)
+			if err != nil {
+				spinner.Fail("Bootstrap export failed")
+				return err
+			}
+			spinner.Success("Bootstrap workspace exported")
+			return nil
 		},
 	}
 }

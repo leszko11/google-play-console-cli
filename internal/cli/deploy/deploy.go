@@ -145,7 +145,14 @@ func NewCommand(deps Deps) *ffcli.Command {
 			}
 			defer cancel()
 
-			return executeDeploy(ctx, requestCtx, client, deps.Stdout, params)
+			spinner := shared.NewSpinner(deps.Stderr, "Running deploy flow")
+			err = executeDeploy(ctx, requestCtx, client, deps.Stdout, params)
+			if err != nil {
+				spinner.Fail("Deploy flow failed")
+				return err
+			}
+			spinner.Success("Deploy flow finished")
+			return nil
 		},
 	}
 }

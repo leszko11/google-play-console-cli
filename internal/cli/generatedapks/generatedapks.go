@@ -136,14 +136,18 @@ func newDownloadCommand(deps Deps) *ffcli.Command {
 				return fmt.Errorf("--output is required")
 			}
 
+			spinner := shared.NewSpinner(deps.Stderr, "Downloading generated APK")
 			raw, err := client.DownloadGeneratedAPK(requestCtx, pkg, versionCode, downloadID)
 			if err != nil {
+				spinner.Fail("Generated APK download failed")
 				return fmt.Errorf("failed to download generated apk: %w", err)
 			}
 
 			if err := writeDownload(outputPath, raw); err != nil {
+				spinner.Fail("Generated APK download failed")
 				return err
 			}
+			spinner.Success("Generated APK downloaded")
 
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,

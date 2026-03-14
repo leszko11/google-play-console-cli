@@ -129,10 +129,13 @@ func newUploadCommand(deps Deps) *ffcli.Command {
 			}
 			defer cancel()
 
+			spinner := shared.NewSpinner(deps.Stderr, "Uploading deobfuscation file")
 			result, err := client.UploadDeobfuscationFile(requestCtx, pkg, editID, versionCode, fileType, filePath)
 			if err != nil {
+				spinner.Fail("Deobfuscation upload failed")
 				return fmt.Errorf("failed to upload deobfuscation file: %w", err)
 			}
+			spinner.Success("Deobfuscation file uploaded")
 
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName":       pkg,

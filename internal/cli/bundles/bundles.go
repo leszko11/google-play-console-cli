@@ -140,10 +140,13 @@ func newUploadCommand(deps Deps) *ffcli.Command {
 			if bundlePath == "" {
 				return fmt.Errorf("--file is required")
 			}
+			spinner := shared.NewSpinner(deps.Stderr, "Uploading App Bundle")
 			bundle, err := client.UploadBundle(requestCtx, pkg, eid, bundlePath)
 			if err != nil {
+				spinner.Fail("App Bundle upload failed")
 				return fmt.Errorf("failed to upload bundle: %w", err)
 			}
+			spinner.Success("App Bundle uploaded")
 			return shared.WriteJSON(deps.Stdout, map[string]any{
 				"packageName": pkg,
 				"editId":      eid,
@@ -179,7 +182,14 @@ func newWaitCommand(deps Deps) *ffcli.Command {
 			if err := validateWaitOptions(versionCode, timeout, interval); err != nil {
 				return err
 			}
-			return runWait(ctx, deps, client, pkg, versionCode, timeout, interval)
+			spinner := shared.NewSpinner(deps.Stderr, fmt.Sprintf("Waiting for bundle %d to finish processing", versionCode))
+			err = runWait(ctx, deps, client, pkg, versionCode, timeout, interval)
+			if err != nil {
+				spinner.Fail(fmt.Sprintf("Bundle %d processing wait failed", versionCode))
+				return err
+			}
+			spinner.Success(fmt.Sprintf("Bundle %d is ready", versionCode))
+			return nil
 		},
 	}
 }
