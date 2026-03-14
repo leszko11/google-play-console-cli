@@ -2,6 +2,7 @@ package shared
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -224,6 +225,33 @@ func WriteJSON(out io.Writer, v any) error {
 	}
 	_, err = out.Write(b)
 	return err
+}
+
+func WriteDelimited(out io.Writer, format string, header []string, rows [][]string) error {
+	if out == nil {
+		out = os.Stdout
+	}
+
+	writer := csv.NewWriter(out)
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "csv":
+		writer.Comma = ','
+	case "tsv":
+		writer.Comma = '\t'
+	default:
+		return UsageErrorf("unsupported delimited output format %q", format)
+	}
+
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return writer.Error()
 }
 
 type BuildClientDeps[T any] struct {

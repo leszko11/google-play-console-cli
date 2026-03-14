@@ -21,7 +21,7 @@ func NewGetCommand(deps Deps) *ffcli.Command {
 		output      string
 	)
 	fs.StringVar(&packageName, "package-name", "", "Package name")
-	fs.StringVar(&output, "output", "", "Output format: json, table, markdown")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, csv, tsv")
 
 	return &ffcli.Command{
 		Name:      "get",
@@ -64,6 +64,8 @@ func writeGetOutput(deps Deps, output string, app gpc.AppInfo) error {
 		}
 		_, err := fmt.Fprintln(deps.Stdout, app.PackageName)
 		return err
+	case "csv", "tsv":
+		return shared.WriteDelimited(deps.Stdout, output, []string{"packageName"}, [][]string{{app.PackageName}})
 	case "markdown":
 		if _, err := fmt.Fprintln(deps.Stdout, "| package |"); err != nil {
 			return err

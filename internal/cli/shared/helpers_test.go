@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -218,6 +219,45 @@ func TestResolveDeveloperID_RequiresValue(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	if !strings.Contains(err.Error(), "--developer-id is required") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWriteDelimited(t *testing.T) {
+	tests := []struct {
+		name   string
+		format string
+		want   string
+	}{
+		{
+			name:   "csv",
+			format: "csv",
+			want:   "packageName,status\ncom.example.app,ok\n",
+		},
+		{
+			name:   "tsv",
+			format: "tsv",
+			want:   "packageName\tstatus\ncom.example.app\tok\n",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			err := WriteDelimited(&out, tc.format, []string{"packageName", "status"}, [][]string{{"com.example.app", "ok"}})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if out.String() != tc.want {
+				t.Fatalf("unexpected output %q, want %q", out.String(), tc.want)
+			}
+		})
+	}
+}
+
+func TestWriteDelimitedRejectsUnsupportedFormat(t *testing.T) {
+	err := WriteDelimited(&bytes.Buffer{}, "json", []string{"packageName"}, [][]string{{"com.example.app"}})
+	if err == nil || !strings.Contains(err.Error(), "unsupported delimited output format") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

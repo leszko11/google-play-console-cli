@@ -376,7 +376,7 @@ USAGE
   list
 
 FLAGS
-  -output string  Output format: json, table
+  -output string  Output format: json, table, csv, tsv
 ```
 
 ## `gpc auth switch --help`
@@ -471,7 +471,7 @@ USAGE
   list
 
 FLAGS
-  -output string  Output format: json, table, markdown
+  -output string  Output format: json, table, markdown, csv, tsv
   -verify=false   Verify API access for each configured package
 ```
 
@@ -485,7 +485,7 @@ USAGE
   get
 
 FLAGS
-  -output string        Output format: json, table, markdown
+  -output string        Output format: json, table, markdown, csv, tsv
   -package-name string  Package name
 ```
 
