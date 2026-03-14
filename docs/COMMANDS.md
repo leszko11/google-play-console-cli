@@ -103,6 +103,7 @@ make generate-command-docs
 - `gpc release full`
 - `gpc release promote`
 - `gpc rollback`
+- `gpc setup`
 - `gpc status`
 - `gpc reviews`
 - `gpc reviews list`
@@ -283,6 +284,7 @@ SUBCOMMANDS
   e2e                    E2E fixture and smoke-testing helpers
   release                Release workflows for staged Google Play deploys
   rollback               Halt the active staged rollout on a track
+  setup                  Provision auth and optional bootstrap workspace for gpc
   status                 Summarize tracks and recent review health for an app
   reviews                Read and reply to Play Store reviews
   reports                Google Play Developer Reporting commands
@@ -1714,6 +1716,29 @@ FLAGS
   -dry-run=false        Create and validate the edit, then delete it instead of updating the track
   -package-name string  Package name
   -track string         Track name (e.g. production)
+```
+
+## `gpc setup --help`
+
+```text
+DESCRIPTION
+  Provision auth and optional bootstrap workspace for gpc
+
+USAGE
+  setup
+
+FLAGS
+  -auto=false                           Run scripted setup without prompts
+  -developer-id string                  Optional developer account ID
+  -dir string                           Bootstrap directory (defaults to ./play)
+  -package-name string                  Optional package name to verify and bootstrap
+  -profile default                      Auth profile name
+  -project-id string                    Google Cloud project ID
+  -service-account-display-name string  Service account display name
+  -service-account-key string           Path to write or reuse the service account key JSON
+  -service-account-name string          Service account name (defaults to gpc-<profile>)
+  -skip-bootstrap=false                 Skip local bootstrap export even when package access is available
+  -write-project-config=true            Write .gpc.yaml when bootstrap runs
 ```
 
 ## `gpc status --help`

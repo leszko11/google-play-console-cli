@@ -50,6 +50,7 @@
 - `e2e`: E2E fixture and smoke-testing helpers
 - `release`: Release workflows for staged Google Play deploys
 - `rollback`: Halt the active staged rollout on a track
+- `setup`: Provision auth and optional bootstrap workspace for gpc
 - `status`: Summarize tracks and recent review health for an app
 - `reviews`: Read and reply to Play Store reviews
 - `reports`: Google Play Developer Reporting commands
