@@ -1,6 +1,7 @@
 package release
 
 import (
+	"archive/zip"
 	"context"
 	"errors"
 	"flag"
@@ -10,9 +11,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/leszko11/google-play-console-cli/internal/cli/listing"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	notesgen "github.com/leszko11/google-play-console-cli/internal/release/notes"
+	"github.com/leszko11/google-play-console-cli/internal/validate"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
@@ -33,6 +37,8 @@ type verifyResult struct {
 	Track          string        `json:"track"`
 	ProjectDir     string        `json:"projectDir"`
 	BuildTask      string        `json:"buildTask"`
+	ArtifactPath   string        `json:"artifactPath,omitempty"`
+	ListingDir     string        `json:"listingDir,omitempty"`
 	NotesMode      string        `json:"notesMode"`
 	Status         string        `json:"status"`
 	Checks         []verifyCheck `json:"checks"`
@@ -45,10 +51,12 @@ type verifyOptions struct {
 	Track       string
 	ProjectDir  string
 	BuildTask   string
+	AABPath     string
 	ProbeTrack  bool
 	NotesMode   string
 	NotesFile   string
 	NotesLocale string
+	NotesText   string
 }
 
 func newVerifyCommand(deps Deps) *ffcli.Command {
@@ -60,20 +68,24 @@ func newVerifyCommand(deps Deps) *ffcli.Command {
 		track       string
 		projectDir  string
 		buildTask   string
+		aabPath     string
 		probeTrack  bool
 		notesMode   string
 		notesFile   string
 		notesLocale string
+		notesText   string
 	)
 
 	fs.StringVar(&packageName, "package-name", defaultStagingPackage, "Target package name")
 	fs.StringVar(&track, "track", defaultTrack, "Target track name")
 	fs.StringVar(&projectDir, "project-dir", ".", "Android project directory")
 	fs.StringVar(&buildTask, "build-task", defaultBuildTask, "Gradle build task for release bundle")
+	fs.StringVar(&aabPath, "aab", "", "Path to prebuilt .aab for artifact validation")
 	fs.BoolVar(&probeTrack, "probe-track", false, "Create temporary edit and probe target track")
 	fs.StringVar(&notesMode, "notes-mode", notesgen.ModeGit, "Release notes mode: git, file, none")
 	fs.StringVar(&notesFile, "notes-file", "", "Release notes file path when notes-mode=file")
 	fs.StringVar(&notesLocale, "notes-locale", notesgen.DefaultLocale, "Release notes locale")
+	fs.StringVar(&notesText, "notes-text", "", "Inline release notes text override")
 
 	return &ffcli.Command{
 		Name:      "verify",
@@ -86,10 +98,12 @@ func newVerifyCommand(deps Deps) *ffcli.Command {
 				Track:       strings.TrimSpace(track),
 				ProjectDir:  strings.TrimSpace(projectDir),
 				BuildTask:   strings.TrimSpace(buildTask),
+				AABPath:     strings.TrimSpace(aabPath),
 				ProbeTrack:  probeTrack,
 				NotesMode:   strings.TrimSpace(notesMode),
 				NotesFile:   strings.TrimSpace(notesFile),
 				NotesLocale: strings.TrimSpace(notesLocale),
+				NotesText:   strings.TrimSpace(notesText),
 			}
 			result, err := runVerify(ctx, deps, opts)
 			_ = shared.WriteJSON(deps.Stdout, result)
@@ -112,7 +126,7 @@ func runVerify(ctx context.Context, deps Deps, opts verifyOptions) (verifyResult
 		BuildTask:   opts.BuildTask,
 		NotesMode:   opts.NotesMode,
 		Status:      "failed",
-		Checks:      make([]verifyCheck, 0, 8),
+		Checks:      make([]verifyCheck, 0, 12),
 	}
 	if result.PackageName == "" {
 		result.PackageName = defaultStagingPackage
@@ -166,6 +180,37 @@ func runVerify(ctx context.Context, deps Deps, opts verifyOptions) (verifyResult
 		result.addOK("gradle_task", fmt.Sprintf("task %q is available", result.BuildTask))
 	}
 
+	artifactPath, artifactErr := resolveVerifyArtifactPath(result.ProjectDir, opts.AABPath)
+	switch {
+	case artifactErr != nil:
+		result.addBlocking("bundle_artifact", artifactErr.Error())
+	case artifactPath == "":
+		result.addWarn("bundle_artifact", "skipped (no existing AAB provided or discovered)")
+	default:
+		result.ArtifactPath = artifactPath
+		if err := validateBundleArtifact(artifactPath); err != nil {
+			result.addBlocking("bundle_artifact", err.Error())
+		} else {
+			result.addOK("bundle_artifact", fmt.Sprintf("bundle artifact ready: %s", artifactPath))
+		}
+	}
+
+	listingDir, listingErr := resolveVerifyListingDir(result.ProjectDir)
+	switch {
+	case listingErr != nil:
+		result.addBlocking("listing_metadata", listingErr.Error())
+	case listingDir == "":
+		result.addWarn("listing_metadata", "skipped (no local listing metadata configured)")
+	default:
+		result.ListingDir = listingDir
+		locales, err := listing.ScanListingsDir(listingDir)
+		if err != nil {
+			result.addBlocking("listing_metadata", err.Error())
+		} else {
+			result.addOK("listing_metadata", fmt.Sprintf("listing metadata ready (dir=%s, locales=%d)", listingDir, len(locales)))
+		}
+	}
+
 	client, requestCtx, cancel, clientErr := buildClient(ctx, deps)
 	if clientErr != nil {
 		result.addBlocking("service_account", clientErr.Error())
@@ -213,6 +258,7 @@ func runVerify(ctx context.Context, deps Deps, opts verifyOptions) (verifyResult
 		FilePath: opts.NotesFile,
 		Locale:   opts.NotesLocale,
 		RepoDir:  result.ProjectDir,
+		Text:     opts.NotesText,
 	}, notesgen.Deps{})
 	if notesErr != nil {
 		result.addBlocking("notes_source", notesErr.Error())
@@ -224,7 +270,19 @@ func runVerify(ctx context.Context, deps Deps, opts verifyOptions) (verifyResult
 			if parseErr != nil {
 				result.addBlocking("notes_source", parseErr.Error())
 			} else {
-				result.addOK("notes_source", fmt.Sprintf("notes ready (%s, locales=%d)", notesResult.Source, len(parsedNotes)))
+				noteErrors := make([]string, 0, len(parsedNotes))
+				for _, note := range parsedNotes {
+					if err := validate.ReleaseNotes(note.Text); err != nil {
+						noteErrors = append(noteErrors, fmt.Sprintf("%v for locale %q", err, note.Locale))
+					}
+				}
+				if len(noteErrors) > 0 {
+					for _, issue := range noteErrors {
+						result.addBlocking("notes_source", issue)
+					}
+				} else {
+					result.addOK("notes_source", fmt.Sprintf("notes ready (%s, locales=%d)", notesResult.Source, len(parsedNotes)))
+				}
 			}
 		}
 	}
@@ -298,4 +356,89 @@ func parseJavaMajor(raw string) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("could not parse java major from output")
+}
+
+func resolveVerifyArtifactPath(projectDir, explicitPath string) (string, error) {
+	explicitPath = strings.TrimSpace(explicitPath)
+	if explicitPath != "" {
+		if err := validateExistingFile(explicitPath, "aab"); err != nil {
+			return "", err
+		}
+		return explicitPath, nil
+	}
+
+	path, err := resolveAABPath(projectDir, "")
+	if err != nil {
+		return "", nil
+	}
+	return path, nil
+}
+
+func validateBundleArtifact(path string) error {
+	if artifactType, err := detectArtifactType(path); err != nil {
+		return err
+	} else if artifactType != artifactTypeAAB {
+		return fmt.Errorf("bundle artifact must end with .aab: %s", path)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("failed to stat bundle artifact: %w", err)
+	}
+	if info.Size() == 0 {
+		return fmt.Errorf("bundle artifact is empty: %s", path)
+	}
+
+	archive, err := zip.OpenReader(path)
+	if err != nil {
+		return fmt.Errorf("bundle artifact is not a valid zip archive: %w", err)
+	}
+	defer archive.Close()
+
+	var hasBundleConfig bool
+	var hasManifest bool
+	var hasSignature bool
+	for _, file := range archive.File {
+		name := strings.ToLower(strings.TrimSpace(file.Name))
+		switch {
+		case name == "bundleconfig.pb":
+			hasBundleConfig = true
+		case name == "base/manifest/androidmanifest.xml":
+			hasManifest = true
+		case strings.HasPrefix(name, "meta-inf/") && (strings.HasSuffix(name, ".rsa") || strings.HasSuffix(name, ".dsa") || strings.HasSuffix(name, ".ec")):
+			hasSignature = true
+		}
+	}
+
+	if !hasBundleConfig {
+		return fmt.Errorf("bundle artifact is missing BundleConfig.pb")
+	}
+	if !hasManifest {
+		return fmt.Errorf("bundle artifact is missing base/manifest/AndroidManifest.xml")
+	}
+	if !hasSignature {
+		return fmt.Errorf("bundle artifact is not signed (missing META-INF signature file)")
+	}
+	return nil
+}
+
+func resolveVerifyListingDir(projectDir string) (string, error) {
+	info, err := config.LoadProjectFromDir(projectDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to load project config: %w", err)
+	}
+	if dir := strings.TrimSpace(info.Config.ListingDir); dir != "" {
+		return dir, nil
+	}
+
+	for _, candidate := range []string{
+		filepath.Join(projectDir, "listing"),
+		filepath.Join(projectDir, "play", "listings"),
+		filepath.Join(projectDir, "listings"),
+	} {
+		if stat, err := os.Stat(candidate); err == nil && stat.IsDir() {
+			return candidate, nil
+		}
+	}
+	return "", nil
 }

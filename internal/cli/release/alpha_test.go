@@ -15,7 +15,7 @@ func TestRunAlphaSuccess(t *testing.T) {
 	projectDir := t.TempDir()
 	mustWriteFile(t, filepath.Join(projectDir, "gradlew"), "#!/bin/bash\n")
 	aabPath := filepath.Join(projectDir, "app", "build", "outputs", "bundle", "stagingRelease", "app-staging-release.aab")
-	mustWriteFile(t, aabPath, "binary")
+	writeFakeAAB(t, aabPath, true)
 
 	client := &fakeReleaseClient{
 		createEditIDs: []string{"edit-1", "edit-2"},
@@ -63,7 +63,7 @@ func TestRunAlphaParsesTaggedReleaseNotesFile(t *testing.T) {
 	projectDir := t.TempDir()
 	mustWriteFile(t, filepath.Join(projectDir, "gradlew"), "#!/bin/bash\n")
 	aabPath := filepath.Join(projectDir, "app", "build", "outputs", "bundle", "stagingRelease", "app-staging-release.aab")
-	mustWriteFile(t, aabPath, "binary")
+	writeFakeAAB(t, aabPath, true)
 	notesPath := filepath.Join(projectDir, "release-notes.txt")
 	mustWriteFile(t, notesPath, `<en-US>
 Bug fixes and stability improvements.
@@ -150,7 +150,7 @@ func TestRunAlphaDeployFailureCleansUp(t *testing.T) {
 	projectDir := t.TempDir()
 	mustWriteFile(t, filepath.Join(projectDir, "gradlew"), "#!/bin/bash\n")
 	aabPath := filepath.Join(projectDir, "artifact.aab")
-	mustWriteFile(t, aabPath, "binary")
+	writeFakeAAB(t, aabPath, true)
 
 	client := &fakeReleaseClient{
 		createEditIDs:  []string{"edit-1"},
@@ -185,7 +185,7 @@ func TestRunAlphaDryRun(t *testing.T) {
 	projectDir := t.TempDir()
 	mustWriteFile(t, filepath.Join(projectDir, "gradlew"), "#!/bin/bash\n")
 	aabPath := filepath.Join(projectDir, "artifact.aab")
-	mustWriteFile(t, aabPath, "binary")
+	writeFakeAAB(t, aabPath, true)
 
 	client := &fakeReleaseClient{
 		createEditIDs: []string{"edit-1"},
@@ -222,5 +222,36 @@ func mustWriteFile(t *testing.T, path, contents string) {
 	}
 	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func TestRunAlphaPreflightVerifyUsesNotesTextAndAAB(t *testing.T) {
+	projectDir := t.TempDir()
+	mustWriteFile(t, filepath.Join(projectDir, "gradlew"), "#!/bin/bash\n")
+	aabPath := writeFakeAAB(t, filepath.Join(projectDir, "artifact.aab"), true)
+
+	client := &fakeReleaseClient{}
+	deps := baseReleaseDeps(t, client)
+
+	result, err := runAlpha(context.Background(), deps, alphaOptions{
+		PackageName:      "com.example.app",
+		Track:            "alpha",
+		ReleaseStatus:    "completed",
+		ProjectDir:       projectDir,
+		BuildTask:        defaultBuildTask,
+		AABPath:          aabPath,
+		SkipBuild:        true,
+		Confirm:          true,
+		CleanupOnFailure: true,
+		VersionCode:      456,
+		NotesMode:        "git",
+		NotesText:        strings.Repeat("a", 501),
+	})
+	if err == nil || !strings.Contains(err.Error(), "release verification failed") {
+		t.Fatalf("expected preflight verify failure, got err=%v result=%+v", err, result)
+	}
+	assertContainsStep(t, result.Steps, "preflight_verify", "error")
+	if result.Verify == nil || result.Verify.Status != "failed" {
+		t.Fatalf("expected embedded verify failure, got %+v", result.Verify)
 	}
 }

@@ -180,10 +180,12 @@ func runAlpha(ctx context.Context, deps Deps, opts alphaOptions) (alphaResult, e
 		Track:       result.Track,
 		ProjectDir:  projectDir,
 		BuildTask:   buildTask,
+		AABPath:     strings.TrimSpace(opts.AABPath),
 		ProbeTrack:  opts.ProbeTrack,
 		NotesMode:   opts.NotesMode,
 		NotesFile:   opts.NotesFile,
 		NotesLocale: opts.NotesLocale,
+		NotesText:   opts.NotesText,
 	})
 	result.Verify = &verify
 	if verify.Status != "ok" {
