@@ -270,6 +270,24 @@ func runCommand(t *testing.T, deps Deps, args ...string) (string, error) {
 	return out.String(), err
 }
 
+func runBootstrapCommand(t *testing.T, deps Deps, args ...string) (string, error) {
+	t.Helper()
+	var out bytes.Buffer
+	deps.Stdout = &out
+	deps.Stderr = &bytes.Buffer{}
+	if deps.LookupEnv == nil {
+		deps.LookupEnv = func(key string) string {
+			if key == "GPC_BYPASS_KEYCHAIN" {
+				return "1"
+			}
+			return ""
+		}
+	}
+	cmd := NewBootstrapCommand(deps)
+	err := cmd.ParseAndRun(context.Background(), args)
+	return out.String(), err
+}
+
 func TestLoadManifestResolvesRelativePaths(t *testing.T) {
 	root := t.TempDir()
 	listingDir := writeListingFixture(t, root)
@@ -454,5 +472,79 @@ func TestAppInitUsesProjectConfigManifestDefault(t *testing.T) {
 	}
 	if client.commitEditCalls != 2 {
 		t.Fatalf("expected appinit to commit both sections, got %+v", client)
+	}
+}
+
+func TestBootstrapWritesDefaultWorkspace(t *testing.T) {
+	root := t.TempDir()
+	client := &fakeClient{
+		listListingsResult: []gpc.ListingInfo{
+			{
+				Language:         "en-US",
+				Title:            "Title",
+				ShortDescription: "Short",
+				FullDescription:  "Full",
+			},
+		},
+		listTracksResult: []gpc.TrackInfo{
+			{
+				Name: "production",
+				Releases: []gpc.TrackReleaseInfo{
+					{
+						Name: "1.0.0",
+						ReleaseNotes: []gpc.LocalizedText{
+							{Language: "en-US", Text: "Release note"},
+						},
+					},
+				},
+			},
+		},
+		listProductsResult: gpc.OneTimeProductsListInfo{
+			Products: []gpc.OneTimeProductInfo{{ProductID: "coins_100"}},
+		},
+		listSubscriptionsResult: gpc.SubscriptionsListInfo{
+			Subscriptions: []gpc.SubscriptionInfo{{ProductID: "premium_monthly"}},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runBootstrapCommand(t, deps, "--package-name", "com.example.app", "--dir", root, "--skip-images", "--write-project-config")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, path := range []string{
+		filepath.Join(root, "appinit.yaml"),
+		filepath.Join(root, ".gpc.yaml"),
+		filepath.Join(root, "listing", "en-US", "title.txt"),
+		filepath.Join(root, "changelog", "production", "en-US.txt"),
+	} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected bootstrap file %s: %v", path, err)
+		}
+	}
+	for _, path := range []string{
+		filepath.Join(root, "products", "coins_100.json"),
+		filepath.Join(root, "subscriptions", "premium_monthly.json"),
+	} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("expected bootstrap to skip %s, got err=%v", path, err)
+		}
+	}
+	if !strings.Contains(out, `"sections":["app-details","changelog","listing"]`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestBootstrapRequiresDir(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+	}
+
+	_, err := runBootstrapCommand(t, deps, "--package-name", "com.example.app")
+	if err == nil || !strings.Contains(err.Error(), "--dir is required") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

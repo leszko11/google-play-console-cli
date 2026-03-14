@@ -24,6 +24,7 @@ make generate-command-docs
 - `gpc auth profiles list`
 - `gpc auth switch`
 - `gpc auth logout`
+- `gpc bootstrap`
 - `gpc appinit`
 - `gpc appinit export`
 - `gpc apps`
@@ -258,6 +259,7 @@ USAGE
 
 SUBCOMMANDS
   auth                   Manage authentication profiles
+  bootstrap              Export current Play state into a local bootstrap workspace
   appinit                Bootstrap app store presence from a manifest
   apps                   App visibility and metadata commands
   app-recoveries         Manage Play app recovery actions
@@ -405,6 +407,23 @@ USAGE
 FLAGS
   -all=false       Remove all stored profiles and credentials
   -profile string  Profile name to remove (defaults to selected active profile)
+```
+
+## `gpc bootstrap --help`
+
+```text
+DESCRIPTION
+  Export current Play state into a local bootstrap workspace
+
+USAGE
+  bootstrap
+
+FLAGS
+  -dir string                  Bootstrap directory
+  -package-name string         Package name
+  -skip-images=false           Skip downloading listing images
+  -tracks string               Comma-separated tracks to export changelogs from
+  -write-project-config=false  Write .gpc.yaml with project-local defaults
 ```
 
 ## `gpc appinit --help`

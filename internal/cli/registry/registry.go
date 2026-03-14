@@ -47,6 +47,7 @@ func Register(root *ffcli.Command, deps Deps) {
 
 	root.Subcommands = []*ffcli.Command{
 		auth.NewCommand(auth.Deps{}),
+		appinit.NewBootstrapCommand(appinit.Deps{}),
 		appinit.NewCommand(appinit.Deps{}),
 		apps.NewCommand(apps.Deps{}),
 		apprecoveries.NewCommand(apprecoveries.Deps{}),
