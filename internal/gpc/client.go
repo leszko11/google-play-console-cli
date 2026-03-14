@@ -14,6 +14,7 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("missing service account credentials")
 	ErrAccessDenied       = errors.New("access denied for package")
+	ErrRateLimited        = errors.New("request rate limited")
 	ErrPackageNotFound    = errors.New("package not found")
 )
 
@@ -85,7 +86,7 @@ func mapAPIErrorWithService(serviceName string, statusCode int, msg string, boot
 
 	switch statusCode {
 	case 401:
-		return fmt.Errorf("%s\n%s", prefix, permissionSetupHint())
+		return fmt.Errorf("%w: %s\n%s", ErrInvalidCredentials, msg, permissionSetupHint())
 	case 403:
 		if isPermissionErrorMessage(msg) {
 			return fmt.Errorf("%w: %s\n%s", ErrAccessDenied, msg, permissionSetupHint())
@@ -96,6 +97,8 @@ func mapAPIErrorWithService(serviceName string, statusCode int, msg string, boot
 			return fmt.Errorf("%w: %s\nhint: this package is not initialized in Google Play yet. Upload the first APK or AAB once in Play Console, then retry. Also verify the service account has access to this app.", ErrPackageNotFound, msg)
 		}
 		return fmt.Errorf("%w: %s", ErrPackageNotFound, msg)
+	case 429:
+		return fmt.Errorf("%w: %s", ErrRateLimited, prefix)
 	default:
 		if isPermissionErrorMessage(msg) {
 			return fmt.Errorf("%s\n%s", prefix, permissionSetupHint())

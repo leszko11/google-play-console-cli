@@ -1,6 +1,7 @@
 package release
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -104,7 +105,7 @@ func normalizeFullManifest(raw rawFullManifest) (fullManifest, error) {
 	raw.ReleaseName = strings.TrimSpace(raw.ReleaseName)
 	if raw.ReleaseName != "" {
 		if err := validate.ReleaseName(raw.ReleaseName); err != nil {
-			return fullManifest{}, shared.UsageErrorf("%s", err)
+			return fullManifest{}, shared.WrapUsageError(err)
 		}
 	}
 
@@ -116,7 +117,7 @@ func normalizeFullManifest(raw rawFullManifest) (fullManifest, error) {
 			return fullManifest{}, shared.UsageErrorf("releaseNotes entries must include non-empty locale and text")
 		}
 		if err := validate.ReleaseNotes(text); err != nil {
-			return fullManifest{}, shared.UsageErrorf("%s for locale %q", err, locale)
+			return fullManifest{}, shared.WrapUsageError(fmt.Errorf("%w for locale %q", err, locale))
 		}
 		notes = append(notes, gpc.LocalizedText{Language: locale, Text: text})
 	}

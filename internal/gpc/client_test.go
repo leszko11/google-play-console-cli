@@ -50,8 +50,18 @@ func TestMapAPIError_MapsUnauthorizedWithPermissionHint(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
+	if !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials for unauthorized error, got %v", err)
+	}
 	if !strings.Contains(err.Error(), "missing Play Console permissions") {
 		t.Fatalf("expected permission hint for unauthorized error, got %v", err)
+	}
+}
+
+func TestMapAPIError_MapsRateLimited(t *testing.T) {
+	err := mapAPIError(http.StatusTooManyRequests, "quota exceeded")
+	if !errors.Is(err, ErrRateLimited) {
+		t.Fatalf("expected ErrRateLimited, got %v", err)
 	}
 }
 
