@@ -73,6 +73,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - App bootstrap workflow (`appinit`)
 - App store export/bootstrap workflow (`appinit export`)
 - Top-level local bootstrap export workflow (`bootstrap`)
+- One-shot environment and auth provisioning (`setup --auto`)
 - Vitals-gated staged releases (`release full --vitals-gate ... --vitals-wait ... --auto-halt-on-regression`)
 - Monetization subscription commands (`subscriptions ...` including offers)
 - Manifest-driven monetization setup workflow (`monetization setup`)
@@ -118,6 +119,9 @@ gpc --version
 
 # Initialize credentials
 gpc auth init --service-account /path/to/service-account.json
+
+# Provision a GCP service account key, store the auth profile, and bootstrap a local workspace
+gpc setup --auto --project-id play-prod --package-name com.example.app --dir ./play
 
 # Initialize additional profiles (multi-identity)
 gpc auth init --profile work --service-account /path/to/work-service-account.json
@@ -576,6 +580,7 @@ When CLI output includes `access denied` or `missing Play Console permissions`:
 gpc --help
 gpc auth --help
 gpc bootstrap --help
+gpc setup --help
 gpc appinit --help
 gpc apps --help
 gpc changelog --help
