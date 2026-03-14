@@ -41,7 +41,7 @@ func newProfilesListCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var output string
-	fs.StringVar(&output, "output", "", "Output format: json, table")
+	fs.StringVar(&output, "output", "", "Output format: json, table, csv, tsv")
 
 	return &ffcli.Command{
 		Name:      "list",
@@ -109,7 +109,8 @@ func newProfilesListCommand(deps Deps) *ffcli.Command {
 				payload.Warnings = warnings
 			}
 
-			switch shared.ResolveOutput(output) {
+			resolvedOutput := shared.ResolveOutput(output)
+			switch resolvedOutput {
 			case "json":
 				return shared.WriteJSON(deps.Stdout, payload)
 			case "table":
@@ -131,8 +132,19 @@ func newProfilesListCommand(deps Deps) *ffcli.Command {
 					}
 				}
 				return nil
+			case "csv", "tsv":
+				delimitedRows := make([][]string, 0, len(rows))
+				for _, row := range rows {
+					delimitedRows = append(delimitedRows, []string{row.Profile, fmt.Sprintf("%t", row.Active), row.Storage})
+				}
+				for _, warning := range warnings {
+					if _, err := fmt.Fprintf(deps.Stderr, "warning: %s\n", warning); err != nil {
+						return err
+					}
+				}
+				return shared.WriteDelimited(deps.Stdout, resolvedOutput, []string{"profile", "active", "storage"}, delimitedRows)
 			default:
-				return shared.UsageErrorf("unsupported output format %q", strings.TrimSpace(shared.ResolveOutput(output)))
+				return shared.UsageErrorf("unsupported output format %q", strings.TrimSpace(resolvedOutput))
 			}
 		},
 	}

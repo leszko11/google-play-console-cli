@@ -26,7 +26,7 @@ func NewListCommand(deps Deps) *ffcli.Command {
 		output string
 	)
 	fs.BoolVar(&verify, "verify", false, "Verify API access for each configured package")
-	fs.StringVar(&output, "output", "", "Output format: json, table, markdown")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, csv, tsv")
 
 	return &ffcli.Command{
 		Name:      "list",
@@ -91,6 +91,16 @@ func writeListOutput(deps Deps, output string, items []listItem) error {
 			}
 		}
 		return nil
+	case "csv", "tsv":
+		rows := make([][]string, 0, len(items))
+		for _, item := range items {
+			status := item.Status
+			if status == "" {
+				status = "configured"
+			}
+			rows = append(rows, []string{item.PackageName, status, item.Error})
+		}
+		return shared.WriteDelimited(deps.Stdout, output, []string{"packageName", "status", "error"}, rows)
 	case "markdown":
 		if _, err := fmt.Fprintln(deps.Stdout, "| package | status |"); err != nil {
 			return err

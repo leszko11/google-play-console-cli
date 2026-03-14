@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,6 +50,26 @@ func runAuthWithErr(t *testing.T, deps Deps, args ...string) (string, error) {
 	cmd := NewCommand(deps)
 	err := cmd.ParseAndRun(context.Background(), args)
 	return out.String(), err
+}
+
+func runAuthIO(t *testing.T, deps Deps, args ...string) (string, string, error) {
+	t.Helper()
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	if deps.LookupEnv == nil {
+		deps.LookupEnv = func(name string) string {
+			if name == authresolver.EnvBypassKeychain {
+				return "1"
+			}
+			return ""
+		}
+	}
+	deps.Stdout = &out
+	deps.Stderr = &errOut
+	cmd := NewCommand(deps)
+	err := cmd.ParseAndRun(context.Background(), args)
+	return out.String(), errOut.String(), err
 }
 
 func writeServiceAccountFile(t *testing.T) string {
@@ -226,6 +247,25 @@ func TestAuthStatus_TableOutput(t *testing.T) {
 	}
 }
 
+func TestAuthStatus_RejectsCSVOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			saPath := writeServiceAccountFile(t)
+			return config.Config{
+				ActiveProfile: "default",
+				Profiles: map[string]config.Profile{
+					"default": {ServiceAccountPath: saPath},
+				},
+			}, nil
+		},
+	}
+
+	_, _, err := runAuthIO(t, deps, "status", "--output", "csv")
+	if err == nil || !strings.Contains(err.Error(), "unsupported output format") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestAuthStatus_UnauthenticatedWhenPathMissing(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) {
@@ -247,6 +287,32 @@ func TestAuthStatus_UnauthenticatedWhenPathMissing(t *testing.T) {
 	out := runAuth(t, deps, "status", "--output", "json")
 	if !bytes.Contains([]byte(out), []byte(`"authenticated":false`)) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestAuthProfilesList_CSVOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{
+				ActiveProfile: "work",
+				Profiles: map[string]config.Profile{
+					"default": {ServiceAccountPath: "/tmp/default.json"},
+					"work":    {ServiceAccountPath: "/tmp/work.json"},
+				},
+			}, nil
+		},
+	}
+
+	out, errOut, err := runAuthIO(t, deps, "profiles", "list", "--output", "csv")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	want := "profile,active,storage\ndefault,false,config\nwork,true,config\n"
+	if out != want {
+		t.Fatalf("unexpected csv output %q, want %q", out, want)
+	}
+	if !strings.Contains(errOut, "warning: keychain bypassed via GPC_BYPASS_KEYCHAIN") {
+		t.Fatalf("expected keychain warning on stderr, got %q", errOut)
 	}
 }
 

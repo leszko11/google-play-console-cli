@@ -105,6 +105,23 @@ func TestAppsListVerify_IncludesStatus(t *testing.T) {
 	}
 }
 
+func TestAppsList_CSVOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{Packages: []string{"com.example.one", "com.example.two"}}, nil
+		},
+	}
+
+	out, err := runApps(t, deps, "list", "--output", "csv")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	want := "packageName,status,error\ncom.example.one,configured,\ncom.example.two,configured,\n"
+	if out != want {
+		t.Fatalf("unexpected csv output %q, want %q", out, want)
+	}
+}
+
 func TestAppsGet_ReturnsClearAPIError(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) {
@@ -128,6 +145,33 @@ func TestAppsGet_ReturnsClearAPIError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "package not found") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAppsGet_TSVOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{
+				ActiveProfile: "default",
+				Profiles: map[string]config.Profile{
+					"default": {ServiceAccountPath: "/tmp/sa.json"},
+				},
+			}, nil
+		},
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				get: map[string]gpc.AppInfo{"com.example.app": {PackageName: "com.example.app"}},
+			}, nil
+		},
+	}
+
+	out, err := runApps(t, deps, "get", "--package-name", "com.example.app", "--output", "tsv")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	want := "packageName\ncom.example.app\n"
+	if out != want {
+		t.Fatalf("unexpected tsv output %q, want %q", out, want)
 	}
 }
 
