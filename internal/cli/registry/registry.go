@@ -22,6 +22,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/iap"
 	"github.com/leszko11/google-play-console-cli/internal/cli/internalsharing"
 	"github.com/leszko11/google-play-console-cli/internal/cli/listing"
+	"github.com/leszko11/google-play-console-cli/internal/cli/migrate"
 	"github.com/leszko11/google-play-console-cli/internal/cli/monetization"
 	"github.com/leszko11/google-play-console-cli/internal/cli/notify"
 	"github.com/leszko11/google-play-console-cli/internal/cli/orders"
@@ -78,6 +79,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		generatedapks.NewCommand(generatedapks.Deps{}),
 		subscriptions.NewCommand(subscriptions.Deps{}),
 		monetization.NewCommand(monetization.Deps{}),
+		migrate.NewCommand(migrate.Deps{}),
 		notify.NewCommand(notify.Deps{}),
 		products.NewCommand(products.Deps{}),
 		iap.NewCommand(iap.Deps{}),

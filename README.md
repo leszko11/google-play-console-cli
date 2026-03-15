@@ -73,6 +73,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - App bootstrap workflow (`appinit`)
 - App store export/bootstrap workflow (`appinit export`)
 - Top-level local bootstrap export workflow (`bootstrap`)
+- Fastlane metadata import into the local `gpc` workspace layout (`migrate fastlane import`)
 - One-shot environment and auth provisioning (`setup --auto`)
 - Declarative multi-step automation via `.gpc/workflow.yml` (`workflow run`)
 - Vitals-gated staged releases (`release full --vitals-gate ... --vitals-wait ... --auto-halt-on-regression`)
@@ -203,6 +204,9 @@ gpc reviews triage --package-name com.example.app
 
 # Export the current Play store state into local round-trip files
 gpc appinit export --package-name com.example.app --dir ./store --write-project-config
+
+# Import an existing Fastlane metadata tree into the local gpc layout
+gpc migrate fastlane import --from-dir ./fastlane/metadata --dir ./store --track production --version-code 123456 --package-name com.example.app --write-project-config
 
 # Preview listing drift before syncing local metadata
 gpc diff listing --package-name com.example.app --dir ./store/listing --delete-missing
@@ -617,6 +621,7 @@ gpc rollback --help
 gpc status --help
 gpc reviews --help
 gpc reports --help
+gpc migrate --help
 gpc notify --help
 gpc orders --help
 gpc external-transactions --help

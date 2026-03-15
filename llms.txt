@@ -61,6 +61,7 @@
 - `generated-apks`: List and download APKs generated from bundles
 - `subscriptions`: Manage monetization subscriptions
 - `monetization`: Monetization workflows
+- `migrate`: Import or transform metadata from other tool layouts
 - `notify`: Notification delivery helpers
 - `products`: Manage monetization one-time products
 - `iap`: Manage legacy in-app products

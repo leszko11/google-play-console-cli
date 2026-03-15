@@ -182,6 +182,9 @@ make generate-command-docs
 - `gpc monetization regions`
 - `gpc monetization setup`
 - `gpc monetization sync`
+- `gpc migrate`
+- `gpc migrate fastlane`
+- `gpc migrate fastlane import`
 - `gpc notify`
 - `gpc notify webhook`
 - `gpc notify slack`
@@ -299,6 +302,7 @@ SUBCOMMANDS
   generated-apks         List and download APKs generated from bundles
   subscriptions          Manage monetization subscriptions
   monetization           Monetization workflows
+  migrate                Import or transform metadata from other tool layouts
   notify                 Notification delivery helpers
   products               Manage monetization one-time products
   iap                    Manage legacy in-app products
@@ -2960,6 +2964,50 @@ FLAGS
   -dry-run=false        Validate manifest and show planned sync actions without applying changes
   -manifest string      Path to monetization manifest (.json/.yaml/.yml)
   -package-name string  Package name
+```
+
+## `gpc migrate --help`
+
+```text
+DESCRIPTION
+  Import or transform metadata from other tool layouts
+
+USAGE
+  migrate
+
+SUBCOMMANDS
+  fastlane  Migrate Fastlane metadata into gpc workspace layout
+```
+
+## `gpc migrate fastlane --help`
+
+```text
+DESCRIPTION
+  Migrate Fastlane metadata into gpc workspace layout
+
+USAGE
+  fastlane
+
+SUBCOMMANDS
+  import  Import Fastlane metadata into the local gpc listing/changelog layout
+```
+
+## `gpc migrate fastlane import --help`
+
+```text
+DESCRIPTION
+  Import Fastlane metadata into the local gpc listing/changelog layout
+
+USAGE
+  import
+
+FLAGS
+  -dir string                  Target gpc workspace directory
+  -from-dir fastlane           Fastlane metadata root (fastlane, `fastlane/metadata`, or `fastlane/metadata/android`)
+  -package-name string         Package name to persist into .gpc.yaml
+  -track production            Track name for imported changelogs
+  -version-code 0              Preferred Fastlane changelog version code (falls back to default.txt)
+  -write-project-config=false  Write .gpc.yaml with local listing/changelog defaults
 ```
 
 ## `gpc notify --help`
