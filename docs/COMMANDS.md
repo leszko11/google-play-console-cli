@@ -184,6 +184,8 @@ make generate-command-docs
 - `gpc monetization sync`
 - `gpc notify`
 - `gpc notify webhook`
+- `gpc notify slack`
+- `gpc notify discord`
 - `gpc products`
 - `gpc products list`
 - `gpc products get`
@@ -2971,6 +2973,8 @@ USAGE
 
 SUBCOMMANDS
   webhook  POST a JSON payload to a webhook endpoint
+  slack    POST a native Slack webhook message
+  discord  POST a native Discord webhook message
 ```
 
 ## `gpc notify webhook --help`
@@ -2988,6 +2992,44 @@ FLAGS
   -retry-attempts 0  Additional retry attempts for network, 429, or 5xx failures
   -retry-delay 1s    Delay between retry attempts
   -url string        Webhook URL
+```
+
+## `gpc notify slack --help`
+
+```text
+DESCRIPTION
+  POST a native Slack webhook message
+
+USAGE
+  slack
+
+FLAGS
+  -event string      Event name metadata
+  -input string      Optional path to JSON context payload (use - for stdin)
+  -message string    Notification message text
+  -retry-attempts 0  Additional retry attempts for network, 429, or 5xx failures
+  -retry-delay 1s    Delay between retry attempts
+  -title string      Optional notification title (defaults to --event)
+  -url string        Slack webhook URL
+```
+
+## `gpc notify discord --help`
+
+```text
+DESCRIPTION
+  POST a native Discord webhook message
+
+USAGE
+  discord
+
+FLAGS
+  -event string      Event name metadata
+  -input string      Optional path to JSON context payload (use - for stdin)
+  -message string    Notification message text
+  -retry-attempts 0  Additional retry attempts for network, 429, or 5xx failures
+  -retry-delay 1s    Delay between retry attempts
+  -title string      Optional embed title (defaults to --event)
+  -url string        Discord webhook URL
 ```
 
 ## `gpc products --help`

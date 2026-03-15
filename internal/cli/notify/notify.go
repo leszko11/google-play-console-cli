@@ -34,14 +34,21 @@ type Deps struct {
 }
 
 type webhookOptions struct {
+	notificationOptions
+	InputPath string
+}
+
+type notificationOptions struct {
 	URL           string
 	Event         string
-	InputPath     string
+	Title         string
+	Message       string
 	RetryAttempts int
 	RetryDelay    time.Duration
 }
 
 type webhookResult struct {
+	Provider     string `json:"provider,omitempty"`
 	URL          string `json:"url"`
 	Event        string `json:"event"`
 	StatusCode   int    `json:"statusCode"`
@@ -59,6 +66,8 @@ func NewCommand(deps Deps) *ffcli.Command {
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
 			newWebhookCommand(deps),
+			newSlackCommand(deps),
+			newDiscordCommand(deps),
 		},
 	}
 }
@@ -107,29 +116,44 @@ func newWebhookCommand(deps Deps) *ffcli.Command {
 			if err != nil {
 				return err
 			}
-			return runWebhook(ctx, deps, opts, payload)
+			return sendNotification(ctx, deps, deliveryOptions{
+				Provider:      "webhook",
+				URL:           opts.URL,
+				Event:         opts.Event,
+				RetryAttempts: opts.RetryAttempts,
+				RetryDelay:    opts.RetryDelay,
+			}, payload)
 		},
 	}
 }
 
 func validateWebhookOptions(opts webhookOptions) (webhookOptions, error) {
-	opts.URL = strings.TrimSpace(opts.URL)
-	if opts.URL == "" {
-		return webhookOptions{}, shared.UsageErrorf("--url is required")
+	normalized, err := validateNotificationOptions(opts.notificationOptions)
+	if err != nil {
+		return webhookOptions{}, err
 	}
-	opts.Event = strings.TrimSpace(opts.Event)
-	if opts.Event == "" {
-		return webhookOptions{}, shared.UsageErrorf("--event is required")
-	}
+	opts.notificationOptions = normalized
 	opts.InputPath = strings.TrimSpace(opts.InputPath)
 	if opts.InputPath == "" {
 		return webhookOptions{}, shared.UsageErrorf("--input is required")
 	}
+	return opts, nil
+}
+
+func validateNotificationOptions(opts notificationOptions) (notificationOptions, error) {
+	opts.URL = strings.TrimSpace(opts.URL)
+	if opts.URL == "" {
+		return notificationOptions{}, shared.UsageErrorf("--url is required")
+	}
+	opts.Event = strings.TrimSpace(opts.Event)
+	if opts.Event == "" {
+		return notificationOptions{}, shared.UsageErrorf("--event is required")
+	}
 	if opts.RetryAttempts < 0 {
-		return webhookOptions{}, shared.UsageErrorf("--retry-attempts must be zero or greater")
+		return notificationOptions{}, shared.UsageErrorf("--retry-attempts must be zero or greater")
 	}
 	if opts.RetryDelay <= 0 {
-		return webhookOptions{}, shared.UsageErrorf("--retry-delay must be greater than zero")
+		return notificationOptions{}, shared.UsageErrorf("--retry-delay must be greater than zero")
 	}
 	return opts, nil
 }
@@ -160,7 +184,15 @@ func readWebhookPayload(path string, stdin io.Reader) ([]byte, error) {
 	return raw, nil
 }
 
-func runWebhook(ctx context.Context, deps Deps, opts webhookOptions, payload []byte) error {
+type deliveryOptions struct {
+	Provider      string
+	URL           string
+	Event         string
+	RetryAttempts int
+	RetryDelay    time.Duration
+}
+
+func sendNotification(ctx context.Context, deps Deps, opts deliveryOptions, payload []byte) error {
 	requestCtx, cancel := shared.ContextWithTimeout(ctx, shared.ActiveGlobalFlags().Timeout)
 	defer cancel()
 
@@ -170,7 +202,7 @@ func runWebhook(ctx context.Context, deps Deps, opts webhookOptions, payload []b
 	for attempt := 0; attempt <= opts.RetryAttempts; attempt++ {
 		req, err := http.NewRequestWithContext(requestCtx, http.MethodPost, opts.URL, bytes.NewReader(payload))
 		if err != nil {
-			return fmt.Errorf("failed to create webhook request: %w", err)
+			return fmt.Errorf("failed to create %s request: %w", requestLabel(opts.Provider), err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-GPC-Event", opts.Event)
@@ -184,7 +216,7 @@ func runWebhook(ctx context.Context, deps Deps, opts webhookOptions, payload []b
 				}
 				continue
 			}
-			return fmt.Errorf("failed to deliver webhook: %w", err)
+			return fmt.Errorf("failed to deliver %s: %w", deliveryLabel(opts.Provider), err)
 		}
 
 		bodyPreview, readErr := readBodyPreview(resp.Body)
@@ -197,6 +229,7 @@ func runWebhook(ctx context.Context, deps Deps, opts webhookOptions, payload []b
 		lastResponseBody = bodyPreview
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			return shared.WriteJSON(deps.Stdout, webhookResult{
+				Provider:     opts.Provider,
 				URL:          opts.URL,
 				Event:        opts.Event,
 				StatusCode:   resp.StatusCode,
@@ -208,14 +241,237 @@ func runWebhook(ctx context.Context, deps Deps, opts webhookOptions, payload []b
 		}
 
 		if !shouldRetryStatus(resp.StatusCode) || attempt >= opts.RetryAttempts {
-			return fmt.Errorf("webhook returned status %d: %s", resp.StatusCode, trimResponse(bodyPreview))
+			return fmt.Errorf("%s returned status %d: %s", responseLabel(opts.Provider), resp.StatusCode, trimResponse(bodyPreview))
 		}
 		if sleepErr := deps.Sleep(requestCtx, opts.RetryDelay); sleepErr != nil {
 			return sleepErr
 		}
 	}
 
-	return fmt.Errorf("webhook delivery failed after %d attempts (last status %d): %s", opts.RetryAttempts+1, lastStatusCode, trimResponse(lastResponseBody))
+	return fmt.Errorf("%s delivery failed after %d attempts (last status %d): %s", opts.Provider, opts.RetryAttempts+1, lastStatusCode, trimResponse(lastResponseBody))
+}
+
+func requestLabel(provider string) string {
+	if provider == "webhook" {
+		return "webhook request"
+	}
+	return provider + " request"
+}
+
+func responseLabel(provider string) string {
+	if provider == "webhook" {
+		return "webhook"
+	}
+	return provider + " notification"
+}
+
+func deliveryLabel(provider string) string {
+	if provider == "webhook" {
+		return "webhook"
+	}
+	return provider + " notification"
+}
+
+func newSlackCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("slack", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+
+	var opts notificationOptions
+	var inputPath string
+	fs.StringVar(&opts.URL, "url", "", "Slack webhook URL")
+	fs.StringVar(&opts.Event, "event", "", "Event name metadata")
+	fs.StringVar(&opts.Title, "title", "", "Optional notification title (defaults to --event)")
+	fs.StringVar(&opts.Message, "message", "", "Notification message text")
+	fs.StringVar(&inputPath, "input", "", "Optional path to JSON context payload (use - for stdin)")
+	fs.IntVar(&opts.RetryAttempts, "retry-attempts", 0, "Additional retry attempts for network, 429, or 5xx failures")
+	fs.DurationVar(&opts.RetryDelay, "retry-delay", defaultRetryDelay, "Delay between retry attempts")
+
+	return &ffcli.Command{
+		Name:      "slack",
+		ShortHelp: "POST a native Slack webhook message",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			opts, err := validateChatOptions(opts)
+			if err != nil {
+				return err
+			}
+			contextPreview, err := readOptionalJSONPreview(inputPath, deps.Stdin)
+			if err != nil {
+				return err
+			}
+			payload, err := buildSlackPayload(opts, contextPreview)
+			if err != nil {
+				return err
+			}
+			return sendNotification(ctx, deps, deliveryOptions{
+				Provider:      "slack",
+				URL:           opts.URL,
+				Event:         opts.Event,
+				RetryAttempts: opts.RetryAttempts,
+				RetryDelay:    opts.RetryDelay,
+			}, payload)
+		},
+	}
+}
+
+func newDiscordCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("discord", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+
+	var opts notificationOptions
+	var inputPath string
+	fs.StringVar(&opts.URL, "url", "", "Discord webhook URL")
+	fs.StringVar(&opts.Event, "event", "", "Event name metadata")
+	fs.StringVar(&opts.Title, "title", "", "Optional embed title (defaults to --event)")
+	fs.StringVar(&opts.Message, "message", "", "Notification message text")
+	fs.StringVar(&inputPath, "input", "", "Optional path to JSON context payload (use - for stdin)")
+	fs.IntVar(&opts.RetryAttempts, "retry-attempts", 0, "Additional retry attempts for network, 429, or 5xx failures")
+	fs.DurationVar(&opts.RetryDelay, "retry-delay", defaultRetryDelay, "Delay between retry attempts")
+
+	return &ffcli.Command{
+		Name:      "discord",
+		ShortHelp: "POST a native Discord webhook message",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			opts, err := validateChatOptions(opts)
+			if err != nil {
+				return err
+			}
+			contextPreview, err := readOptionalJSONPreview(inputPath, deps.Stdin)
+			if err != nil {
+				return err
+			}
+			payload, err := buildDiscordPayload(opts, contextPreview)
+			if err != nil {
+				return err
+			}
+			return sendNotification(ctx, deps, deliveryOptions{
+				Provider:      "discord",
+				URL:           opts.URL,
+				Event:         opts.Event,
+				RetryAttempts: opts.RetryAttempts,
+				RetryDelay:    opts.RetryDelay,
+			}, payload)
+		},
+	}
+}
+
+func validateChatOptions(opts notificationOptions) (notificationOptions, error) {
+	normalized, err := validateNotificationOptions(opts)
+	if err != nil {
+		return notificationOptions{}, err
+	}
+	normalized.Message = strings.TrimSpace(normalized.Message)
+	if normalized.Message == "" {
+		return notificationOptions{}, shared.UsageErrorf("--message is required")
+	}
+	normalized.Title = strings.TrimSpace(normalized.Title)
+	if normalized.Title == "" {
+		normalized.Title = normalized.Event
+	}
+	return normalized, nil
+}
+
+func readOptionalJSONPreview(path string, stdin io.Reader) (string, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", nil
+	}
+	raw, err := readWebhookPayload(path, stdin)
+	if err != nil {
+		return "", err
+	}
+	return prettyJSONPreview(raw, 1800)
+}
+
+func prettyJSONPreview(raw []byte, maxLen int) (string, error) {
+	var parsed any
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return "", shared.UsageErrorf("--input must contain valid JSON")
+	}
+	formatted, err := json.MarshalIndent(parsed, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to format JSON preview: %w", err)
+	}
+	preview := string(formatted)
+	if len(preview) <= maxLen {
+		return preview, nil
+	}
+	suffix := "\n... (truncated)"
+	if maxLen <= len(suffix) {
+		return suffix[:maxLen], nil
+	}
+	return preview[:maxLen-len(suffix)] + suffix, nil
+}
+
+func buildSlackPayload(opts notificationOptions, contextPreview string) ([]byte, error) {
+	blocks := []map[string]any{
+		{
+			"type": "section",
+			"text": map[string]any{
+				"type": "mrkdwn",
+				"text": "*" + opts.Title + "*",
+			},
+		},
+		{
+			"type": "section",
+			"text": map[string]any{
+				"type": "mrkdwn",
+				"text": opts.Message,
+			},
+		},
+		{
+			"type": "context",
+			"elements": []map[string]any{
+				{
+					"type": "mrkdwn",
+					"text": "Event: `" + opts.Event + "`",
+				},
+			},
+		},
+	}
+	if contextPreview != "" {
+		blocks = append(blocks, map[string]any{
+			"type": "section",
+			"text": map[string]any{
+				"type": "mrkdwn",
+				"text": "*Context*\n```" + contextPreview + "```",
+			},
+		})
+	}
+	return json.Marshal(map[string]any{
+		"text":   opts.Message,
+		"blocks": blocks,
+	})
+}
+
+func buildDiscordPayload(opts notificationOptions, contextPreview string) ([]byte, error) {
+	fields := []map[string]any{
+		{
+			"name":   "Event",
+			"value":  opts.Event,
+			"inline": false,
+		},
+	}
+	if contextPreview != "" {
+		fields = append(fields, map[string]any{
+			"name":   "Context",
+			"value":  "```json\n" + contextPreview + "\n```",
+			"inline": false,
+		})
+	}
+	return json.Marshal(map[string]any{
+		"content": opts.Message,
+		"embeds": []map[string]any{
+			{
+				"title":       opts.Title,
+				"description": opts.Message,
+				"fields":      fields,
+			},
+		},
+	})
 }
 
 func readBodyPreview(body io.Reader) (string, error) {

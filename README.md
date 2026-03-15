@@ -85,7 +85,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - Account users management (`users list/create/update/delete`)
 - Per-app grants management (`grants create/update/delete`)
 - Internal app sharing upload (`internal-sharing upload`)
-- Generic webhook delivery for CI notifications (`notify webhook`)
+- Generic webhook delivery plus native Slack and Discord notifications (`notify webhook`, `notify slack`, `notify discord`)
 - Read-only listing and track diff previews (`diff`)
 - CI quality gates for format, lint, test, and build
 
@@ -184,6 +184,10 @@ gpc reports errors reports list --package-name com.example.app --filter 'issueTy
 
 # Deliver a raw JSON summary to a webhook endpoint with event metadata
 gpc notify webhook --url https://hooks.example.com/deploy --event release.completed --input /path/to/release-summary.json
+
+# Deliver a native Slack or Discord message with optional JSON context
+gpc notify slack --url https://hooks.slack.com/services/... --event release.completed --message "Production deploy completed." --input /path/to/release-summary.json
+gpc notify discord --url https://discord.com/api/webhooks/... --event reviews.summary --message "Pending reviews need replies." --input /path/to/reviews-summary.json
 
 # Plan a local release pipeline from .gpc/workflow.yml without executing it
 gpc workflow run --dry-run --var packageName=com.example.app
