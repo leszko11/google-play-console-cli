@@ -202,10 +202,11 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("commit", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, editID string
-	var confirm bool
+	var confirm, dryRun bool
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
-	fs.BoolVar(&confirm, "confirm", false, "Confirm committing the edit (required)")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm committing the edit (required unless --dry-run)")
+	fs.BoolVar(&dryRun, "dry-run", false, "Validate the edit without committing it")
 
 	return &ffcli.Command{
 		Name:      "commit",
@@ -222,8 +223,19 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 			if editID == "" {
 				return shared.UsageErrorf("--edit-id is required")
 			}
-			if !confirm {
-				return shared.UsageErrorf("--confirm is required to commit edit %q", editID)
+			if !confirm && !dryRun {
+				return shared.UsageErrorf("--confirm is required unless --dry-run is set")
+			}
+			if dryRun {
+				if err := client.ValidateEdit(requestCtx, pkg, editID); err != nil {
+					return fmt.Errorf("failed to validate edit: %w", err)
+				}
+				return shared.WriteJSON(deps.Stdout, map[string]any{
+					"packageName": pkg,
+					"editId":      editID,
+					"status":      "dry-run",
+					"validated":   true,
+				})
 			}
 			edit, err := client.CommitEdit(requestCtx, pkg, editID)
 			if err != nil {
@@ -242,10 +254,11 @@ func newDeleteCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("delete", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, editID string
-	var confirm bool
+	var confirm, dryRun bool
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
-	fs.BoolVar(&confirm, "confirm", false, "Confirm deleting the edit (required)")
+	fs.BoolVar(&confirm, "confirm", false, "Confirm deleting the edit (required unless --dry-run)")
+	fs.BoolVar(&dryRun, "dry-run", false, "Verify the edit exists without deleting it")
 
 	return &ffcli.Command{
 		Name:      "delete",
@@ -262,8 +275,19 @@ func newDeleteCommand(deps Deps) *ffcli.Command {
 			if editID == "" {
 				return shared.UsageErrorf("--edit-id is required")
 			}
-			if !confirm {
-				return shared.UsageErrorf("--confirm is required to delete edit %q", editID)
+			if !confirm && !dryRun {
+				return shared.UsageErrorf("--confirm is required unless --dry-run is set")
+			}
+			if dryRun {
+				edit, err := client.GetEdit(requestCtx, pkg, editID)
+				if err != nil {
+					return fmt.Errorf("failed to get edit: %w", err)
+				}
+				return shared.WriteJSON(deps.Stdout, map[string]any{
+					"packageName": pkg,
+					"edit":        edit,
+					"status":      "dry-run",
+				})
 			}
 			if err := client.DeleteEdit(requestCtx, pkg, editID); err != nil {
 				return fmt.Errorf("failed to delete edit: %w", err)
