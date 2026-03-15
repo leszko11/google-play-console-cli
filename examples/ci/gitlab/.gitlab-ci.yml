@@ -1,0 +1,24 @@
+stages:
+  - verify
+
+variables:
+  GPC_VERSION: "v0.3.0"
+  GPC_DEFAULT_OUTPUT: "json"
+  GPC_BYPASS_KEYCHAIN: "1"
+  GPC_CONFIG_PATH: "$CI_PROJECT_DIR/.tmp/gpc/config.json"
+
+verify_play_access:
+  stage: verify
+  image: ubuntu:24.04
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends ca-certificates curl tar
+  script:
+    - ./examples/ci/install-gpc.sh "$GPC_VERSION" "$CI_PROJECT_DIR/.bin"
+    - export PATH="$CI_PROJECT_DIR/.bin:$PATH"
+    - mkdir -p "$(dirname "$GPC_CONFIG_PATH")"
+    - printf '%s' "$GPC_SERVICE_ACCOUNT_JSON" > "$CI_PROJECT_DIR/gpc-sa.json"
+    - chmod 600 "$CI_PROJECT_DIR/gpc-sa.json"
+    - gpc auth init --service-account "$CI_PROJECT_DIR/gpc-sa.json"
+    - gpc auth status --output json
+    - gpc apps get --package-name "$GPC_TEST_PACKAGE" --output json
