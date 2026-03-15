@@ -104,6 +104,7 @@ make dev
 Detailed smoke tests: `docs/TESTING.md`.
 Auth behavior and credential source model: `docs/AUTH.md`.
 Google Play API caveats: `docs/API_NOTES.md`.
+Multi-CI examples for GitHub Actions, GitLab CI, CircleCI, and Bitrise: `docs/CI.md`.
 Release process: `docs/RELEASING.md`.
 Endpoint index notes: `docs/openapi/README.md`.
 Endpoint coverage report: `docs/openapi/COVERAGE.md`.

@@ -1,0 +1,32 @@
+version: 2.1
+
+jobs:
+  verify-play-access:
+    docker:
+      - image: cimg/base:stable
+    environment:
+      GPC_VERSION: v0.3.0
+      GPC_DEFAULT_OUTPUT: json
+      GPC_BYPASS_KEYCHAIN: "1"
+      GPC_CONFIG_PATH: /tmp/gpc/config.json
+    steps:
+      - checkout
+      - run:
+          name: Install gpc
+          command: |
+            ./examples/ci/install-gpc.sh "$GPC_VERSION" "$HOME/.local/bin"
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
+      - run:
+          name: Verify auth and package access
+          command: |
+            source "$BASH_ENV"
+            printf '%s' "$GPC_SERVICE_ACCOUNT_JSON" > /tmp/gpc-sa.json
+            chmod 600 /tmp/gpc-sa.json
+            gpc auth init --service-account /tmp/gpc-sa.json
+            gpc auth status --output json
+            gpc apps get --package-name "$GPC_TEST_PACKAGE" --output json
+
+workflows:
+  verify:
+    jobs:
+      - verify-play-access

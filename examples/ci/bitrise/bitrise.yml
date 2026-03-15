@@ -1,0 +1,33 @@
+format_version: "11"
+default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
+project_type: other
+
+app:
+  envs:
+    - GPC_VERSION: v0.3.0
+    - GPC_DEFAULT_OUTPUT: json
+    - GPC_BYPASS_KEYCHAIN: "1"
+    - GPC_CONFIG_PATH: "$BITRISE_SOURCE_DIR/.tmp/gpc/config.json"
+
+workflows:
+  primary:
+    steps:
+      - git-clone@8: {}
+      - script@1:
+          title: Install and verify gpc
+          inputs:
+            - content: |-
+                #!/usr/bin/env bash
+                set -euo pipefail
+
+                cd "$BITRISE_SOURCE_DIR"
+                ./examples/ci/install-gpc.sh "$GPC_VERSION" "$BITRISE_SOURCE_DIR/.bin"
+                export PATH="$BITRISE_SOURCE_DIR/.bin:$PATH"
+
+                mkdir -p "$(dirname "$GPC_CONFIG_PATH")"
+                printf '%s' "$GPC_SERVICE_ACCOUNT_JSON" > "$BITRISE_SOURCE_DIR/gpc-sa.json"
+                chmod 600 "$BITRISE_SOURCE_DIR/gpc-sa.json"
+
+                gpc auth init --service-account "$BITRISE_SOURCE_DIR/gpc-sa.json"
+                gpc auth status --output json
+                gpc apps get --package-name "$GPC_TEST_PACKAGE" --output json
