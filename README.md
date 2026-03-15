@@ -253,9 +253,18 @@ gpc edits expansion-files upload --package-name com.example.app --edit-id <edit-
 # - tvBanner: exactly 1280x720
 # - screenshot types: each side in range 320-3840
 
-# Commit or delete edits are destructive and require explicit confirmation
+# Commit or delete edits are destructive by default; use --dry-run to preview safely
+gpc edits commit --package-name com.example.app --edit-id <edit-id> --dry-run
+gpc edits delete --package-name com.example.app --edit-id <edit-id> --dry-run
 gpc edits commit --package-name com.example.app --edit-id <edit-id> --confirm
 gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
+
+# Dry-run coverage today
+# - Previewable: bootstrap/appinit export, changelog sync, listing sync, deploy,
+#   release alpha/full/promote, rollback, monetization sync/setup, product/subscription sync,
+#   workflow run, and edits commit/delete
+# - Confirmation-only: direct refund/cancel/delete passthrough commands where Play exposes
+#   no safe preview API and a dry-run would only echo local intent
 
 # List/get/reply to user reviews
 gpc reviews list --package-name com.example.app --max-results 50

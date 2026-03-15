@@ -21,10 +21,14 @@ type fakeClient struct {
 	createErr          error
 	get                gpc.EditInfo
 	getErr             error
+	getFn              func(packageName, editID string) (gpc.EditInfo, error)
 	validate           error
+	validateFn         func(packageName, editID string) error
 	commit             gpc.EditInfo
 	commitErr          error
+	commitFn           func(packageName, editID string) (gpc.EditInfo, error)
 	deleteErr          error
+	deleteFn           func(packageName, editID string) error
 	appDetails         gpc.AppDetailsInfo
 	appDetailsErr      error
 	updateDetailsErr   error
@@ -69,14 +73,30 @@ type fakeClient struct {
 func (f fakeClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, error) {
 	return f.create, f.createErr
 }
-func (f fakeClient) GetEdit(_ context.Context, _, _ string) (gpc.EditInfo, error) {
+func (f fakeClient) GetEdit(_ context.Context, packageName, editID string) (gpc.EditInfo, error) {
+	if f.getFn != nil {
+		return f.getFn(packageName, editID)
+	}
 	return f.get, f.getErr
 }
-func (f fakeClient) ValidateEdit(_ context.Context, _, _ string) error { return f.validate }
-func (f fakeClient) CommitEdit(_ context.Context, _, _ string) (gpc.EditInfo, error) {
+func (f fakeClient) ValidateEdit(_ context.Context, packageName, editID string) error {
+	if f.validateFn != nil {
+		return f.validateFn(packageName, editID)
+	}
+	return f.validate
+}
+func (f fakeClient) CommitEdit(_ context.Context, packageName, editID string) (gpc.EditInfo, error) {
+	if f.commitFn != nil {
+		return f.commitFn(packageName, editID)
+	}
 	return f.commit, f.commitErr
 }
-func (f fakeClient) DeleteEdit(_ context.Context, _, _ string) error { return f.deleteErr }
+func (f fakeClient) DeleteEdit(_ context.Context, packageName, editID string) error {
+	if f.deleteFn != nil {
+		return f.deleteFn(packageName, editID)
+	}
+	return f.deleteErr
+}
 func (f fakeClient) GetAppDetails(_ context.Context, _, _ string) (gpc.AppDetailsInfo, error) {
 	return f.appDetails, f.appDetailsErr
 }
@@ -257,6 +277,42 @@ func TestEditsCommit_RequiresConfirm(t *testing.T) {
 	}
 }
 
+func TestEditsCommit_DryRunValidatesWithoutCommitting(t *testing.T) {
+	var validateCalls, commitCalls int
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				validateFn: func(packageName, editID string) error {
+					validateCalls++
+					if packageName != "com.example.app" || editID != "edit-1" {
+						t.Fatalf("unexpected validate target %q %q", packageName, editID)
+					}
+					return nil
+				},
+				commitFn: func(string, string) (gpc.EditInfo, error) {
+					commitCalls++
+					return gpc.EditInfo{}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(t, deps, "commit", "--package-name", "com.example.app", "--edit-id", "edit-1", "--dry-run")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if validateCalls != 1 {
+		t.Fatalf("expected one validate call, got %d", validateCalls)
+	}
+	if commitCalls != 0 {
+		t.Fatalf("expected no commit calls in dry-run, got %d", commitCalls)
+	}
+	if !strings.Contains(out, `"status":"dry-run"`) || !strings.Contains(out, `"validated":true`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
 func TestEditsDelete_RequiresConfirm(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
@@ -271,6 +327,42 @@ func TestEditsDelete_RequiresConfirm(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--confirm is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEditsDelete_DryRunChecksEditWithoutDeleting(t *testing.T) {
+	var getCalls, deleteCalls int
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				getFn: func(packageName, editID string) (gpc.EditInfo, error) {
+					getCalls++
+					if packageName != "com.example.app" || editID != "edit-1" {
+						t.Fatalf("unexpected get target %q %q", packageName, editID)
+					}
+					return gpc.EditInfo{ID: "edit-1", ExpiryTimeSeconds: "1712345678"}, nil
+				},
+				deleteFn: func(string, string) error {
+					deleteCalls++
+					return nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(t, deps, "delete", "--package-name", "com.example.app", "--edit-id", "edit-1", "--dry-run")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if getCalls != 1 {
+		t.Fatalf("expected one get call, got %d", getCalls)
+	}
+	if deleteCalls != 0 {
+		t.Fatalf("expected no delete calls in dry-run, got %d", deleteCalls)
+	}
+	if !strings.Contains(out, `"status":"dry-run"`) || !strings.Contains(out, `"id":"edit-1"`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
 

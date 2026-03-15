@@ -759,7 +759,8 @@ USAGE
   commit
 
 FLAGS
-  -confirm=false        Confirm committing the edit (required)
+  -confirm=false        Confirm committing the edit (required unless --dry-run)
+  -dry-run=false        Validate the edit without committing it
   -edit-id string       Edit ID
   -package-name string  Package name
 ```
@@ -774,7 +775,8 @@ USAGE
   delete
 
 FLAGS
-  -confirm=false        Confirm deleting the edit (required)
+  -confirm=false        Confirm deleting the edit (required unless --dry-run)
+  -dry-run=false        Verify the edit exists without deleting it
   -edit-id string       Edit ID
   -package-name string  Package name
 ```
