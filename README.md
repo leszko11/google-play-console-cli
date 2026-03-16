@@ -88,6 +88,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - Account users management (`users list/create/update/delete`)
 - Per-app grants management (`grants create/update/delete`)
 - Internal app sharing upload (`internal-sharing upload`)
+- Play Games Services achievement, event, and leaderboard metadata (`games`)
 - Generic webhook delivery plus native Slack and Discord notifications (`notify webhook`, `notify slack`, `notify discord`)
 - Read-only listing and track diff previews (`diff`)
 - Markdown table output for supported read-only and reporting commands (`--output markdown`)
@@ -641,6 +642,7 @@ gpc device-tier-configs --help
 gpc system-apks --help
 gpc generated-apks --help
 gpc app-recoveries --help
+gpc games --help
 gpc subscriptions --help
 gpc monetization --help
 gpc products --help
