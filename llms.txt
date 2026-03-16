@@ -72,6 +72,7 @@
 - `workflow`: Run declarative gpc workflows from .gpc/workflow.yml
 - `grants`: Manage per-app user grants
 - `internal-sharing`: Upload artifacts for internal app sharing
+- `integrity`: Decode and inspect Play Integrity tokens
 - `completion`: Generate shell completion script
 
 ## Common Flows

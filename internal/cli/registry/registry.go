@@ -20,6 +20,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/generatedapks"
 	"github.com/leszko11/google-play-console-cli/internal/cli/grants"
 	"github.com/leszko11/google-play-console-cli/internal/cli/iap"
+	"github.com/leszko11/google-play-console-cli/internal/cli/integrity"
 	"github.com/leszko11/google-play-console-cli/internal/cli/internalsharing"
 	"github.com/leszko11/google-play-console-cli/internal/cli/listing"
 	"github.com/leszko11/google-play-console-cli/internal/cli/migrate"
@@ -91,6 +92,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		workflow.NewCommand(workflow.Deps{}),
 		grants.NewCommand(grants.Deps{}),
 		internalsharing.NewCommand(internalsharing.Deps{}),
+		integrity.NewCommand(integrity.Deps{}),
 		completion.NewCommand(root),
 	}
 }

@@ -640,6 +640,7 @@ gpc purchases --help
 gpc users --help
 gpc grants --help
 gpc internal-sharing --help
+gpc integrity --help
 gpc completion --help
 ```
 
