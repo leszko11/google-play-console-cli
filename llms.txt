@@ -39,6 +39,7 @@
 - `apps`: App visibility and metadata commands
 - `app-recoveries`: Manage Play app recovery actions
 - `changelog`: Release changelog workflows
+- `custom-apps`: Create custom private apps for managed Play organizations
 - `edits`: Manage Google Play edit transactions
 - `tracks`: Manage release tracks inside an edit
 - `apks`: Manage APK uploads in an edit

@@ -89,6 +89,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - Per-app grants management (`grants create/update/delete`)
 - Internal app sharing upload (`internal-sharing upload`)
 - Play Games Services achievement, event, and leaderboard metadata (`games`)
+- Custom private app publishing for managed Play organizations (`custom-apps create`)
 - Generic webhook delivery plus native Slack and Discord notifications (`notify webhook`, `notify slack`, `notify discord`)
 - Read-only listing and track diff previews (`diff`)
 - Markdown table output for supported read-only and reporting commands (`--output markdown`)
@@ -212,6 +213,9 @@ gpc appinit export --package-name com.example.app --dir ./store --write-project-
 
 # Import an existing Fastlane metadata tree into the local gpc layout
 gpc migrate fastlane import --from-dir ./fastlane/metadata --dir ./store --track production --version-code 123456 --package-name com.example.app --write-project-config
+
+# Create a private custom app for one or more managed organizations
+gpc custom-apps create --developer-id 123456 --input /path/to/custom-app.json
 
 # Preview listing drift before syncing local metadata
 gpc diff listing --package-name com.example.app --dir ./store/listing --delete-missing
@@ -643,6 +647,7 @@ gpc system-apks --help
 gpc generated-apks --help
 gpc app-recoveries --help
 gpc games --help
+gpc custom-apps --help
 gpc subscriptions --help
 gpc monetization --help
 gpc products --help

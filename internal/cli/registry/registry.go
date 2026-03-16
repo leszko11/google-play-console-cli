@@ -9,6 +9,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/bundles"
 	"github.com/leszko11/google-play-console-cli/internal/cli/changelog"
 	"github.com/leszko11/google-play-console-cli/internal/cli/completion"
+	"github.com/leszko11/google-play-console-cli/internal/cli/customapps"
 	"github.com/leszko11/google-play-console-cli/internal/cli/deobfuscation"
 	"github.com/leszko11/google-play-console-cli/internal/cli/deploy"
 	"github.com/leszko11/google-play-console-cli/internal/cli/devicetierconfigs"
@@ -63,6 +64,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		apps.NewCommand(apps.Deps{}),
 		apprecoveries.NewCommand(apprecoveries.Deps{}),
 		changelog.NewCommand(changelog.Deps{}),
+		customapps.NewCommand(customapps.Deps{}),
 		edits.NewCommand(edits.Deps{}),
 		tracks.NewCommand(tracks.Deps{}),
 		apks.NewCommand(apks.Deps{}),
