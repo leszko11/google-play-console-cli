@@ -74,6 +74,7 @@
 - `grants`: Manage per-app user grants
 - `internal-sharing`: Upload artifacts for internal app sharing
 - `integrity`: Decode and inspect Play Integrity tokens
+- `update`: Check for and install newer gpc releases
 - `completion`: Generate shell completion script
 
 ## Common Flows

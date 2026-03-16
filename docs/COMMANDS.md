@@ -264,6 +264,7 @@ make generate-command-docs
 - `gpc internal-sharing upload`
 - `gpc integrity`
 - `gpc integrity decode`
+- `gpc update`
 - `gpc completion`
 - `gpc completion bash`
 - `gpc completion zsh`
@@ -321,6 +322,7 @@ SUBCOMMANDS
   grants                 Manage per-app user grants
   internal-sharing       Upload artifacts for internal app sharing
   integrity              Decode and inspect Play Integrity tokens
+  update                 Check for and install newer gpc releases
   completion             Generate shell completion script
 
 FLAGS
@@ -4302,6 +4304,21 @@ FLAGS
   -input string         Path to a file containing the integrity token (use - for stdin)
   -package-name string  Package name
   -token string         Integrity token
+```
+
+## `gpc update --help`
+
+```text
+DESCRIPTION
+  Check for and install newer gpc releases
+
+USAGE
+  update
+
+FLAGS
+  -check=false     Check for updates without downloading or replacing the binary
+  -confirm=false   Download and replace the current gpc binary
+  -version string  Install a specific release tag (for example v0.3.0)
 ```
 
 ## `gpc completion --help`

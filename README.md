@@ -90,6 +90,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - Internal app sharing upload (`internal-sharing upload`)
 - Generic webhook delivery plus native Slack and Discord notifications (`notify webhook`, `notify slack`, `notify discord`)
 - Read-only listing and track diff previews (`diff`)
+- Release-aware binary upgrade checks and in-place self-update for direct installs (`update`)
 - CI quality gates for format, lint, test, and build
 
 ## Build
@@ -650,6 +651,7 @@ gpc users --help
 gpc grants --help
 gpc internal-sharing --help
 gpc integrity --help
+gpc update --help
 gpc completion --help
 ```
 
