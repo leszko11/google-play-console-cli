@@ -28,6 +28,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/notify"
 	"github.com/leszko11/google-play-console-cli/internal/cli/orders"
 	"github.com/leszko11/google-play-console-cli/internal/cli/products"
+	"github.com/leszko11/google-play-console-cli/internal/cli/publish"
 	"github.com/leszko11/google-play-console-cli/internal/cli/purchases"
 	"github.com/leszko11/google-play-console-cli/internal/cli/release"
 	"github.com/leszko11/google-play-console-cli/internal/cli/reports"
@@ -84,6 +85,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		migrate.NewCommand(migrate.Deps{}),
 		notify.NewCommand(notify.Deps{}),
 		products.NewCommand(products.Deps{}),
+		publish.NewCommand(publish.Deps{}),
 		iap.NewCommand(iap.Deps{}),
 		listing.NewCommand(listing.Deps{}),
 		purchases.NewCommand(purchases.Deps{}),

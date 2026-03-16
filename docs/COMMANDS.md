@@ -212,6 +212,9 @@ make generate-command-docs
 - `gpc products purchase-options activate`
 - `gpc products purchase-options deactivate`
 - `gpc products purchase-options delete`
+- `gpc publish`
+- `gpc publish alpha`
+- `gpc publish production`
 - `gpc iap`
 - `gpc iap list`
 - `gpc iap get`
@@ -308,6 +311,7 @@ SUBCOMMANDS
   migrate                Import or transform metadata from other tool layouts
   notify                 Notification delivery helpers
   products               Manage monetization one-time products
+  publish                Common publish flows with track presets
   iap                    Manage legacy in-app products
   listing                Store listing workflows
   purchases              Manage one-time and subscription purchases
@@ -3457,6 +3461,78 @@ FLAGS
   -package-name string        Package name
   -product-id string          One-time product ID
   -purchase-option-id string  Purchase option ID
+```
+
+## `gpc publish --help`
+
+```text
+DESCRIPTION
+  Common publish flows with track presets
+
+USAGE
+  publish
+
+SUBCOMMANDS
+  alpha       Upload and publish to the alpha track in one flow
+  production  Upload and publish to the production track in one flow
+```
+
+## `gpc publish alpha --help`
+
+```text
+DESCRIPTION
+  Upload and publish to the alpha track in one flow
+
+USAGE
+  alpha
+
+FLAGS
+  -aab string                  Path to .aab file
+  -apk string                  Path to .apk file
+  -cleanup-on-failure=true     Delete edit if publish fails before commit
+  -confirm=false               Confirm committing the edit (required unless --dry-run)
+  -dry-run=false               Run publish steps, then delete edit instead of committing
+  -mapping-file string         Path to deobfuscation mapping file
+  -mapping-type string         Mapping type: proguard or nativeCode (defaults to proguard)
+  -package-name string         Package name
+  -release-name string         Release name
+  -release-notes-file string   Path to release notes file (JSON object/array, tagged blocks, or plain text)
+  -release-notes-locale en-US  Release notes locale (BCP-47)
+  -release-notes-text string   Release notes text
+  -status completed            Release status (draft, inProgress, halted, completed)
+  -update-priority 0           In-app update priority (0-5)
+  -user-fraction -1            Rollout user fraction (0-1)
+  -wait-interval 5s            Polling interval between generated APK checks
+  -wait-timeout 1m30s          Maximum time to wait for generated APK availability after bundle upload
+```
+
+## `gpc publish production --help`
+
+```text
+DESCRIPTION
+  Upload and publish to the production track in one flow
+
+USAGE
+  production
+
+FLAGS
+  -aab string                  Path to .aab file
+  -apk string                  Path to .apk file
+  -cleanup-on-failure=true     Delete edit if publish fails before commit
+  -confirm=false               Confirm committing the edit (required unless --dry-run)
+  -dry-run=false               Run publish steps, then delete edit instead of committing
+  -mapping-file string         Path to deobfuscation mapping file
+  -mapping-type string         Mapping type: proguard or nativeCode (defaults to proguard)
+  -package-name string         Package name
+  -release-name string         Release name
+  -release-notes-file string   Path to release notes file (JSON object/array, tagged blocks, or plain text)
+  -release-notes-locale en-US  Release notes locale (BCP-47)
+  -release-notes-text string   Release notes text
+  -status completed            Release status (draft, inProgress, halted, completed)
+  -update-priority 0           In-app update priority (0-5)
+  -user-fraction -1            Rollout user fraction (0-1)
+  -wait-interval 5s            Polling interval between generated APK checks
+  -wait-timeout 1m30s          Maximum time to wait for generated APK availability after bundle upload
 ```
 
 ## `gpc iap --help`
