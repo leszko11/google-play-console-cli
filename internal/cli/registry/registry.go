@@ -40,6 +40,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/subscriptions"
 	"github.com/leszko11/google-play-console-cli/internal/cli/systemapks"
 	"github.com/leszko11/google-play-console-cli/internal/cli/tracks"
+	"github.com/leszko11/google-play-console-cli/internal/cli/updatecmd"
 	"github.com/leszko11/google-play-console-cli/internal/cli/users"
 	"github.com/leszko11/google-play-console-cli/internal/cli/validatecmd"
 	"github.com/leszko11/google-play-console-cli/internal/cli/workflow"
@@ -47,7 +48,8 @@ import (
 )
 
 type Deps struct {
-	GlobalFlags *shared.GlobalFlags
+	GlobalFlags    *shared.GlobalFlags
+	CurrentVersion string
 }
 
 func Register(root *ffcli.Command, deps Deps) {
@@ -95,6 +97,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		grants.NewCommand(grants.Deps{}),
 		internalsharing.NewCommand(internalsharing.Deps{}),
 		integrity.NewCommand(integrity.Deps{}),
+		updatecmd.NewCommand(updatecmd.Deps{CurrentVersion: deps.CurrentVersion}),
 		completion.NewCommand(root),
 	}
 }

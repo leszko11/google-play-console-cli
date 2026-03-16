@@ -31,6 +31,6 @@ func newRootCommand() *ffcli.Command {
 		},
 	}
 
-	registry.Register(root, registry.Deps{GlobalFlags: globalFlags})
+	registry.Register(root, registry.Deps{GlobalFlags: globalFlags, CurrentVersion: Version})
 	return root
 }
