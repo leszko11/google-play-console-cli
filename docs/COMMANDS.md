@@ -259,6 +259,8 @@ make generate-command-docs
 - `gpc grants delete`
 - `gpc internal-sharing`
 - `gpc internal-sharing upload`
+- `gpc integrity`
+- `gpc integrity decode`
 - `gpc completion`
 - `gpc completion bash`
 - `gpc completion zsh`
@@ -314,6 +316,7 @@ SUBCOMMANDS
   workflow               Run declarative gpc workflows from .gpc/workflow.yml
   grants                 Manage per-app user grants
   internal-sharing       Upload artifacts for internal app sharing
+  integrity              Decode and inspect Play Integrity tokens
   completion             Generate shell completion script
 
 FLAGS
@@ -4195,6 +4198,34 @@ FLAGS
   -aab string           Path to .aab file
   -apk string           Path to .apk file
   -package-name string  Package name
+```
+
+## `gpc integrity --help`
+
+```text
+DESCRIPTION
+  Decode and inspect Play Integrity tokens
+
+USAGE
+  integrity
+
+SUBCOMMANDS
+  decode  Decode a Play Integrity token
+```
+
+## `gpc integrity decode --help`
+
+```text
+DESCRIPTION
+  Decode a Play Integrity token
+
+USAGE
+  decode
+
+FLAGS
+  -input string         Path to a file containing the integrity token (use - for stdin)
+  -package-name string  Package name
+  -token string         Integrity token
 ```
 
 ## `gpc completion --help`
