@@ -91,27 +91,6 @@ gpc completion zsh > ~/.zfunc/_gpc
 - Read-only listing and track diff previews (`diff`)
 - CI quality gates for format, lint, test, and build
 
-## Comparison
-
-The table below is based on features documented in public repos. A blank cell means "not clearly documented in the public repo we reviewed", not a claim that the feature is impossible.
-
-| Capability | `gpc` | `tamtom/play-console-cli` | `dl-alexandre/google-play-api-cli` |
-| --- | --- | --- | --- |
-| Workflow engine | ✅ `.gpc/workflow.yml` | - | - |
-| Vitals-gated staged release flow | ✅ built-in | - | - |
-| Financial report downloads | ✅ `reports financial` | ✅ documented | - |
-| Pre-submission validation gate | ✅ `gpc validate` | ⚠️ listing/screenshot validation | - |
-| GitHub Action installer | ✅ `setup-gpc` | - | - |
-| Fastlane import | ✅ `migrate fastlane import` | ✅ documented | - |
-| Fastlane diff | - | ✅ documented | - |
-| Markdown output | - | ✅ `--output markdown` | ✅ documented |
-| YAML output | - | - | ✅ documented |
-| Self-update | - | ✅ `gplay update` | - |
-| OAuth device-code auth | - | - | ✅ documented |
-| Play Integrity API | - | - | ✅ documented |
-| Play Games Services | - | - | ✅ documented |
-| Custom app publishing | - | - | ✅ documented |
-
 ## Build
 
 ```bash
