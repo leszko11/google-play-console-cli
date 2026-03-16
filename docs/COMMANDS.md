@@ -41,6 +41,8 @@ make generate-command-docs
 - `gpc app-recoveries deploy`
 - `gpc changelog`
 - `gpc changelog sync`
+- `gpc custom-apps`
+- `gpc custom-apps create`
 - `gpc edits`
 - `gpc edits create`
 - `gpc edits get`
@@ -295,6 +297,7 @@ SUBCOMMANDS
   apps                   App visibility and metadata commands
   app-recoveries         Manage Play app recovery actions
   changelog              Release changelog workflows
+  custom-apps            Create custom private apps for managed Play organizations
   edits                  Manage Google Play edit transactions
   tracks                 Manage release tracks inside an edit
   apks                   Manage APK uploads in an edit
@@ -709,6 +712,33 @@ FLAGS
   -fallback-locale string  Locale file to reuse when a locale-specific file is missing
   -package-name string     Package name
   -track string            Track name
+```
+
+## `gpc custom-apps --help`
+
+```text
+DESCRIPTION
+  Create custom private apps for managed Play organizations
+
+USAGE
+  custom-apps
+
+SUBCOMMANDS
+  create  Create a custom app
+```
+
+## `gpc custom-apps create --help`
+
+```text
+DESCRIPTION
+  Create a custom app
+
+USAGE
+  create
+
+FLAGS
+  -developer-id string  Developer account ID (numeric or developers/<id>)
+  -input string         Path to custom app JSON payload (use - for stdin)
 ```
 
 ## `gpc edits --help`
