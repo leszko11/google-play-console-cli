@@ -59,6 +59,7 @@
 - `device-tier-configs`: Manage application device tier configs
 - `system-apks`: Manage generated system APK variants
 - `generated-apks`: List and download APKs generated from bundles
+- `games`: Inspect Play Games Services achievements, events, and leaderboards
 - `subscriptions`: Manage monetization subscriptions
 - `monetization`: Monetization workflows
 - `migrate`: Import or transform metadata from other tool layouts

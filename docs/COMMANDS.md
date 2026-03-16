@@ -150,6 +150,14 @@ make generate-command-docs
 - `gpc generated-apks`
 - `gpc generated-apks list`
 - `gpc generated-apks download`
+- `gpc games`
+- `gpc games achievements`
+- `gpc games achievements list`
+- `gpc games events`
+- `gpc games events list`
+- `gpc games leaderboards`
+- `gpc games leaderboards list`
+- `gpc games leaderboards get`
 - `gpc subscriptions`
 - `gpc subscriptions list`
 - `gpc subscriptions get`
@@ -307,6 +315,7 @@ SUBCOMMANDS
   device-tier-configs    Manage application device tier configs
   system-apks            Manage generated system APK variants
   generated-apks         List and download APKs generated from bundles
+  games                  Inspect Play Games Services achievements, events, and leaderboards
   subscriptions          Manage monetization subscriptions
   monetization           Monetization workflows
   migrate                Import or transform metadata from other tool layouts
@@ -2451,6 +2460,124 @@ FLAGS
   -output string        Path to write the downloaded APK
   -package-name string  Package name
   -version-code 0       Version code of the App Bundle
+```
+
+## `gpc games --help`
+
+```text
+DESCRIPTION
+  Inspect Play Games Services achievements, events, and leaderboards
+
+USAGE
+  games
+
+SUBCOMMANDS
+  achievements  List Play Games achievement definitions
+  events        List Play Games event definitions
+  leaderboards  List and inspect Play Games leaderboards
+```
+
+## `gpc games achievements --help`
+
+```text
+DESCRIPTION
+  List Play Games achievement definitions
+
+USAGE
+  achievements
+
+SUBCOMMANDS
+  list  List Play Games achievement definitions
+```
+
+## `gpc games achievements list --help`
+
+```text
+DESCRIPTION
+  List Play Games achievement definitions
+
+USAGE
+  list
+
+FLAGS
+  -language string    Preferred language for localized strings
+  -output string      Output format: json, table, markdown
+  -page-size 0        Maximum items per page
+  -page-token string  Page token for the next page
+```
+
+## `gpc games events --help`
+
+```text
+DESCRIPTION
+  List Play Games event definitions
+
+USAGE
+  events
+
+SUBCOMMANDS
+  list  List Play Games event definitions
+```
+
+## `gpc games events list --help`
+
+```text
+DESCRIPTION
+  List Play Games event definitions
+
+USAGE
+  list
+
+FLAGS
+  -language string    Preferred language for localized strings
+  -output string      Output format: json, table, markdown
+  -page-size 0        Maximum items per page
+  -page-token string  Page token for the next page
+```
+
+## `gpc games leaderboards --help`
+
+```text
+DESCRIPTION
+  List and inspect Play Games leaderboards
+
+USAGE
+  leaderboards
+
+SUBCOMMANDS
+  list  List Play Games leaderboards
+  get   Get Play Games leaderboard metadata
+```
+
+## `gpc games leaderboards list --help`
+
+```text
+DESCRIPTION
+  List Play Games leaderboards
+
+USAGE
+  list
+
+FLAGS
+  -language string    Preferred language for localized strings
+  -output string      Output format: json, table, markdown
+  -page-size 0        Maximum items per page
+  -page-token string  Page token for the next page
+```
+
+## `gpc games leaderboards get --help`
+
+```text
+DESCRIPTION
+  Get Play Games leaderboard metadata
+
+USAGE
+  get
+
+FLAGS
+  -language string        Preferred language for localized strings
+  -leaderboard-id string  Leaderboard ID
+  -output string          Output format: json, table, markdown
 ```
 
 ## `gpc subscriptions --help`
