@@ -152,6 +152,69 @@ func TestReportsFinancialGet_TableOutput(t *testing.T) {
 	}
 }
 
+func TestReportsFinancialList_MarkdownOutput(t *testing.T) {
+	ff := &fakeFinancialClient{
+		listResult: FinancialObjectList{
+			Objects: []FinancialObjectInfo{
+				{
+					Bucket:      "play-financial",
+					Name:        "reports/earnings_2026-03.csv",
+					Size:        128,
+					ContentType: "text/csv",
+					Updated:     time.Date(2026, 3, 14, 12, 0, 0, 0, time.UTC),
+				},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig:         func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:          func(context.Context, gpc.CredentialInput) (Client, error) { return &fakeClient{}, nil },
+		NewFinancialClient: func(context.Context, gpc.CredentialInput) (FinancialClient, error) { return ff, nil },
+	}
+
+	out, err := runReports(t, deps, "financial", "list", "--bucket", "play-financial", "--output", "markdown")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{
+		"| bucket | name | size | contentType | updated |",
+		"| play-financial | reports/earnings_2026-03.csv | 128 | text/csv | 2026-03-14T12:00:00Z |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+}
+
+func TestReportsFinancialGet_MarkdownOutput(t *testing.T) {
+	ff := &fakeFinancialClient{
+		downloadResult: FinancialObjectDownload{
+			Bucket:      "play-financial",
+			Name:        "reports/sales.csv",
+			ContentType: "text/csv",
+			Data:        []byte("date,sku,amount\n2026-03-01,sku.one,12.34\n"),
+		},
+	}
+	deps := Deps{
+		LoadConfig:         func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:          func(context.Context, gpc.CredentialInput) (Client, error) { return &fakeClient{}, nil },
+		NewFinancialClient: func(context.Context, gpc.CredentialInput) (FinancialClient, error) { return ff, nil },
+	}
+
+	out, err := runReports(t, deps, "financial", "get", "--gcs-uri", "gs://play-financial/reports/sales.csv", "--output", "markdown")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{
+		"| date | sku | amount |",
+		"| 2026-03-01 | sku.one | 12.34 |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+}
+
 func TestReportsFinancialGet_RequiresLocation(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },

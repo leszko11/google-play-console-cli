@@ -58,7 +58,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 
 	var packageName, output string
 	fs.StringVar(&packageName, "package-name", "", "Package name")
-	fs.StringVar(&output, "output", "", "Output format: json or table")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown")
 
 	return &ffcli.Command{
 		Name:      "status",
@@ -87,6 +87,8 @@ func NewCommand(deps Deps) *ffcli.Command {
 				return shared.WriteJSON(deps.Stdout, result)
 			case "table":
 				return writeTable(deps.Stdout, result)
+			case "markdown":
+				return writeMarkdown(deps.Stdout, result)
 			default:
 				return shared.UsageErrorf("unsupported output format %q", shared.ResolveOutput(output))
 			}
@@ -212,6 +214,80 @@ func writeTable(out io.Writer, result statusResult) error {
 
 	for _, alert := range result.Alerts {
 		if _, err := fmt.Fprintf(out, "ALERT\t%s\n", alert); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeMarkdown(out io.Writer, result statusResult) error {
+	summaryRows := [][]string{
+		{"status", result.Status},
+		{"package", result.PackageName},
+	}
+	if err := shared.WriteMarkdownTable(out, []string{"field", "value"}, summaryRows); err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintln(out); err != nil {
+		return err
+	}
+
+	if result.TrackError != "" {
+		if err := shared.WriteMarkdownTable(out, []string{"trackError"}, [][]string{{result.TrackError}}); err != nil {
+			return err
+		}
+	} else {
+		trackRows := make([][]string, 0, len(result.Tracks))
+		for _, track := range result.Tracks {
+			if len(track.Releases) == 0 {
+				trackRows = append(trackRows, []string{track.Name, "-", "-", "-"})
+				continue
+			}
+			for _, release := range track.Releases {
+				trackRows = append(trackRows, []string{
+					track.Name,
+					release.Status,
+					fmt.Sprintf("%.3f", release.UserFraction),
+					joinVersionCodes(release.VersionCodes),
+				})
+			}
+		}
+		if err := shared.WriteMarkdownTable(out, []string{"track", "releaseStatus", "userFraction", "versionCodes"}, trackRows); err != nil {
+			return err
+		}
+	}
+
+	if result.ReviewsError != "" {
+		if _, err := fmt.Fprintln(out); err != nil {
+			return err
+		}
+		if err := shared.WriteMarkdownTable(out, []string{"reviewsError"}, [][]string{{result.ReviewsError}}); err != nil {
+			return err
+		}
+	} else if result.Reviews != nil {
+		if _, err := fmt.Fprintln(out); err != nil {
+			return err
+		}
+		reviewRows := [][]string{
+			{"total", strconv.Itoa(result.Reviews.Total)},
+			{"average", fmt.Sprintf("%.3f", result.Reviews.AverageRating)},
+			{"pendingReply", strconv.Itoa(result.Reviews.PendingReply)},
+		}
+		if err := shared.WriteMarkdownTable(out, []string{"field", "value"}, reviewRows); err != nil {
+			return err
+		}
+	}
+
+	if len(result.Alerts) > 0 {
+		if _, err := fmt.Fprintln(out); err != nil {
+			return err
+		}
+		alertRows := make([][]string, 0, len(result.Alerts))
+		for _, alert := range result.Alerts {
+			alertRows = append(alertRows, []string{alert})
+		}
+		if err := shared.WriteMarkdownTable(out, []string{"alert"}, alertRows); err != nil {
 			return err
 		}
 	}

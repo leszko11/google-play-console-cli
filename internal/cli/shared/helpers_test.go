@@ -120,6 +120,19 @@ func TestResolveOutput_NonTTYFallback(t *testing.T) {
 	}
 }
 
+func TestWriteMarkdownTable(t *testing.T) {
+	var out bytes.Buffer
+	err := WriteMarkdownTable(&out, []string{"name", "notes"}, [][]string{{"alpha|beta", "line1\nline2"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "| name | notes |\n| --- | --- |\n| alpha\\|beta | line1<br>line2 |\n"
+	if out.String() != want {
+		t.Fatalf("unexpected markdown output %q, want %q", out.String(), want)
+	}
+}
+
 func TestResolveServiceAccountPath_Precedence(t *testing.T) {
 	prev := boundGlobalFlags
 	prevBypass := resolveCredentialsShouldBypassKeychain

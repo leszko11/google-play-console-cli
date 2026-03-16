@@ -204,3 +204,29 @@ func TestStatusTableOutput(t *testing.T) {
 		}
 	}
 }
+
+func TestStatusMarkdownOutput(t *testing.T) {
+	client := &fakeClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runCommand(t, deps, "--package-name", "com.example.app", "--output", "markdown")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{
+		"| field | value |",
+		"| status | warn |",
+		"| package | com.example.app |",
+		"| track | releaseStatus | userFraction | versionCodes |",
+		"| production | inProgress | 0.100 | 123 |",
+		"| alert |",
+		"| 2 unreplied reviews |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+}

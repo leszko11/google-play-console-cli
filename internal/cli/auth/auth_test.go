@@ -316,6 +316,37 @@ func TestAuthProfilesList_CSVOutput(t *testing.T) {
 	}
 }
 
+func TestAuthProfilesList_MarkdownOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{
+				ActiveProfile: "work",
+				Profiles: map[string]config.Profile{
+					"default": {ServiceAccountPath: "/tmp/default.json"},
+					"work":    {ServiceAccountPath: "/tmp/work.json"},
+				},
+			}, nil
+		},
+	}
+
+	out, errOut, err := runAuthIO(t, deps, "profiles", "list", "--output", "markdown")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{
+		"| profile | active | storage |",
+		"| default | false | config |",
+		"| work | true | config |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+	if !strings.Contains(errOut, "warning: keychain bypassed via GPC_BYPASS_KEYCHAIN") {
+		t.Fatalf("expected keychain warning on stderr, got %q", errOut)
+	}
+}
+
 func TestAuthStatus_UnauthenticatedWhenPathInvalidJSON(t *testing.T) {
 	invalidPath := filepath.Join(t.TempDir(), "invalid-service-account.json")
 	if err := os.WriteFile(invalidPath, []byte("not-json"), 0o600); err != nil {
@@ -358,6 +389,38 @@ func TestAuthStatus_InvalidOutput(t *testing.T) {
 	}
 	if !bytes.Contains([]byte(err.Error()), []byte("unsupported output format")) {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAuthStatus_MarkdownOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			saPath := writeServiceAccountFile(t)
+			return config.Config{
+				ActiveProfile: "default",
+				Profiles: map[string]config.Profile{
+					"default": {ServiceAccountPath: saPath, DeveloperID: "1234567890123456789"},
+				},
+			}, nil
+		},
+		LookupEnv: func(name string) string {
+			if name == authresolver.EnvBypassKeychain {
+				return "1"
+			}
+			return ""
+		},
+	}
+
+	out := runAuth(t, deps, "status", "--output", "markdown")
+	for _, want := range []string{
+		"| field | value |",
+		"| authenticated | true |",
+		"| activeProfile | default |",
+		"| developerId | 1234567890123456789 |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
 	}
 }
 

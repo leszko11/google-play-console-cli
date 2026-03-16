@@ -18,7 +18,7 @@ func NewStatusCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("status", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var output string
-	fs.StringVar(&output, "output", "", "Output format: json, table")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown")
 
 	return &ffcli.Command{
 		Name:      "status",
@@ -38,6 +38,8 @@ func NewStatusCommand(deps Deps) *ffcli.Command {
 				return shared.WriteJSON(deps.Stdout, status)
 			case "table":
 				return writeStatusTable(deps.Stdout, status)
+			case "markdown":
+				return writeStatusMarkdown(deps.Stdout, status)
 			default:
 				return shared.UsageErrorf("unsupported output format %q", strings.TrimSpace(resolvedOutput))
 			}
@@ -101,4 +103,33 @@ func writeStatusTable(out io.Writer, status statusPayload) error {
 		}
 	}
 	return nil
+}
+
+func writeStatusMarkdown(out io.Writer, status statusPayload) error {
+	rows := [][]string{{"authenticated", fmt.Sprintf("%t", status.Authenticated)}}
+	if status.ActiveProfile != "" {
+		rows = append(rows, []string{"activeProfile", status.ActiveProfile})
+	}
+	if status.SelectedProfile != "" {
+		rows = append(rows, []string{"selectedProfile", status.SelectedProfile})
+	}
+	if status.Source != "" {
+		rows = append(rows, []string{"source", status.Source})
+	}
+	if status.StorageBackend != "" {
+		rows = append(rows, []string{"storageBackend", status.StorageBackend})
+	}
+	if status.ServiceAccountPath != "" {
+		rows = append(rows, []string{"serviceAccountPath", status.ServiceAccountPath})
+	}
+	if status.LastValidatedAt != "" {
+		rows = append(rows, []string{"lastValidatedAt", status.LastValidatedAt})
+	}
+	if status.DeveloperID != "" {
+		rows = append(rows, []string{"developerId", status.DeveloperID})
+	}
+	for _, warning := range status.Warnings {
+		rows = append(rows, []string{"warning", warning})
+	}
+	return shared.WriteMarkdownTable(out, []string{"field", "value"}, rows)
 }

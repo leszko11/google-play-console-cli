@@ -44,7 +44,7 @@ func newFinancialListCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&prefix, "prefix", "", "Optional object prefix filter")
 	fs.Int64Var(&pageSize, "page-size", 0, "Maximum objects per page")
 	fs.StringVar(&pageToken, "page-token", "", "Page token for the next page")
-	fs.StringVar(&output, "output", "", "Output format: json, table, csv, tsv")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, csv, tsv")
 
 	return &ffcli.Command{
 		Name:      "list",
@@ -83,6 +83,8 @@ func newFinancialListCommand(deps Deps) *ffcli.Command {
 				})
 			case "table":
 				return writeFinancialListTable(deps.Stdout, result.Objects)
+			case "markdown":
+				return writeFinancialListMarkdown(deps.Stdout, result.Objects)
 			case "csv", "tsv":
 				rows := make([][]string, 0, len(result.Objects))
 				for _, object := range result.Objects {
@@ -109,7 +111,7 @@ func newFinancialGetCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&gcsURI, "gcs-uri", "", "Cloud Storage object URI in the form gs://bucket/object.csv")
 	fs.StringVar(&bucket, "bucket", "", "Cloud Storage bucket containing the report")
 	fs.StringVar(&objectName, "object", "", "Cloud Storage object name")
-	fs.StringVar(&output, "output", "", "Output format: json, table, csv, tsv")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, csv, tsv")
 
 	return &ffcli.Command{
 		Name:      "get",
@@ -151,6 +153,8 @@ func newFinancialGetCommand(deps Deps) *ffcli.Command {
 				})
 			case "table":
 				return writeFinancialRowsTable(deps.Stdout, columns, records)
+			case "markdown":
+				return shared.WriteMarkdownTable(deps.Stdout, columns, records)
 			case "csv", "tsv":
 				return shared.WriteDelimited(deps.Stdout, resolvedOutput, columns, records)
 			default:
@@ -296,6 +300,20 @@ func writeFinancialListTable(out io.Writer, objects []FinancialObjectInfo) error
 		}
 	}
 	return nil
+}
+
+func writeFinancialListMarkdown(out io.Writer, objects []FinancialObjectInfo) error {
+	rows := make([][]string, 0, len(objects))
+	for _, object := range objects {
+		rows = append(rows, []string{
+			object.Bucket,
+			object.Name,
+			fmt.Sprintf("%d", object.Size),
+			object.ContentType,
+			object.Updated.Format(timeLayoutRFC3339OrEmpty),
+		})
+	}
+	return shared.WriteMarkdownTable(out, []string{"bucket", "name", "size", "contentType", "updated"}, rows)
 }
 
 func writeFinancialRowsTable(out io.Writer, columns []string, rows [][]string) error {

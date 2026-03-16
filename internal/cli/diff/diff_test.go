@@ -156,6 +156,36 @@ func TestListingDiffTableOutput(t *testing.T) {
 	}
 }
 
+func TestListingDiffMarkdownOutput(t *testing.T) {
+	client := &fakeClient{
+		listings: []gpc.ListingInfo{
+			{Language: "en-US", Title: "Old title", ShortDescription: "Short", FullDescription: "Full"},
+		},
+		images: map[string][]gpc.ImageInfo{
+			"en-US/phoneScreenshots": {{SHA256: localImageHash(t, "remote-image")}},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runCommand(t, deps, "listing", "--package-name", "com.example.app", "--dir", writeListingFixture(t), "--output", "markdown")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{
+		"| field | value |",
+		"| status | diff |",
+		"| scope | target | field | action | live | desired |",
+		"| listing | en-US | title | update | Old title | Title |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+}
+
 func TestTrackDiffJSON(t *testing.T) {
 	client := &fakeClient{
 		tracks: []gpc.TrackInfo{
@@ -216,5 +246,39 @@ func TestTrackDiffRequiresVersionCodes(t *testing.T) {
 	_, err := runCommand(t, deps, "track", "--package-name", "com.example.app", "--track", "production", "--status", "completed")
 	if err == nil || !strings.Contains(err.Error(), "--version-codes is required") {
 		t.Fatalf("expected version code usage error, got %v", err)
+	}
+}
+
+func TestTrackDiffMarkdownOutput(t *testing.T) {
+	client := &fakeClient{
+		tracks: []gpc.TrackInfo{
+			{
+				Name: "production",
+				Releases: []gpc.TrackReleaseInfo{{
+					Name:         "1.0.0",
+					Status:       "draft",
+					VersionCodes: []int64{100},
+				}},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runCommand(t, deps, "track", "--package-name", "com.example.app", "--track", "production", "--status", "completed", "--version-codes", "200", "--output", "markdown")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{
+		"| field | value |",
+		"| track | production |",
+		"| scope | target | field | action | live | desired |",
+		"| track | production | status | update | draft | completed |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
 	}
 }

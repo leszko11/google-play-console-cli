@@ -102,22 +102,15 @@ func writeListOutput(deps Deps, output string, items []listItem) error {
 		}
 		return shared.WriteDelimited(deps.Stdout, output, []string{"packageName", "status", "error"}, rows)
 	case "markdown":
-		if _, err := fmt.Fprintln(deps.Stdout, "| package | status |"); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintln(deps.Stdout, "| --- | --- |"); err != nil {
-			return err
-		}
+		rows := make([][]string, 0, len(items))
 		for _, item := range items {
 			status := item.Status
 			if status == "" {
 				status = "configured"
 			}
-			if _, err := fmt.Fprintf(deps.Stdout, "| %s | %s |\n", item.PackageName, status); err != nil {
-				return err
-			}
+			rows = append(rows, []string{item.PackageName, status})
 		}
-		return nil
+		return shared.WriteMarkdownTable(deps.Stdout, []string{"package", "status"}, rows)
 	default:
 		return shared.UsageErrorf("unsupported output format %q", output)
 	}
