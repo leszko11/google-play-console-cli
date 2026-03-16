@@ -1161,6 +1161,10 @@ func validateImageUploadFile(imageType, imagePath string) error {
 	return nil
 }
 
+func ValidateImageUploadFile(imageType, imagePath string) error {
+	return validateImageUploadFile(imageType, imagePath)
+}
+
 func isScreenshotImageType(imageType string) bool {
 	switch imageType {
 	case "phoneScreenshots", "sevenInchScreenshots", "tenInchScreenshots", "tvScreenshots", "wearScreenshots":

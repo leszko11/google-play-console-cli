@@ -57,6 +57,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - Deobfuscation mapping upload (`deobfuscation upload`)
 - End-to-end deploy orchestration (`deploy`)
 - Read-only operator diagnostics (`doctor`)
+- Pre-submission validation gate for release readiness, listing assets, and optional edit validation (`validate`)
 - E2E fixture readiness diagnostics (`e2e fixtures status`)
 - Staging release workflows (`release verify`, `release alpha`)
 - Reviews management (`reviews list/get/reply`)
@@ -615,6 +616,7 @@ gpc apks --help
 gpc deobfuscation --help
 gpc deploy --help
 gpc doctor --help
+gpc validate --help
 gpc e2e --help
 gpc release --help
 gpc rollback --help

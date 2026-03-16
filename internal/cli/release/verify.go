@@ -59,6 +59,10 @@ type verifyOptions struct {
 	NotesText   string
 }
 
+type VerifyCheck = verifyCheck
+type VerifyResult = verifyResult
+type VerifyOptions = verifyOptions
+
 func newVerifyCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
@@ -290,6 +294,10 @@ func runVerify(ctx context.Context, deps Deps, opts verifyOptions) (verifyResult
 	return finalizeVerifyResult(result), nil
 }
 
+func RunVerify(ctx context.Context, deps Deps, opts VerifyOptions) (VerifyResult, error) {
+	return runVerify(ctx, deps, opts)
+}
+
 func finalizeVerifyResult(result verifyResult) verifyResult {
 	if len(result.BlockingIssues) == 0 {
 		result.Status = "ok"
@@ -441,4 +449,8 @@ func resolveVerifyListingDir(projectDir string) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+func ResolveVerifyListingDir(projectDir string) (string, error) {
+	return resolveVerifyListingDir(projectDir)
 }

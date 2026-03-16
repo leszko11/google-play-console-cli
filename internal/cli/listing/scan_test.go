@@ -1,6 +1,10 @@
 package listing
 
 import (
+	"image"
+	"image/color"
+	"image/jpeg"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,5 +90,71 @@ func TestScanListingsDirRejectsDuplicateSingleImageType(t *testing.T) {
 	_, err := scanListingsDir(root)
 	if err == nil || !strings.Contains(err.Error(), `multiple files provided for image type "icon"`) {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateListingsDir(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "en-US", "title.txt"), "Title")
+	writeFile(t, filepath.Join(root, "en-US", "short-description.txt"), "Short")
+	writeFile(t, filepath.Join(root, "en-US", "full-description.txt"), "Full")
+	writePNGImage(t, filepath.Join(root, "en-US", "images", "icon.png"), 512, 512)
+	writeJPEGImage(t, filepath.Join(root, "en-US", "images", "phoneScreenshots", "1.jpg"), 1080, 1920)
+
+	summary, err := ValidateListingsDir(root)
+	if err != nil {
+		t.Fatalf("validate failed: %v", err)
+	}
+	if summary.LocaleCount != 1 || summary.ImageCount != 2 {
+		t.Fatalf("unexpected summary: %+v", summary)
+	}
+}
+
+func TestValidateListingsDirRejectsInvalidImageDimensions(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "en-US", "title.txt"), "Title")
+	writeFile(t, filepath.Join(root, "en-US", "short-description.txt"), "Short")
+	writeFile(t, filepath.Join(root, "en-US", "full-description.txt"), "Full")
+	writePNGImage(t, filepath.Join(root, "en-US", "images", "icon.png"), 256, 256)
+
+	_, err := ValidateListingsDir(root)
+	if err == nil || !strings.Contains(err.Error(), "icon requires dimensions 512x512") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func writePNGImage(t *testing.T, path string, width, height int) {
+	t.Helper()
+	writeImage(t, path, width, height, func(file *os.File, img image.Image) error {
+		return png.Encode(file, img)
+	})
+}
+
+func writeJPEGImage(t *testing.T, path string, width, height int) {
+	t.Helper()
+	writeImage(t, path, width, height, func(file *os.File, img image.Image) error {
+		return jpeg.Encode(file, img, &jpeg.Options{Quality: 90})
+	})
+}
+
+func writeImage(t *testing.T, path string, width, height int, encode func(file *os.File, img image.Image) error) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create image: %v", err)
+	}
+	defer file.Close()
+
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{R: 0x11, G: 0x22, B: 0x33, A: 0xff})
+		}
+	}
+	if err := encode(file, img); err != nil {
+		t.Fatalf("encode image: %v", err)
 	}
 }
