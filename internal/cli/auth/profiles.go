@@ -41,7 +41,7 @@ func newProfilesListCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var output string
-	fs.StringVar(&output, "output", "", "Output format: json, table, csv, tsv")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, csv, tsv")
 
 	return &ffcli.Command{
 		Name:      "list",
@@ -143,6 +143,17 @@ func newProfilesListCommand(deps Deps) *ffcli.Command {
 					}
 				}
 				return shared.WriteDelimited(deps.Stdout, resolvedOutput, []string{"profile", "active", "storage"}, delimitedRows)
+			case "markdown":
+				markdownRows := make([][]string, 0, len(rows))
+				for _, row := range rows {
+					markdownRows = append(markdownRows, []string{row.Profile, fmt.Sprintf("%t", row.Active), row.Storage})
+				}
+				for _, warning := range warnings {
+					if _, err := fmt.Fprintf(deps.Stderr, "warning: %s\n", warning); err != nil {
+						return err
+					}
+				}
+				return shared.WriteMarkdownTable(deps.Stdout, []string{"profile", "active", "storage"}, markdownRows)
 			default:
 				return shared.UsageErrorf("unsupported output format %q", strings.TrimSpace(resolvedOutput))
 			}

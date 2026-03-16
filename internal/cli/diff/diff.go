@@ -141,7 +141,7 @@ func newListingCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&opts.PackageName, "package-name", "", "Package name")
 	fs.StringVar(&opts.Dir, "dir", "", "Listings directory root")
 	fs.BoolVar(&opts.DeleteMissing, "delete-missing", false, "Mark remote-only locales as deletions")
-	fs.StringVar(&opts.Output, "output", "", "Output format: json or table")
+	fs.StringVar(&opts.Output, "output", "", "Output format: json, table, markdown")
 
 	return &ffcli.Command{
 		Name:      "listing",
@@ -173,7 +173,7 @@ func newListingCommand(deps Deps) *ffcli.Command {
 			if err != nil {
 				return err
 			}
-			return writeResult(deps.Stdout, opts.Output, result, writeListingTable)
+			return writeResult(deps.Stdout, opts.Output, result, writeListingTable, writeListingMarkdown)
 		},
 	}
 }
@@ -196,7 +196,7 @@ func newTrackCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&opts.ReleaseNotesFile, "release-notes-file", "", "Path to release notes file (JSON object/array, tagged blocks, or plain text)")
 	fs.StringVar(&opts.ReleaseNotesLocale, "release-notes-locale", notesgen.DefaultLocale, "Release notes locale (BCP-47)")
 	fs.StringVar(&opts.ReleaseNotesText, "release-notes-text", "", "Release notes text")
-	fs.StringVar(&opts.Output, "output", "", "Output format: json or table")
+	fs.StringVar(&opts.Output, "output", "", "Output format: json, table, markdown")
 
 	return &ffcli.Command{
 		Name:      "track",
@@ -223,7 +223,7 @@ func newTrackCommand(deps Deps) *ffcli.Command {
 			if err != nil {
 				return err
 			}
-			return writeResult(deps.Stdout, opts.Output, result, writeTrackTable)
+			return writeResult(deps.Stdout, opts.Output, result, writeTrackTable, writeTrackMarkdown)
 		},
 	}
 }
@@ -583,7 +583,7 @@ func deleteEdit(ctx context.Context, client Client, packageName, editID string) 
 	return nil
 }
 
-func writeResult(out io.Writer, output string, payload any, tableWriter func(io.Writer, any) error) error {
+func writeResult(out io.Writer, output string, payload any, tableWriter func(io.Writer, any) error, markdownWriter func(io.Writer, any) error) error {
 	format, err := resolveOutput(output)
 	if err != nil {
 		return err
@@ -593,6 +593,8 @@ func writeResult(out io.Writer, output string, payload any, tableWriter func(io.
 		return shared.WriteJSON(out, payload)
 	case "table":
 		return tableWriter(out, payload)
+	case "markdown":
+		return markdownWriter(out, payload)
 	default:
 		return shared.UsageErrorf("unsupported output format %q", format)
 	}
@@ -627,6 +629,34 @@ func writeListingTable(out io.Writer, payload any) error {
 	return nil
 }
 
+func writeListingMarkdown(out io.Writer, payload any) error {
+	result, ok := payload.(listingResult)
+	if !ok {
+		return fmt.Errorf("unexpected listing payload type %T", payload)
+	}
+	status := "no-diff"
+	if result.HasDiff {
+		status = "diff"
+	}
+	if err := shared.WriteMarkdownTable(out, []string{"field", "value"}, [][]string{
+		{"status", status},
+		{"package", result.PackageName},
+		{"dir", result.Dir},
+		{"deleteMissing", strconv.FormatBool(result.DeleteMissing)},
+		{"changeCount", strconv.Itoa(result.ChangeCount)},
+	}); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(out); err != nil {
+		return err
+	}
+	rows := make([][]string, 0, len(result.Changes))
+	for _, entry := range result.Changes {
+		rows = append(rows, []string{entry.Scope, entry.Target, entry.Field, entry.Action, formatValue(entry.Live), formatValue(entry.Desired)})
+	}
+	return shared.WriteMarkdownTable(out, []string{"scope", "target", "field", "action", "live", "desired"}, rows)
+}
+
 func writeTrackTable(out io.Writer, payload any) error {
 	result, ok := payload.(trackResult)
 	if !ok {
@@ -659,13 +689,41 @@ func writeTrackTable(out io.Writer, payload any) error {
 	return nil
 }
 
+func writeTrackMarkdown(out io.Writer, payload any) error {
+	result, ok := payload.(trackResult)
+	if !ok {
+		return fmt.Errorf("unexpected track payload type %T", payload)
+	}
+	status := "no-diff"
+	if result.HasDiff {
+		status = "diff"
+	}
+	if err := shared.WriteMarkdownTable(out, []string{"field", "value"}, [][]string{
+		{"status", status},
+		{"package", result.PackageName},
+		{"track", result.Track},
+		{"trackFound", strconv.FormatBool(result.TrackFound)},
+		{"changeCount", strconv.Itoa(result.ChangeCount)},
+	}); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(out); err != nil {
+		return err
+	}
+	rows := make([][]string, 0, len(result.Changes))
+	for _, entry := range result.Changes {
+		rows = append(rows, []string{entry.Scope, entry.Target, entry.Field, entry.Action, formatValue(entry.Live), formatValue(entry.Desired)})
+	}
+	return shared.WriteMarkdownTable(out, []string{"scope", "target", "field", "action", "live", "desired"}, rows)
+}
+
 func resolveOutput(local string) (string, error) {
 	output := shared.ResolveOutput(local)
 	switch output {
-	case "json", "table":
+	case "json", "table", "markdown":
 		return output, nil
 	default:
-		return "", shared.UsageErrorf("output must be json or table")
+		return "", shared.UsageErrorf("output must be json, table, or markdown")
 	}
 }
 

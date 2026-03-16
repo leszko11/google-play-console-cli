@@ -67,14 +67,7 @@ func writeGetOutput(deps Deps, output string, app gpc.AppInfo) error {
 	case "csv", "tsv":
 		return shared.WriteDelimited(deps.Stdout, output, []string{"packageName"}, [][]string{{app.PackageName}})
 	case "markdown":
-		if _, err := fmt.Fprintln(deps.Stdout, "| package |"); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintln(deps.Stdout, "| --- |"); err != nil {
-			return err
-		}
-		_, err := fmt.Fprintf(deps.Stdout, "| %s |\n", app.PackageName)
-		return err
+		return shared.WriteMarkdownTable(deps.Stdout, []string{"package"}, [][]string{{app.PackageName}})
 	default:
 		return shared.UsageErrorf("unsupported output format %q", output)
 	}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
@@ -252,6 +253,52 @@ func WriteDelimited(out io.Writer, format string, header []string, rows [][]stri
 	}
 	writer.Flush()
 	return writer.Error()
+}
+
+func WriteMarkdownTable(out io.Writer, header []string, rows [][]string) error {
+	if out == nil {
+		out = os.Stdout
+	}
+	if len(header) == 0 {
+		return UsageErrorf("markdown table header must not be empty")
+	}
+
+	normalizedHeader := slices.Clone(header)
+	if _, err := fmt.Fprintln(out, formatMarkdownRow(normalizedHeader)); err != nil {
+		return err
+	}
+
+	separator := make([]string, len(normalizedHeader))
+	for i := range separator {
+		separator[i] = "---"
+	}
+	if _, err := fmt.Fprintln(out, formatMarkdownRow(separator)); err != nil {
+		return err
+	}
+
+	for _, row := range rows {
+		normalizedRow := make([]string, len(normalizedHeader))
+		copy(normalizedRow, row)
+		if _, err := fmt.Fprintln(out, formatMarkdownRow(normalizedRow)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func formatMarkdownRow(cells []string) string {
+	escaped := make([]string, len(cells))
+	for i, cell := range cells {
+		escaped[i] = escapeMarkdownCell(cell)
+	}
+	return "| " + strings.Join(escaped, " | ") + " |"
+}
+
+func escapeMarkdownCell(cell string) string {
+	cell = strings.ReplaceAll(cell, "\r\n", "\n")
+	cell = strings.ReplaceAll(cell, "\r", "\n")
+	cell = strings.ReplaceAll(cell, "|", "\\|")
+	return strings.ReplaceAll(cell, "\n", "<br>")
 }
 
 type BuildClientDeps[T any] struct {
