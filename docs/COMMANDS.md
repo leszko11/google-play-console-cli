@@ -250,6 +250,7 @@ make generate-command-docs
 - `gpc users create`
 - `gpc users update`
 - `gpc users delete`
+- `gpc validate`
 - `gpc workflow`
 - `gpc workflow run`
 - `gpc grants`
@@ -309,6 +310,7 @@ SUBCOMMANDS
   listing                Store listing workflows
   purchases              Manage one-time and subscription purchases
   users                  Manage Play Console account users
+  validate               Run pre-submission validation checks
   workflow               Run declarative gpc workflows from .gpc/workflow.yml
   grants                 Manage per-app user grants
   internal-sharing       Upload artifacts for internal app sharing
@@ -4046,6 +4048,29 @@ FLAGS
   -developer-id string  Developer account ID (numeric or developers/<id>)
   -name string          User resource name (developers/<developer-id>/users/<email>)
   -user-email string    User email for resource name synthesis
+```
+
+## `gpc validate --help`
+
+```text
+DESCRIPTION
+  Run pre-submission validation checks
+
+USAGE
+  validate
+
+FLAGS
+  -aab string                            Path to prebuilt .aab for artifact validation
+  -build-task :app:bundleStagingRelease  Gradle build task for release bundle
+  -edit-id string                        Existing edit ID to validate
+  -notes-file string                     Release notes file path when notes-mode=file
+  -notes-locale en-US                    Release notes locale
+  -notes-mode git                        Release notes mode: git, file, none
+  -notes-text string                     Inline release notes text override
+  -package-name string                   Target package name
+  -probe-track=false                     Create temporary edit and probe target track
+  -project-dir .                         Android project directory
+  -track alpha                           Target track name
 ```
 
 ## `gpc workflow --help`
