@@ -75,6 +75,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - App store export/bootstrap workflow (`appinit export`)
 - Top-level local bootstrap export workflow (`bootstrap`)
 - Fastlane metadata import into the local `gpc` workspace layout (`migrate fastlane import`)
+- Composite publish shortcuts for alpha and production tracks with built-in bundle processing wait (`publish alpha`, `publish production`)
 - One-shot environment and auth provisioning (`setup --auto`)
 - Declarative multi-step automation via `.gpc/workflow.yml` (`workflow run`)
 - Vitals-gated staged releases (`release full --vitals-gate ... --vitals-wait ... --auto-halt-on-regression`)
@@ -516,6 +517,13 @@ gpc release alpha \
   --notes-mode git \
   --confirm
 
+# Publish an already-built bundle to alpha and wait for processing before track update + commit
+gpc publish alpha \
+  --package-name com.example.app \
+  --aab /path/to/app.aab \
+  --release-notes-text "Bug fixes and stability improvements." \
+  --confirm
+
 # Promote the latest releasable release between tracks in one flow
 gpc release promote \
   --package-name com.example.app \
@@ -634,6 +642,7 @@ gpc app-recoveries --help
 gpc subscriptions --help
 gpc monetization --help
 gpc products --help
+gpc publish --help
 gpc iap --help
 gpc listing --help
 gpc purchases --help

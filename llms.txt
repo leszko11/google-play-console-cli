@@ -64,6 +64,7 @@
 - `migrate`: Import or transform metadata from other tool layouts
 - `notify`: Notification delivery helpers
 - `products`: Manage monetization one-time products
+- `publish`: Common publish flows with track presets
 - `iap`: Manage legacy in-app products
 - `listing`: Store listing workflows
 - `purchases`: Manage one-time and subscription purchases
