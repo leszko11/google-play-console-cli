@@ -20,7 +20,7 @@
 - `--bootstrap-assist`: Enable interactive bootstrap build assistance
 - `--debug`: Enable debug logging
 - `--fields`: Comma-separated JSON field projection
-- `--output`: Output format override: json, table, markdown
+- `--output`: Output format override: json, table, markdown, yaml
 - `--package-name`: App package name
 - `--paginate`: Fetch all paginated API responses
 - `--pretty`: Pretty print JSON output

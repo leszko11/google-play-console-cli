@@ -44,7 +44,7 @@ func newFinancialListCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&prefix, "prefix", "", "Optional object prefix filter")
 	fs.Int64Var(&pageSize, "page-size", 0, "Maximum objects per page")
 	fs.StringVar(&pageToken, "page-token", "", "Page token for the next page")
-	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, csv, tsv")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, yaml, csv, tsv")
 
 	return &ffcli.Command{
 		Name:      "list",
@@ -81,6 +81,14 @@ func newFinancialListCommand(deps Deps) *ffcli.Command {
 					"count":         len(result.Objects),
 					"nextPageToken": result.NextPageToken,
 				})
+			case "yaml":
+				return shared.WriteYAML(deps.Stdout, map[string]any{
+					"bucket":        bucket,
+					"prefix":        strings.TrimSpace(prefix),
+					"objects":       result.Objects,
+					"count":         len(result.Objects),
+					"nextPageToken": result.NextPageToken,
+				})
 			case "table":
 				return writeFinancialListTable(deps.Stdout, result.Objects)
 			case "markdown":
@@ -111,7 +119,7 @@ func newFinancialGetCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&gcsURI, "gcs-uri", "", "Cloud Storage object URI in the form gs://bucket/object.csv")
 	fs.StringVar(&bucket, "bucket", "", "Cloud Storage bucket containing the report")
 	fs.StringVar(&objectName, "object", "", "Cloud Storage object name")
-	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, csv, tsv")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, yaml, csv, tsv")
 
 	return &ffcli.Command{
 		Name:      "get",
@@ -144,6 +152,15 @@ func newFinancialGetCommand(deps Deps) *ffcli.Command {
 			switch resolvedOutput {
 			case "json":
 				return shared.WriteJSON(deps.Stdout, financialGetResult{
+					Bucket:      download.Bucket,
+					Object:      download.Name,
+					ContentType: download.ContentType,
+					Columns:     columns,
+					Rows:        rows,
+					RowCount:    len(rows),
+				})
+			case "yaml":
+				return shared.WriteYAML(deps.Stdout, financialGetResult{
 					Bucket:      download.Bucket,
 					Object:      download.Name,
 					ContentType: download.ContentType,

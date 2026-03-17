@@ -133,6 +133,26 @@ func TestWriteMarkdownTable(t *testing.T) {
 	}
 }
 
+func TestWriteYAML_UsesJSONFieldNames(t *testing.T) {
+	type sample struct {
+		PackageName string `json:"packageName"`
+		Status      string `json:"status"`
+	}
+
+	var out bytes.Buffer
+	err := WriteYAML(&out, sample{PackageName: "com.example.app", Status: "ok"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := out.String()
+	for _, want := range []string{"packageName: com.example.app", "status: ok"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in yaml output: %s", want, got)
+		}
+	}
+}
+
 func TestResolveServiceAccountPath_Precedence(t *testing.T) {
 	prev := boundGlobalFlags
 	prevBypass := resolveCredentialsShouldBypassKeychain

@@ -14,6 +14,7 @@ import (
 	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
+	"gopkg.in/yaml.v3"
 )
 
 var resolveOutputLookupEnv = os.Getenv
@@ -226,6 +227,42 @@ func WriteJSON(out io.Writer, v any) error {
 	}
 	_, err = out.Write(b)
 	return err
+}
+
+func WriteYAML(out io.Writer, v any) error {
+	if out == nil {
+		out = os.Stdout
+	}
+	if fields := strings.TrimSpace(ActiveGlobalFlags().Fields); fields != "" {
+		projected, err := ProjectFields(v, fields)
+		if err != nil {
+			return UsageErrorf("%v", err)
+		}
+		v = projected
+	}
+
+	normalized, err := normalizeForYAML(v)
+	if err != nil {
+		return err
+	}
+	b, err := yaml.Marshal(normalized)
+	if err != nil {
+		return err
+	}
+	_, err = out.Write(b)
+	return err
+}
+
+func normalizeForYAML(v any) (any, error) {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var normalized any
+	if err := json.Unmarshal(raw, &normalized); err != nil {
+		return nil, err
+	}
+	return normalized, nil
 }
 
 func WriteDelimited(out io.Writer, format string, header []string, rows [][]string) error {

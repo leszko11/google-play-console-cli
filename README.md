@@ -92,7 +92,7 @@ gpc completion zsh > ~/.zfunc/_gpc
 - Custom private app publishing for managed Play organizations (`custom-apps create`)
 - Generic webhook delivery plus native Slack and Discord notifications (`notify webhook`, `notify slack`, `notify discord`)
 - Read-only listing and track diff previews (`diff`)
-- Markdown table output for supported read-only and reporting commands (`--output markdown`)
+- Markdown and YAML output for supported read-only and reporting commands (`--output markdown`, `--output yaml`)
 - Release-aware binary upgrade checks and in-place self-update for direct installs (`update`)
 - CI quality gates for format, lint, test, and build
 

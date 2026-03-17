@@ -141,7 +141,7 @@ func newListingCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&opts.PackageName, "package-name", "", "Package name")
 	fs.StringVar(&opts.Dir, "dir", "", "Listings directory root")
 	fs.BoolVar(&opts.DeleteMissing, "delete-missing", false, "Mark remote-only locales as deletions")
-	fs.StringVar(&opts.Output, "output", "", "Output format: json, table, markdown")
+	fs.StringVar(&opts.Output, "output", "", "Output format: json, table, markdown, yaml")
 
 	return &ffcli.Command{
 		Name:      "listing",
@@ -196,7 +196,7 @@ func newTrackCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&opts.ReleaseNotesFile, "release-notes-file", "", "Path to release notes file (JSON object/array, tagged blocks, or plain text)")
 	fs.StringVar(&opts.ReleaseNotesLocale, "release-notes-locale", notesgen.DefaultLocale, "Release notes locale (BCP-47)")
 	fs.StringVar(&opts.ReleaseNotesText, "release-notes-text", "", "Release notes text")
-	fs.StringVar(&opts.Output, "output", "", "Output format: json, table, markdown")
+	fs.StringVar(&opts.Output, "output", "", "Output format: json, table, markdown, yaml")
 
 	return &ffcli.Command{
 		Name:      "track",
@@ -591,6 +591,8 @@ func writeResult(out io.Writer, output string, payload any, tableWriter func(io.
 	switch format {
 	case "json":
 		return shared.WriteJSON(out, payload)
+	case "yaml":
+		return shared.WriteYAML(out, payload)
 	case "table":
 		return tableWriter(out, payload)
 	case "markdown":
@@ -720,10 +722,10 @@ func writeTrackMarkdown(out io.Writer, payload any) error {
 func resolveOutput(local string) (string, error) {
 	output := shared.ResolveOutput(local)
 	switch output {
-	case "json", "table", "markdown":
+	case "json", "table", "markdown", "yaml":
 		return output, nil
 	default:
-		return "", shared.UsageErrorf("output must be json, table, or markdown")
+		return "", shared.UsageErrorf("output must be json, table, markdown, or yaml")
 	}
 }
 

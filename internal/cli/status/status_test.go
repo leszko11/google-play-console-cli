@@ -230,3 +230,21 @@ func TestStatusMarkdownOutput(t *testing.T) {
 		}
 	}
 }
+
+func TestStatusYAMLOutput(t *testing.T) {
+	client := &fakeClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runCommand(t, deps, "--package-name", "com.example.app", "--output", "yaml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{"packageName: com.example.app", "status: warn", "pendingReply: 2"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+}

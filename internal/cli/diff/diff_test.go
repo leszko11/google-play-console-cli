@@ -186,6 +186,31 @@ func TestListingDiffMarkdownOutput(t *testing.T) {
 	}
 }
 
+func TestListingDiffYAMLOutput(t *testing.T) {
+	client := &fakeClient{
+		listings: []gpc.ListingInfo{
+			{Language: "en-US", Title: "Old title", ShortDescription: "Short", FullDescription: "Full"},
+		},
+		images: map[string][]gpc.ImageInfo{
+			"en-US/phoneScreenshots": {{SHA256: localImageHash(t, "remote-image")}},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runCommand(t, deps, "listing", "--package-name", "com.example.app", "--dir", writeListingFixture(t), "--output", "yaml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{"packageName: com.example.app", "hasDiff: true", "field: title"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+}
+
 func TestTrackDiffJSON(t *testing.T) {
 	client := &fakeClient{
 		tracks: []gpc.TrackInfo{
@@ -277,6 +302,35 @@ func TestTrackDiffMarkdownOutput(t *testing.T) {
 		"| scope | target | field | action | live | desired |",
 		"| track | production | status | update | draft | completed |",
 	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+}
+
+func TestTrackDiffYAMLOutput(t *testing.T) {
+	client := &fakeClient{
+		tracks: []gpc.TrackInfo{
+			{
+				Name: "production",
+				Releases: []gpc.TrackReleaseInfo{{
+					Name:         "1.0.0",
+					Status:       "draft",
+					VersionCodes: []int64{100},
+				}},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runCommand(t, deps, "track", "--package-name", "com.example.app", "--track", "production", "--status", "completed", "--version-codes", "200", "--output", "yaml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{"packageName: com.example.app", "track: production", "field: status"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in output: %s", want, out)
 		}
