@@ -18,7 +18,7 @@ func NewStatusCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("status", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var output string
-	fs.StringVar(&output, "output", "", "Output format: json, table, markdown")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, yaml")
 
 	return &ffcli.Command{
 		Name:      "status",
@@ -36,6 +36,8 @@ func NewStatusCommand(deps Deps) *ffcli.Command {
 			switch resolvedOutput {
 			case "json":
 				return shared.WriteJSON(deps.Stdout, status)
+			case "yaml":
+				return shared.WriteYAML(deps.Stdout, status)
 			case "table":
 				return writeStatusTable(deps.Stdout, status)
 			case "markdown":

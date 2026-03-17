@@ -341,7 +341,7 @@ FLAGS
   -bootstrap-assist=false  Enable interactive bootstrap build assistance
   -debug string            Enable debug logging
   -fields string           Comma-separated JSON field projection
-  -output string           Output format override: json, table, markdown
+  -output string           Output format override: json, table, markdown, yaml
   -package-name string     App package name
   -paginate=false          Fetch all paginated API responses
   -pretty=false            Pretty print JSON output
@@ -397,7 +397,7 @@ USAGE
   status
 
 FLAGS
-  -output string  Output format: json, table, markdown
+  -output string  Output format: json, table, markdown, yaml
 ```
 
 ## `gpc auth profiles --help`
@@ -423,7 +423,7 @@ USAGE
   list
 
 FLAGS
-  -output string  Output format: json, table, markdown, csv, tsv
+  -output string  Output format: json, table, markdown, yaml, csv, tsv
 ```
 
 ## `gpc auth switch --help`
@@ -535,7 +535,7 @@ USAGE
   list
 
 FLAGS
-  -output string  Output format: json, table, markdown, csv, tsv
+  -output string  Output format: json, table, markdown, yaml, csv, tsv
   -verify=false   Verify API access for each configured package
 ```
 
@@ -549,7 +549,7 @@ USAGE
   get
 
 FLAGS
-  -output string        Output format: json, table, markdown, csv, tsv
+  -output string        Output format: json, table, markdown, yaml, csv, tsv
   -package-name string  Package name
 ```
 
@@ -1568,7 +1568,7 @@ USAGE
 FLAGS
   -delete-missing=false  Mark remote-only locales as deletions
   -dir string            Listings directory root
-  -output string         Output format: json, table, markdown
+  -output string         Output format: json, table, markdown, yaml
   -package-name string   Package name
 ```
 
@@ -1582,7 +1582,7 @@ USAGE
   track
 
 FLAGS
-  -output string               Output format: json, table, markdown
+  -output string               Output format: json, table, markdown, yaml
   -package-name string         Package name
   -release-name string         Release name
   -release-notes-file string   Path to release notes file (JSON object/array, tagged blocks, or plain text)
@@ -1812,7 +1812,7 @@ USAGE
   status
 
 FLAGS
-  -output string        Output format: json, table, markdown
+  -output string        Output format: json, table, markdown, yaml
   -package-name string  Package name
 ```
 
@@ -2114,7 +2114,7 @@ USAGE
 
 FLAGS
   -bucket string      Cloud Storage bucket containing financial reports
-  -output string      Output format: json, table, markdown, csv, tsv
+  -output string      Output format: json, table, markdown, yaml, csv, tsv
   -page-size 0        Maximum objects per page
   -page-token string  Page token for the next page
   -prefix string      Optional object prefix filter
@@ -2133,7 +2133,7 @@ FLAGS
   -bucket string   Cloud Storage bucket containing the report
   -gcs-uri string  Cloud Storage object URI in the form gs://bucket/object.csv
   -object string   Cloud Storage object name
-  -output string   Output format: json, table, markdown, csv, tsv
+  -output string   Output format: json, table, markdown, yaml, csv, tsv
 ```
 
 ## `gpc reports summary --help`

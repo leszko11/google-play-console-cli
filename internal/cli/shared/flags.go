@@ -37,7 +37,7 @@ func BindGlobalFlags(fs *flag.FlagSet, cfg *GlobalFlags) {
 	fs.StringVar(&cfg.PackageName, "package-name", "", "App package name")
 	fs.StringVar(&cfg.ServiceAccount, "service-account", "", "Path to service account JSON")
 	fs.StringVar(&cfg.Profile, "profile", "", "Authentication profile override")
-	fs.StringVar(&cfg.Output, "output", "", "Output format override: json, table, markdown")
+	fs.StringVar(&cfg.Output, "output", "", "Output format override: json, table, markdown, yaml")
 	fs.StringVar(&cfg.Fields, "fields", "", "Comma-separated JSON field projection")
 	fs.DurationVar(&cfg.Timeout, "timeout", 0, "Request timeout")
 	fs.DurationVar(&cfg.UploadTimeout, "upload-timeout", 0, "Upload request timeout")

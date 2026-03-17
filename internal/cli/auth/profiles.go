@@ -41,7 +41,7 @@ func newProfilesListCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var output string
-	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, csv, tsv")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, yaml, csv, tsv")
 
 	return &ffcli.Command{
 		Name:      "list",
@@ -113,6 +113,13 @@ func newProfilesListCommand(deps Deps) *ffcli.Command {
 			switch resolvedOutput {
 			case "json":
 				return shared.WriteJSON(deps.Stdout, payload)
+			case "yaml":
+				for _, warning := range warnings {
+					if _, err := fmt.Fprintf(deps.Stderr, "warning: %s\n", warning); err != nil {
+						return err
+					}
+				}
+				return shared.WriteYAML(deps.Stdout, payload)
 			case "table":
 				if _, err := fmt.Fprintln(deps.Stdout, "PROFILE\tACTIVE\tSTORAGE"); err != nil {
 					return err

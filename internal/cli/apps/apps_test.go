@@ -122,6 +122,24 @@ func TestAppsList_CSVOutput(t *testing.T) {
 	}
 }
 
+func TestAppsList_YAMLOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{Packages: []string{"com.example.one"}}, nil
+		},
+	}
+
+	out, err := runApps(t, deps, "list", "--output", "yaml")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{"- packageName: com.example.one"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+}
+
 func TestAppsGet_ReturnsClearAPIError(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) {
@@ -172,6 +190,32 @@ func TestAppsGet_TSVOutput(t *testing.T) {
 	want := "packageName\ncom.example.app\n"
 	if out != want {
 		t.Fatalf("unexpected tsv output %q, want %q", out, want)
+	}
+}
+
+func TestAppsGet_YAMLOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{
+				ActiveProfile: "default",
+				Profiles: map[string]config.Profile{
+					"default": {ServiceAccountPath: "/tmp/sa.json"},
+				},
+			}, nil
+		},
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				get: map[string]gpc.AppInfo{"com.example.app": {PackageName: "com.example.app"}},
+			}, nil
+		},
+	}
+
+	out, err := runApps(t, deps, "get", "--package-name", "com.example.app", "--output", "yaml")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if !strings.Contains(out, "packageName: com.example.app") {
+		t.Fatalf("unexpected yaml output: %s", out)
 	}
 }
 

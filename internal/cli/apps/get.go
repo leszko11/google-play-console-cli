@@ -21,7 +21,7 @@ func NewGetCommand(deps Deps) *ffcli.Command {
 		output      string
 	)
 	fs.StringVar(&packageName, "package-name", "", "Package name")
-	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, csv, tsv")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, yaml, csv, tsv")
 
 	return &ffcli.Command{
 		Name:      "get",
@@ -58,6 +58,8 @@ func writeGetOutput(deps Deps, output string, app gpc.AppInfo) error {
 	switch output {
 	case "json":
 		return shared.WriteJSON(deps.Stdout, app)
+	case "yaml":
+		return shared.WriteYAML(deps.Stdout, app)
 	case "table":
 		if _, err := fmt.Fprintln(deps.Stdout, "PACKAGE"); err != nil {
 			return err

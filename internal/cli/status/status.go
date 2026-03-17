@@ -58,7 +58,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 
 	var packageName, output string
 	fs.StringVar(&packageName, "package-name", "", "Package name")
-	fs.StringVar(&output, "output", "", "Output format: json, table, markdown")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, yaml")
 
 	return &ffcli.Command{
 		Name:      "status",
@@ -85,6 +85,8 @@ func NewCommand(deps Deps) *ffcli.Command {
 			switch shared.ResolveOutput(output) {
 			case "json":
 				return shared.WriteJSON(deps.Stdout, result)
+			case "yaml":
+				return shared.WriteYAML(deps.Stdout, result)
 			case "table":
 				return writeTable(deps.Stdout, result)
 			case "markdown":
