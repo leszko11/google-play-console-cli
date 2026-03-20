@@ -29,7 +29,7 @@ func (f *fakeClient) DeleteEdit(_ context.Context, _, _ string) error {
 }
 
 func (f *fakeClient) ValidateEdit(_ context.Context, _, _ string) error { return nil }
-func (f *fakeClient) CommitEdit(_ context.Context, _, _ string) (gpc.EditInfo, error) {
+func (f *fakeClient) CommitEdit(_ context.Context, _, _ string, _ bool) (gpc.EditInfo, error) {
 	return gpc.EditInfo{ID: "edit-1"}, nil
 }
 func (f *fakeClient) GetTrack(_ context.Context, _, _, _ string) (gpc.TrackInfo, error) {

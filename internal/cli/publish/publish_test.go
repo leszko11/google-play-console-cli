@@ -55,7 +55,7 @@ func (f *fakeClient) ValidateEdit(_ context.Context, _, _ string) error {
 	return f.validateErr
 }
 
-func (f *fakeClient) CommitEdit(_ context.Context, _, _ string) (gpc.EditInfo, error) {
+func (f *fakeClient) CommitEdit(_ context.Context, _, _ string, _ bool) (gpc.EditInfo, error) {
 	if f.commitErr != nil {
 		return gpc.EditInfo{}, f.commitErr
 	}

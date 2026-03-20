@@ -29,7 +29,7 @@ type Client interface {
 	CreateEdit(ctx context.Context, packageName string) (gpc.EditInfo, error)
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	ValidateEdit(ctx context.Context, packageName, editID string) error
-	CommitEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
+	CommitEdit(ctx context.Context, packageName, editID string, changesNotSentForReview bool) (gpc.EditInfo, error)
 	UpdateTrack(ctx context.Context, packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error)
 	UploadBundle(ctx context.Context, packageName, editID, bundlePath string) (gpc.BundleInfo, error)
 	UploadAPK(ctx context.Context, packageName, editID, apkPath string) (gpc.APKInfo, error)
@@ -364,7 +364,7 @@ func executeDeploy(parentCtx, requestCtx context.Context, client Client, out io.
 		return shared.WriteJSON(out, result)
 	}
 
-	if _, err := client.CommitEdit(requestCtx, p.PackageName, result.EditID); err != nil {
+	if _, err := client.CommitEdit(requestCtx, p.PackageName, result.EditID, false); err != nil {
 		return fail("commit_edit", fmt.Errorf("failed to commit edit: %w", err))
 	}
 	result.Committed = true

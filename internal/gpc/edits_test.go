@@ -21,7 +21,7 @@ func TestEditMethods_RejectMissingClient(t *testing.T) {
 	if err := c.ValidateEdit(context.Background(), "com.example.app", "edit-1"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from ValidateEdit, got %v", err)
 	}
-	if _, err := c.CommitEdit(context.Background(), "com.example.app", "edit-1"); !errors.Is(err, ErrInvalidCredentials) {
+	if _, err := c.CommitEdit(context.Background(), "com.example.app", "edit-1", false); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials from CommitEdit, got %v", err)
 	}
 	if err := c.DeleteEdit(context.Background(), "com.example.app", "edit-1"); !errors.Is(err, ErrInvalidCredentials) {
@@ -95,7 +95,7 @@ func TestEditMethods_ValidateArgs(t *testing.T) {
 	if err := c.ValidateEdit(context.Background(), "com.example.app", ""); err == nil || !strings.Contains(err.Error(), "edit id is required") {
 		t.Fatalf("unexpected ValidateEdit error: %v", err)
 	}
-	if _, err := c.CommitEdit(context.Background(), "", "edit-1"); err == nil || !strings.Contains(err.Error(), "package name is required") {
+	if _, err := c.CommitEdit(context.Background(), "", "edit-1", false); err == nil || !strings.Contains(err.Error(), "package name is required") {
 		t.Fatalf("unexpected CommitEdit error: %v", err)
 	}
 	if err := c.DeleteEdit(context.Background(), "", "edit-1"); err == nil || !strings.Contains(err.Error(), "package name is required") {

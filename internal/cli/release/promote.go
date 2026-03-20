@@ -197,7 +197,7 @@ func runPromote(ctx context.Context, deps Deps, opts promoteOptions) (promoteRes
 		return result, nil
 	}
 
-	if _, err := client.CommitEdit(requestCtx, result.PackageName, currentEditID); err != nil {
+	if _, err := client.CommitEdit(requestCtx, result.PackageName, currentEditID, false); err != nil {
 		return fail("commit_edit", fmt.Errorf("failed to commit edit: %w", err))
 	}
 	result.Committed = true

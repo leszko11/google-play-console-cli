@@ -31,7 +31,7 @@ type Client interface {
 	CreateEdit(ctx context.Context, packageName string) (gpc.EditInfo, error)
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	ValidateEdit(ctx context.Context, packageName, editID string) error
-	CommitEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
+	CommitEdit(ctx context.Context, packageName, editID string, changesNotSentForReview bool) (gpc.EditInfo, error)
 	GetAppDetails(ctx context.Context, packageName, editID string) (gpc.AppDetailsInfo, error)
 	ListImages(ctx context.Context, packageName, editID, language, imageType string) ([]gpc.ImageInfo, error)
 	ListTracks(ctx context.Context, packageName, editID string) ([]gpc.TrackInfo, error)
@@ -342,7 +342,7 @@ func runAppDetails(parentCtx, requestCtx context.Context, client Client, package
 		}
 		return nil
 	}
-	if _, err := client.CommitEdit(requestCtx, packageName, edit.ID); err != nil {
+	if _, err := client.CommitEdit(requestCtx, packageName, edit.ID, false); err != nil {
 		return fail(fmt.Errorf("failed to commit app details edit: %w", err))
 	}
 	return nil
