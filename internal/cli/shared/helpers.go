@@ -323,6 +323,19 @@ func WriteMarkdownTable(out io.Writer, header []string, rows [][]string) error {
 	return nil
 }
 
+// WriteMinimal writes one value per line with no header, suitable for piping.
+func WriteMinimal(out io.Writer, values []string) error {
+	if out == nil {
+		out = os.Stdout
+	}
+	for _, v := range values {
+		if _, err := fmt.Fprintln(out, v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func formatMarkdownRow(cells []string) string {
 	escaped := make([]string, len(cells))
 	for i, cell := range cells {

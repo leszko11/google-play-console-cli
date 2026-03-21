@@ -116,6 +116,47 @@ func TestReviewsList_ReturnsReviews(t *testing.T) {
 	}
 }
 
+func TestReviewsList_MinimalOutput(t *testing.T) {
+	bindGlobalPaginate(t, false)
+	fc := &fakeClient{
+		list: gpc.ReviewsListInfo{
+			Reviews: []gpc.ReviewInfo{
+				{ReviewID: "review-1"},
+				{ReviewID: "review-2"},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runReviews(t, deps, "list", "--package-name", "com.example.app", "--output", "minimal")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if out != "review-1\nreview-2\n" {
+		t.Fatalf("unexpected output: %q", out)
+	}
+}
+
+func TestReviewsList_RejectsUnsupportedOutput(t *testing.T) {
+	bindGlobalPaginate(t, false)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runReviews(t, deps, "list", "--package-name", "com.example.app", "--output", "table")
+	if err == nil || !strings.Contains(err.Error(), `unsupported output format "table"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestReviewsList_UsesGlobalPaginate(t *testing.T) {
 	bindGlobalPaginate(t, true)
 	fc := &fakeClient{}

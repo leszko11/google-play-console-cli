@@ -58,7 +58,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 
 	var packageName, output string
 	fs.StringVar(&packageName, "package-name", "", "Package name")
-	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, yaml")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, yaml, minimal")
 
 	return &ffcli.Command{
 		Name:      "status",
@@ -91,6 +91,8 @@ func NewCommand(deps Deps) *ffcli.Command {
 				return writeTable(deps.Stdout, result)
 			case "markdown":
 				return writeMarkdown(deps.Stdout, result)
+			case "minimal":
+				return shared.WriteMinimal(deps.Stdout, []string{result.Status})
 			default:
 				return shared.UsageErrorf("unsupported output format %q", shared.ResolveOutput(output))
 			}

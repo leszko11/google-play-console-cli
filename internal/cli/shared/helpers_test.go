@@ -133,6 +133,55 @@ func TestWriteMarkdownTable(t *testing.T) {
 	}
 }
 
+func TestWriteMinimal(t *testing.T) {
+	tests := []struct {
+		name   string
+		values []string
+		want   string
+	}{
+		{
+			name:   "multiple values",
+			values: []string{"com.example.app", "com.example.other"},
+			want:   "com.example.app\ncom.example.other\n",
+		},
+		{
+			name:   "single value",
+			values: []string{"com.example.app"},
+			want:   "com.example.app\n",
+		},
+		{
+			name:   "empty",
+			values: []string{},
+			want:   "",
+		},
+		{
+			name:   "nil",
+			values: nil,
+			want:   "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			err := WriteMinimal(&out, tc.values)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if out.String() != tc.want {
+				t.Fatalf("unexpected output %q, want %q", out.String(), tc.want)
+			}
+		})
+	}
+}
+
+func TestWriteMinimal_NilWriter(t *testing.T) {
+	err := WriteMinimal(nil, []string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestWriteYAML_UsesJSONFieldNames(t *testing.T) {
 	type sample struct {
 		PackageName string `json:"packageName"`

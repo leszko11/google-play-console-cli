@@ -539,7 +539,7 @@ USAGE
   list
 
 FLAGS
-  -output string  Output format: json, table, markdown, yaml, csv, tsv
+  -output string  Output format: json, table, markdown, yaml, csv, tsv, minimal
   -verify=false   Verify API access for each configured package
 ```
 
@@ -1290,6 +1290,7 @@ USAGE
 
 FLAGS
   -edit-id string       Edit ID
+  -output string        Output format: json, minimal
   -package-name string  Package name
 ```
 
@@ -1474,6 +1475,7 @@ USAGE
 
 FLAGS
   -edit-id string       Edit ID
+  -output string        Output format: json, minimal
   -package-name string  Package name
 ```
 
@@ -1867,7 +1869,7 @@ USAGE
   status
 
 FLAGS
-  -output string        Output format: json, table, markdown, yaml
+  -output string        Output format: json, table, markdown, yaml, minimal
   -package-name string  Package name
 ```
 
@@ -1898,6 +1900,7 @@ USAGE
 
 FLAGS
   -max-results 0                Maximum number of reviews per page
+  -output string                Output format: json, minimal
   -package-name string          Package name
   -start-index 0                Index of first review to return (non-token pagination)
   -token string                 Pagination token

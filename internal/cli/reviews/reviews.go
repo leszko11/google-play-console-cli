@@ -68,13 +68,14 @@ func withDefaults(deps Deps) Deps {
 func newListCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var packageName, token, translationLanguage string
+	var packageName, token, translationLanguage, output string
 	var maxResults, startIndex int64
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.Int64Var(&maxResults, "max-results", 0, "Maximum number of reviews per page")
 	fs.Int64Var(&startIndex, "start-index", 0, "Index of first review to return (non-token pagination)")
 	fs.StringVar(&token, "token", "", "Pagination token")
 	fs.StringVar(&translationLanguage, "translation-language", "", "Language localization code for translated responses")
+	fs.StringVar(&output, "output", "", "Output format: json, minimal")
 
 	return &ffcli.Command{
 		Name:      "list",
@@ -107,11 +108,22 @@ func newListCommand(deps Deps) *ffcli.Command {
 				return fmt.Errorf("failed to list reviews: %w", err)
 			}
 
-			return shared.WriteJSON(deps.Stdout, map[string]any{
-				"packageName": pkg,
-				"reviews":     result.Reviews,
-				"nextToken":   result.NextToken,
-			})
+			switch shared.ResolveOutput(output) {
+			case "json":
+				return shared.WriteJSON(deps.Stdout, map[string]any{
+					"packageName": pkg,
+					"reviews":     result.Reviews,
+					"nextToken":   result.NextToken,
+				})
+			case "minimal":
+				values := make([]string, 0, len(result.Reviews))
+				for _, r := range result.Reviews {
+					values = append(values, r.ReviewID)
+				}
+				return shared.WriteMinimal(deps.Stdout, values)
+			default:
+				return shared.UsageErrorf("unsupported output format %q", shared.ResolveOutput(output))
+			}
 		},
 	}
 }

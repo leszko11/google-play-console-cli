@@ -79,6 +79,42 @@ func TestBundlesList_ReturnsBundles(t *testing.T) {
 	}
 }
 
+func TestBundlesList_MinimalOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				list: []gpc.BundleInfo{
+					{VersionCode: 1},
+					{VersionCode: 2},
+				},
+			}, nil
+		},
+	}
+
+	out, err := runBundles(t, deps, "list", "--package-name", "com.example.app", "--edit-id", "edit-1", "--output", "minimal")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if out != "1\n2\n" {
+		t.Fatalf("unexpected output: %q", out)
+	}
+}
+
+func TestBundlesList_RejectsUnsupportedOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runBundles(t, deps, "list", "--package-name", "com.example.app", "--edit-id", "edit-1", "--output", "table")
+	if err == nil || !strings.Contains(err.Error(), `unsupported output format "table"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestBundlesUpload_RequiresFile(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
