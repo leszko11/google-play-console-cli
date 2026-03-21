@@ -33,6 +33,7 @@
 
 ## Top-Level Commands
 
+- `audit`: View and manage the local CLI audit trail
 - `auth`: Manage authentication profiles
 - `bootstrap`: Export current Play state into a local bootstrap workspace
 - `appinit`: Bootstrap app store presence from a manifest
@@ -51,6 +52,7 @@
 - `e2e`: E2E fixture and smoke-testing helpers
 - `release`: Release workflows for staged Google Play deploys
 - `rollback`: Halt the active staged rollout on a track
+- `screenshots`: Manage screenshot-only sync workflows
 - `setup`: Provision auth and optional bootstrap workspace for gpc
 - `status`: Summarize tracks and recent review health for an app
 - `reviews`: Read and reply to Play Store reviews
@@ -74,8 +76,10 @@
 - `validate`: Run pre-submission validation checks
 - `workflow`: Run declarative gpc workflows from .gpc/workflow.yml
 - `grants`: Manage per-app user grants
+- `health`: Show composite health score for an app
 - `internal-sharing`: Upload artifacts for internal app sharing
 - `integrity`: Decode and inspect Play Integrity tokens
+- `watch`: Monitor release status and review health at regular intervals
 - `update`: Check for and install newer gpc releases
 - `completion`: Generate shell completion script
 
