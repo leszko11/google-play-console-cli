@@ -9,13 +9,15 @@ import (
 
 	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
 type profileRow struct {
-	Profile string `json:"profile"`
-	Active  bool   `json:"active"`
-	Storage string `json:"storage"`
+	Profile            string `json:"profile"`
+	Active             bool   `json:"active"`
+	Storage            string `json:"storage"`
+	ServiceAccountPath string `json:"serviceAccountPath,omitempty"`
 }
 
 type profilesPayload struct {
@@ -85,16 +87,28 @@ func newProfilesListCommand(deps Deps) *ffcli.Command {
 
 			rows := make([]profileRow, 0, len(names))
 			for name := range names {
-				storage := "unknown"
-				if _, ok := keychainProfiles[name]; ok {
-					storage = "keychain"
-				} else if profile, ok := cfg.Profiles[name]; ok && strings.TrimSpace(profile.ServiceAccountPath) != "" {
-					storage = "config"
+				storage := "legacy"
+				serviceAccountPath := ""
+				if profile, ok := cfg.Profiles[name]; ok {
+					switch strings.TrimSpace(profile.Storage) {
+					case config.StorageKeychain:
+						storage = config.StorageKeychain
+					case config.StoragePath:
+						storage = config.StoragePath
+						serviceAccountPath = strings.TrimSpace(profile.ServiceAccountPath)
+					default:
+						if strings.TrimSpace(profile.ServiceAccountPath) != "" {
+							serviceAccountPath = strings.TrimSpace(profile.ServiceAccountPath)
+						}
+					}
+				} else if _, ok := keychainProfiles[name]; ok {
+					storage = "legacy"
 				}
 				rows = append(rows, profileRow{
-					Profile: name,
-					Active:  name == selected,
-					Storage: storage,
+					Profile:            name,
+					Active:             name == selected,
+					Storage:            storage,
+					ServiceAccountPath: serviceAccountPath,
 				})
 			}
 			sort.Slice(rows, func(i, j int) bool {
@@ -121,7 +135,7 @@ func newProfilesListCommand(deps Deps) *ffcli.Command {
 				}
 				return shared.WriteYAML(deps.Stdout, payload)
 			case "table":
-				if _, err := fmt.Fprintln(deps.Stdout, "PROFILE\tACTIVE\tSTORAGE"); err != nil {
+				if _, err := fmt.Fprintln(deps.Stdout, "PROFILE\tACTIVE\tSTORAGE\tSERVICE_ACCOUNT_PATH"); err != nil {
 					return err
 				}
 				for _, row := range rows {
@@ -129,7 +143,7 @@ func newProfilesListCommand(deps Deps) *ffcli.Command {
 					if row.Active {
 						active = "yes"
 					}
-					if _, err := fmt.Fprintf(deps.Stdout, "%s\t%s\t%s\n", row.Profile, active, row.Storage); err != nil {
+					if _, err := fmt.Fprintf(deps.Stdout, "%s\t%s\t%s\t%s\n", row.Profile, active, row.Storage, row.ServiceAccountPath); err != nil {
 						return err
 					}
 				}
@@ -142,25 +156,25 @@ func newProfilesListCommand(deps Deps) *ffcli.Command {
 			case "csv", "tsv":
 				delimitedRows := make([][]string, 0, len(rows))
 				for _, row := range rows {
-					delimitedRows = append(delimitedRows, []string{row.Profile, fmt.Sprintf("%t", row.Active), row.Storage})
+					delimitedRows = append(delimitedRows, []string{row.Profile, fmt.Sprintf("%t", row.Active), row.Storage, row.ServiceAccountPath})
 				}
 				for _, warning := range warnings {
 					if _, err := fmt.Fprintf(deps.Stderr, "warning: %s\n", warning); err != nil {
 						return err
 					}
 				}
-				return shared.WriteDelimited(deps.Stdout, resolvedOutput, []string{"profile", "active", "storage"}, delimitedRows)
+				return shared.WriteDelimited(deps.Stdout, resolvedOutput, []string{"profile", "active", "storage", "serviceAccountPath"}, delimitedRows)
 			case "markdown":
 				markdownRows := make([][]string, 0, len(rows))
 				for _, row := range rows {
-					markdownRows = append(markdownRows, []string{row.Profile, fmt.Sprintf("%t", row.Active), row.Storage})
+					markdownRows = append(markdownRows, []string{row.Profile, fmt.Sprintf("%t", row.Active), row.Storage, row.ServiceAccountPath})
 				}
 				for _, warning := range warnings {
 					if _, err := fmt.Fprintf(deps.Stderr, "warning: %s\n", warning); err != nil {
 						return err
 					}
 				}
-				return shared.WriteMarkdownTable(deps.Stdout, []string{"profile", "active", "storage"}, markdownRows)
+				return shared.WriteMarkdownTable(deps.Stdout, []string{"profile", "active", "storage", "serviceAccountPath"}, markdownRows)
 			default:
 				return shared.UsageErrorf("unsupported output format %q", strings.TrimSpace(resolvedOutput))
 			}

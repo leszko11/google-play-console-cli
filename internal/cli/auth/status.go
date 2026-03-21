@@ -84,8 +84,18 @@ func writeStatusTable(out io.Writer, status statusPayload) error {
 			return err
 		}
 	}
+	if status.ProfileStorage != "" {
+		if _, err := fmt.Fprintf(out, "profileStorage\t%s\n", status.ProfileStorage); err != nil {
+			return err
+		}
+	}
 	if status.ServiceAccountPath != "" {
 		if _, err := fmt.Fprintf(out, "serviceAccountPath\t%s\n", status.ServiceAccountPath); err != nil {
+			return err
+		}
+	}
+	if status.ManagedCredentialPath != "" {
+		if _, err := fmt.Fprintf(out, "managedCredentialPath\t%s\n", status.ManagedCredentialPath); err != nil {
 			return err
 		}
 	}
@@ -121,8 +131,14 @@ func writeStatusMarkdown(out io.Writer, status statusPayload) error {
 	if status.StorageBackend != "" {
 		rows = append(rows, []string{"storageBackend", status.StorageBackend})
 	}
+	if status.ProfileStorage != "" {
+		rows = append(rows, []string{"profileStorage", status.ProfileStorage})
+	}
 	if status.ServiceAccountPath != "" {
 		rows = append(rows, []string{"serviceAccountPath", status.ServiceAccountPath})
+	}
+	if status.ManagedCredentialPath != "" {
+		rows = append(rows, []string{"managedCredentialPath", status.ManagedCredentialPath})
 	}
 	if status.LastValidatedAt != "" {
 		rows = append(rows, []string{"lastValidatedAt", status.LastValidatedAt})

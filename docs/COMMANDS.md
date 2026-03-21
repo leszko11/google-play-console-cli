@@ -441,6 +441,7 @@ FLAGS
   -profile default            Auth profile name
   -prompt-developer-id=false  Prompt for developer ID when missing (interactive terminals only)
   -service-account string     Path to service account JSON
+  -storage auto               Credential storage backend: auto, keychain, path
 ```
 
 ## `gpc auth status --help`
@@ -1908,6 +1909,7 @@ FLAGS
   -service-account-key string           Path to write or reuse the service account key JSON
   -service-account-name string          Service account name (defaults to gpc-<profile>)
   -skip-bootstrap=false                 Skip local bootstrap export even when package access is available
+  -storage auto                         Credential storage backend: auto, keychain, path
   -write-project-config=true            Write .gpc.yaml when bootstrap runs
 ```
 

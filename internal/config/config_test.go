@@ -63,3 +63,34 @@ func TestLoad_EmptyConfigFileReturnsZeroConfig(t *testing.T) {
 		t.Fatalf("expected no packages, got %v", got.Packages)
 	}
 }
+
+func TestWriteManagedServiceAccount_UsesConfigBaseDir(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "nested", "config.json")
+	t.Setenv("GPC_CONFIG_PATH", cfgPath)
+
+	path, err := WriteManagedServiceAccount("work", []byte(`{"type":"service_account"}`))
+	if err != nil {
+		t.Fatalf("write managed service account: %v", err)
+	}
+
+	wantPath := filepath.Join(filepath.Dir(cfgPath), "credentials", "work.json")
+	if path != wantPath {
+		t.Fatalf("unexpected managed path: got %q want %q", path, wantPath)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat managed service account: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("unexpected file mode: %o", info.Mode().Perm())
+	}
+
+	dirInfo, err := os.Stat(filepath.Dir(path))
+	if err != nil {
+		t.Fatalf("stat managed credentials dir: %v", err)
+	}
+	if dirInfo.Mode().Perm() != 0o700 {
+		t.Fatalf("unexpected dir mode: %o", dirInfo.Mode().Perm())
+	}
+}

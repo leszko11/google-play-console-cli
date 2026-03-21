@@ -8,6 +8,8 @@ Run full local checks:
 make dev
 ```
 
+`make test`, `make coverage`, and `make dev` now run with `GPC_BYPASS_KEYCHAIN=1` by default so local test runs do not prompt macOS keychain or bleed into host auth profiles.
+
 ## Smoke Harness Scripts
 
 Phase scripts:
@@ -54,6 +56,7 @@ Example:
 ```bash
 export GPC_SERVICE_ACCOUNT=/absolute/path/to/sa.json
 export GPC_TEST_PACKAGE=com.example.app
+export GPC_BYPASS_KEYCHAIN=1
 export GPC_ENABLE_PHASE3=0
 scripts/smoke-test-all.sh
 ```
@@ -94,6 +97,25 @@ For `purchases subscriptions defer --validate-only`, the current known blocker i
 3. fallback attempt through the legacy acknowledge endpoint rejected with `The product purchase is not owned by the user`
 
 Until the app-side billing flow yields an already-acknowledged subscription fixture, this check should be treated as a documented external Play constraint rather than a CLI regression.
+
+## Branch-Aware Demo App E2E
+
+Workflow: `.github/workflows/branch-aware-e2e.yml`
+
+This workflow calls the demo app harness in `leszko11/gpc-test-app` and asks it to build and validate a chosen CLI ref or SHA instead of validating CLI `main` after merge.
+
+Default behavior:
+
+- `workflow_dispatch` lets you validate the current branch or an explicit `cli_ref`.
+- `pull_request` runs advisory-only on same-repository PRs.
+- phases 3-5 run by default; phase 6 stays optional.
+
+Important GitHub Actions constraint:
+
+- reusable workflows execute with the caller repository's secrets and variables
+- for branch-aware runs to work, this repository must expose the same Play and Android signing credentials that the demo app harness needs for phases 3-5
+
+The called workflow source lives in `gpc-test-app/.github/workflows/e2e.yml`, and each run writes a summary with the tested CLI ref and the workflow source URL.
 
 ## CLI Smoke Commands
 

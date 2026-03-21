@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -474,6 +475,132 @@ func TestResolveCredentials_KeychainSource(t *testing.T) {
 	}
 	if !CredentialLocallyValid(resolved.Input) {
 		t.Fatal("expected locally valid keychain credential")
+	}
+}
+
+func TestResolveCredentials_PathProfileSkipsKeychain(t *testing.T) {
+	prevGlobals := boundGlobalFlags
+	prevBypass := resolveCredentialsShouldBypassKeychain
+	prevLoad := resolveCredentialsLoadProfileCredential
+	defer func() {
+		boundGlobalFlags = prevGlobals
+		resolveCredentialsShouldBypassKeychain = prevBypass
+		resolveCredentialsLoadProfileCredential = prevLoad
+	}()
+
+	boundGlobalFlags = &GlobalFlags{}
+	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return false }
+	resolveCredentialsLoadProfileCredential = func(string) ([]byte, error) {
+		t.Fatal("did not expect keychain lookup for path-backed profile")
+		return nil, nil
+	}
+
+	cfg := config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {ServiceAccountPath: "/tmp/path.json", Storage: config.StoragePath},
+		},
+	}
+
+	resolved, err := ResolveCredentials(cfg, func(string) string { return "" })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolved.Source != authresolver.SourceConfig {
+		t.Fatalf("expected config source, got %q", resolved.Source)
+	}
+	if resolved.Input.ServiceAccountPath != "/tmp/path.json" {
+		t.Fatalf("unexpected path: %q", resolved.Input.ServiceAccountPath)
+	}
+	if resolved.ProfileStorage != config.StoragePath {
+		t.Fatalf("unexpected profile storage: %q", resolved.ProfileStorage)
+	}
+}
+
+func TestResolveCredentials_KeychainProfileBypassFallsBackToPath(t *testing.T) {
+	prevGlobals := boundGlobalFlags
+	prevBypass := resolveCredentialsShouldBypassKeychain
+	prevLoad := resolveCredentialsLoadProfileCredential
+	defer func() {
+		boundGlobalFlags = prevGlobals
+		resolveCredentialsShouldBypassKeychain = prevBypass
+		resolveCredentialsLoadProfileCredential = prevLoad
+	}()
+
+	boundGlobalFlags = &GlobalFlags{}
+	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return true }
+	resolveCredentialsLoadProfileCredential = func(string) ([]byte, error) {
+		t.Fatal("did not expect keychain lookup while bypass is enabled")
+		return nil, nil
+	}
+
+	cfg := config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {ServiceAccountPath: "/tmp/fallback.json", Storage: config.StorageKeychain},
+		},
+	}
+
+	resolved, err := ResolveCredentials(cfg, func(string) string { return "" })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolved.Source != authresolver.SourceConfig {
+		t.Fatalf("expected config fallback, got %q", resolved.Source)
+	}
+	if !slices.Contains(resolved.Warnings, "keychain bypassed via GPC_BYPASS_KEYCHAIN") {
+		t.Fatalf("expected bypass warning, got %v", resolved.Warnings)
+	}
+}
+
+func TestWriteMinimal(t *testing.T) {
+	tests := []struct {
+		name   string
+		values []string
+		want   string
+	}{
+		{
+			name:   "multiple values",
+			values: []string{"com.example.app", "com.example.other"},
+			want:   "com.example.app\ncom.example.other\n",
+		},
+		{
+			name:   "single value",
+			values: []string{"com.example.app"},
+			want:   "com.example.app\n",
+		},
+		{
+			name:   "empty",
+			values: []string{},
+			want:   "",
+		},
+		{
+			name:   "nil",
+			values: nil,
+			want:   "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			err := WriteMinimal(&out, tc.values)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if out.String() != tc.want {
+				t.Fatalf("unexpected output %q, want %q", out.String(), tc.want)
+			}
+		})
+	}
+}
+
+func TestWriteMinimal_NilWriter(t *testing.T) {
+	// Passing nil writer should not panic; it falls back to os.Stdout.
+	// We cannot easily capture os.Stdout in a unit test, so just verify no panic.
+	err := WriteMinimal(nil, []string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

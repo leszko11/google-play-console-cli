@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
 
@@ -138,6 +139,72 @@ func TestSetupAutoRequiresProjectID(t *testing.T) {
 	_, err := runSetup(t, deps, "--auto")
 	if err == nil || !strings.Contains(err.Error(), "--project-id is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSetupAutoDefaultsToManagedCredentialsPath(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("GPC_CONFIG_PATH", configPath)
+
+	var authArgs []string
+	var createdKeyPath string
+	verifyClient := &fakeVerifyClient{}
+
+	deps := Deps{
+		RunCommand: func(_ context.Context, _ string, name string, args ...string) (string, error) {
+			if name != "gcloud" {
+				t.Fatalf("unexpected command: %s %v", name, args)
+			}
+			switch {
+			case len(args) >= 1 && args[0] == "--version":
+				return "Google Cloud SDK 999.0.0", nil
+			case len(args) >= 3 && args[0] == "iam" && args[1] == "service-accounts" && args[2] == "describe":
+				return "", errExit1
+			case len(args) >= 3 && args[0] == "iam" && args[1] == "service-accounts" && args[2] == "create":
+				return "", nil
+			case len(args) >= 3 && args[0] == "services" && args[1] == "enable":
+				return "", nil
+			case len(args) >= 5 && args[0] == "iam" && args[1] == "service-accounts" && args[2] == "keys":
+				createdKeyPath = args[4]
+				if err := os.MkdirAll(filepath.Dir(createdKeyPath), 0o700); err != nil {
+					t.Fatalf("mkdir key dir: %v", err)
+				}
+				if err := os.WriteFile(createdKeyPath, []byte(`{"type":"service_account"}`), 0o600); err != nil {
+					t.Fatalf("write key: %v", err)
+				}
+				return "", nil
+			default:
+				return "", nil
+			}
+		},
+		RunAuthInit: func(_ context.Context, args []string) error {
+			authArgs = append([]string(nil), args...)
+			return nil
+		},
+		RunBootstrap: func(_ context.Context, args []string) error { return nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (VerifyClient, error) {
+			return verifyClient, nil
+		},
+		Stdout: &bytes.Buffer{},
+		Stderr: &bytes.Buffer{},
+	}
+
+	if _, err := runSetup(t, deps, "--auto", "--project-id", "play-prod"); err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+
+	wantPath, err := config.ManagedServiceAccountPath("default")
+	if err != nil {
+		t.Fatalf("managed path: %v", err)
+	}
+	if createdKeyPath != wantPath {
+		t.Fatalf("unexpected key path: got %q want %q", createdKeyPath, wantPath)
+	}
+	if !contains(authArgs, "--storage") || !contains(authArgs, "auto") {
+		t.Fatalf("expected auth init storage auto args, got %v", authArgs)
+	}
+	if !contains(authArgs, wantPath) {
+		t.Fatalf("expected managed key path in auth args, got %v", authArgs)
 	}
 }
 
