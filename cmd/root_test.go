@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"flag"
 	"os"
 	"strings"
 	"testing"
@@ -44,5 +46,35 @@ func TestRootVersionFlagPrintsJSON(t *testing.T) {
 		!strings.Contains(out, `"commit":"abc123"`) ||
 		!strings.Contains(out, `"date":"2026-03-01T12:00:00Z"`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestRootUnknownCommandPrintsSuggestions(t *testing.T) {
+	cmd := newRootCommand()
+
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe stderr: %v", err)
+	}
+	defer stderrR.Close()
+
+	oldStderr := os.Stderr
+	os.Stderr = stderrW
+	defer func() { os.Stderr = oldStderr }()
+
+	err = cmd.Exec(context.Background(), []string{"statu"})
+	_ = stderrW.Close()
+	if err != flag.ErrHelp {
+		t.Fatalf("expected flag.ErrHelp, got %v", err)
+	}
+
+	buf := make([]byte, 4096)
+	n, _ := stderrR.Read(buf)
+	out := string(buf[:n])
+	if !strings.Contains(out, `Unknown command "statu". Did you mean:`) {
+		t.Fatalf("unexpected stderr: %s", out)
+	}
+	if !strings.Contains(out, "gpc status") {
+		t.Fatalf("expected status suggestion, got: %s", out)
 	}
 }
