@@ -67,6 +67,7 @@ make generate-command-docs
 - `gpc edits images`
 - `gpc edits images list`
 - `gpc edits images upload`
+- `gpc edits images upload-dir`
 - `gpc edits images delete`
 - `gpc edits images delete-all`
 - `gpc edits expansion-files`
@@ -105,6 +106,8 @@ make generate-command-docs
 - `gpc release full`
 - `gpc release promote`
 - `gpc rollback`
+- `gpc screenshots`
+- `gpc screenshots sync`
 - `gpc setup`
 - `gpc status`
 - `gpc reviews`
@@ -309,6 +312,7 @@ SUBCOMMANDS
   e2e                    E2E fixture and smoke-testing helpers
   release                Release workflows for staged Google Play deploys
   rollback               Halt the active staged rollout on a track
+  screenshots            Manage screenshot-only sync workflows
   setup                  Provision auth and optional bootstrap workspace for gpc
   status                 Summarize tracks and recent review health for an app
   reviews                Read and reply to Play Store reviews
@@ -815,10 +819,11 @@ USAGE
   commit
 
 FLAGS
-  -confirm=false        Confirm committing the edit (required unless --dry-run)
-  -dry-run=false        Validate the edit without committing it
-  -edit-id string       Edit ID
-  -package-name string  Package name
+  -changes-not-sent-for-review=false  Indicate that the changes in this edit will not be reviewed until they are explicitly sent for review from the Google Play Console UI
+  -confirm=false                      Confirm committing the edit (required unless --dry-run)
+  -dry-run=false                      Validate the edit without committing it
+  -edit-id string                     Edit ID
+  -package-name string                Package name
 ```
 
 ## `gpc edits delete --help`
@@ -1083,6 +1088,7 @@ USAGE
 SUBCOMMANDS
   list        List images for one locale/type inside an edit
   upload      Upload one image inside an edit
+  upload-dir  Upload all image files from a directory inside an edit
   delete      Delete one image inside an edit
   delete-all  Delete all images for one locale/type inside an edit
 ```
@@ -1118,6 +1124,25 @@ FLAGS
   -image-type string    Image type (icon, featureGraphic, phoneScreenshots, ...)
   -locale string        Listing locale (BCP-47, e.g. en-US)
   -package-name string  Package name
+```
+
+## `gpc edits images upload-dir --help`
+
+```text
+DESCRIPTION
+  Upload all image files from a directory inside an edit
+
+USAGE
+  upload-dir
+
+FLAGS
+  -dir string           Directory containing image files (PNG/JPEG)
+  -edit-id string       Edit ID
+  -image-type string    Image type (icon, featureGraphic, phoneScreenshots, ...)
+  -locale string        Listing locale (BCP-47, e.g. en-US)
+  -output string        Output format: json
+  -package-name string  Package name
+  -replace=false        Delete existing images for this locale/type before uploading
 ```
 
 ## `gpc edits images delete --help`
@@ -1777,6 +1802,36 @@ FLAGS
   -dry-run=false        Create and validate the edit, then delete it instead of updating the track
   -package-name string  Package name
   -track string         Track name (e.g. production)
+```
+
+## `gpc screenshots --help`
+
+```text
+DESCRIPTION
+  Manage screenshot-only sync workflows
+
+USAGE
+  screenshots
+
+SUBCOMMANDS
+  sync  Sync screenshots from a directory
+```
+
+## `gpc screenshots sync --help`
+
+```text
+DESCRIPTION
+  Sync screenshots from a directory
+
+USAGE
+  sync
+
+FLAGS
+  -confirm=false        Confirm committing the edit (required unless --dry-run)
+  -dir string           Screenshot directory root
+  -dry-run=false        Create and validate the edit, then delete it instead of mutating Play
+  -output string        Output format: json
+  -package-name string  Package name
 ```
 
 ## `gpc setup --help`

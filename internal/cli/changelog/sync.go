@@ -20,7 +20,7 @@ type Client interface {
 	CreateEdit(ctx context.Context, packageName string) (gpc.EditInfo, error)
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	ValidateEdit(ctx context.Context, packageName, editID string) error
-	CommitEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
+	CommitEdit(ctx context.Context, packageName, editID string, changesNotSentForReview bool) (gpc.EditInfo, error)
 	GetTrack(ctx context.Context, packageName, editID, trackName string) (gpc.TrackInfo, error)
 	UpdateTrack(ctx context.Context, packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error)
 }
@@ -220,7 +220,7 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 	if err := client.ValidateEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
 		return fail(fmt.Errorf("failed to validate edit: %w", err))
 	}
-	if _, err := client.CommitEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
+	if _, err := client.CommitEdit(requestCtx, opts.PackageName, edit.ID, false); err != nil {
 		return fail(fmt.Errorf("failed to commit edit: %w", err))
 	}
 	result.Status = "committed"

@@ -244,7 +244,7 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 		return shared.WriteJSON(out, result)
 	}
 
-	if _, err := client.CommitEdit(requestCtx, opts.PackageName, currentEditID); err != nil {
+	if _, err := client.CommitEdit(requestCtx, opts.PackageName, currentEditID, false); err != nil {
 		return fail("commit_edit", fmt.Errorf("failed to commit edit: %w", err))
 	}
 	currentEditID = ""
@@ -389,7 +389,7 @@ func haltRollout(ctx context.Context, client Client, packageName string, manifes
 	if err := client.ValidateEdit(ctx, packageName, editID); err != nil {
 		return fmt.Errorf("failed to validate halt edit: %w", err)
 	}
-	if _, err := client.CommitEdit(ctx, packageName, editID); err != nil {
+	if _, err := client.CommitEdit(ctx, packageName, editID, false); err != nil {
 		return fmt.Errorf("failed to commit halt edit: %w", err)
 	}
 	cleanup = false

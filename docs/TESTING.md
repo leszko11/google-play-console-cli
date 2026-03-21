@@ -135,6 +135,7 @@ gpc edits listings delete --package-name com.example.app --edit-id <edit-id> --l
 gpc edits listings delete-all --package-name com.example.app --edit-id <edit-id>
 gpc edits images list --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
 gpc edits images upload --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type icon --file /path/to/icon-512.png
+gpc edits images upload-dir --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots --dir ./screenshots/en-US/phone --replace
 gpc edits images delete --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots --image-id <image-id>
 gpc edits images delete-all --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
 gpc edits expansion-files get --package-name com.example.app --edit-id <edit-id> --apk-version-code 123 --expansion-file-type main
@@ -154,6 +155,7 @@ gpc bundles upload --package-name com.example.app --edit-id <edit-id> --file /pa
 gpc apks list --package-name com.example.app --edit-id <edit-id>
 gpc apks upload --package-name com.example.app --edit-id <edit-id> --file /path/to/app.apk
 gpc deobfuscation upload --package-name com.example.app --edit-id <edit-id> --version-code <version-code> --type proguard --file /path/to/mapping.txt
+gpc screenshots sync --package-name com.example.app --dir ./screenshots --confirm
 gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --confirm
 gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --release-notes-file /path/to/release-notes.json --confirm
 gpc deploy --package-name com.example.app --aab /path/to/app.aab --track internal --status completed --dry-run
@@ -292,8 +294,12 @@ gpc internal-sharing upload --package-name com.example.app --aab /path/to/app.aa
   - `gpc edits listings delete-all ...` should return `status: deleted_all`.
   - `gpc edits images list ...` should return image metadata for locale + image type.
   - `gpc edits images upload ...` should return `status: uploaded`; invalid type/dimensions should fail before API call.
+  - `gpc edits images upload-dir ... --replace` should return `status: uploaded`, deterministic upload ordering, and the replaced image list when prior images existed.
   - `gpc edits images delete ...` should return `status: deleted`.
   - `gpc edits images delete-all ...` should return `status: deleted_all`.
+  - `gpc screenshots sync ... --confirm` should create an edit, replace locale/type screenshots, and return `status: committed`.
+  - `gpc screenshots sync ... --dry-run` should return `status: dry-run` and delete the temporary edit.
+  - Draft-app commits should either auto-retry with `changesNotSentForReview=true` or emit the internal-track hint when Play rejects non-draft releases on a draft app.
   - `gpc edits commit ... --confirm` should be required for publishing changes.
   - `gpc tracks list ...` should return track JSON for the given edit.
   - `gpc tracks update ... --release-notes-file ...` should apply all locale notes from the payload in one request.

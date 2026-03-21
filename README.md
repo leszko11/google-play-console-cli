@@ -51,7 +51,8 @@ gpc completion zsh > ~/.zfunc/_gpc
 - Edit transactions and listing updates (`edits`)
 - Testers and country availability inside edits
 - Track management inside edits (`tracks list/get/update/promote`)
-- Store images inside edits (`edits images list/upload/delete/delete-all`)
+- Store images inside edits (`edits images list/upload/upload-dir/delete/delete-all`)
+- Screenshot-only sync workflow (`screenshots sync`)
 - APK expansion files inside edits (`edits expansion-files get/patch/update/upload`)
 - Binary uploads in edits (`apks list/upload`, `bundles list/upload`)
 - Deobfuscation mapping upload (`deobfuscation upload`)
@@ -253,8 +254,25 @@ gpc edits listings delete-all --package-name com.example.app --edit-id <edit-id>
 # Manage store images in an edit
 gpc edits images list --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
 gpc edits images upload --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type icon --file /path/to/icon-512.png
+gpc edits images upload-dir --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots --dir ./screenshots/en-US/phone --replace
 gpc edits images delete --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots --image-id <image-id>
 gpc edits images delete-all --package-name com.example.app --edit-id <edit-id> --locale en-US --image-type phoneScreenshots
+
+# Sync screenshot directories end-to-end with an edit lifecycle handled for you
+gpc screenshots sync --package-name com.example.app --dir ./screenshots --confirm
+
+# Supported screenshot layouts:
+# 1. Simple tree:
+#    screenshots/en-US/phone/01.png
+#    screenshots/en-US/seven-inch/01.png
+# 2. Listing-style tree:
+#    screenshots/en-US/images/phoneScreenshots/01.png
+# Alias mapping:
+#   phone -> phoneScreenshots
+#   seven-inch -> sevenInchScreenshots
+#   ten-inch -> tenInchScreenshots
+#   tv -> tvScreenshots
+#   wear -> wearScreenshots
 
 # Manage APK expansion files in an edit
 gpc edits expansion-files get --package-name com.example.app --edit-id <edit-id> --apk-version-code 123 --expansion-file-type main
@@ -275,7 +293,13 @@ gpc edits expansion-files upload --package-name com.example.app --edit-id <edit-
 gpc edits commit --package-name com.example.app --edit-id <edit-id> --dry-run
 gpc edits delete --package-name com.example.app --edit-id <edit-id> --dry-run
 gpc edits commit --package-name com.example.app --edit-id <edit-id> --confirm
+gpc edits commit --package-name com.example.app --edit-id <edit-id> --confirm --changes-not-sent-for-review
 gpc edits delete --package-name com.example.app --edit-id <edit-id> --confirm
+
+# Draft-app troubleshooting:
+# - gpc retries edit commits with changesNotSentForReview=true when Play requires it.
+# - If Play returns "Only releases with status draft may be created on draft app",
+#   fix the internal track release status in Play Console before retrying.
 
 # Dry-run coverage today
 # - Previewable: bootstrap/appinit export, changelog sync, listing sync, deploy,
@@ -635,6 +659,7 @@ gpc validate --help
 gpc e2e --help
 gpc release --help
 gpc rollback --help
+gpc screenshots --help
 gpc status --help
 gpc reviews --help
 gpc reports --help

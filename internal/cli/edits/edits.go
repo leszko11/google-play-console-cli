@@ -25,7 +25,7 @@ type Client interface {
 	CreateEdit(ctx context.Context, packageName string) (gpc.EditInfo, error)
 	GetEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
 	ValidateEdit(ctx context.Context, packageName, editID string) error
-	CommitEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
+	CommitEdit(ctx context.Context, packageName, editID string, changesNotSentForReview bool) (gpc.EditInfo, error)
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	GetAppDetails(ctx context.Context, packageName, editID string) (gpc.AppDetailsInfo, error)
 	UpdateAppDetails(ctx context.Context, packageName, editID string, update gpc.AppDetailsUpdate) (gpc.AppDetailsInfo, error)
@@ -202,11 +202,12 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("commit", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, editID string
-	var confirm, dryRun bool
+	var confirm, dryRun, changesNotSentForReview bool
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
 	fs.BoolVar(&confirm, "confirm", false, "Confirm committing the edit (required unless --dry-run)")
 	fs.BoolVar(&dryRun, "dry-run", false, "Validate the edit without committing it")
+	fs.BoolVar(&changesNotSentForReview, "changes-not-sent-for-review", false, "Indicate that the changes in this edit will not be reviewed until they are explicitly sent for review from the Google Play Console UI")
 
 	return &ffcli.Command{
 		Name:      "commit",
@@ -237,14 +238,16 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 					"validated":   true,
 				})
 			}
-			edit, err := client.CommitEdit(requestCtx, pkg, editID)
+			commit, err := shared.CommitEditWithReviewFallback(requestCtx, client, pkg, editID, changesNotSentForReview)
 			if err != nil {
 				return fmt.Errorf("failed to commit edit: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
-				"packageName": pkg,
-				"edit":        edit,
-				"status":      "committed",
+				"packageName":             pkg,
+				"edit":                    commit.Edit,
+				"status":                  "committed",
+				"changesNotSentForReview": commit.ChangesNotSentForReview,
+				"commitRetried":           commit.RetriedWithChangesNotSentForReview,
 			})
 		},
 	}
@@ -325,6 +328,7 @@ func newImagesCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newImagesListCommand(deps),
 			newImagesUploadCommand(deps),
+			newImagesUploadDirCommand(deps),
 			newImagesDeleteCommand(deps),
 			newImagesDeleteAllCommand(deps),
 		},
@@ -440,6 +444,93 @@ func newImagesUploadCommand(deps Deps) *ffcli.Command {
 				"locale":      locale,
 				"imageType":   imageType,
 				"image":       imageInfo,
+				"status":      "uploaded",
+			})
+		},
+	}
+}
+
+func newImagesUploadDirCommand(deps Deps) *ffcli.Command {
+	fs := flag.NewFlagSet("upload-dir", flag.ContinueOnError)
+	fs.SetOutput(deps.Stderr)
+	var packageName, editID, locale, imageType, dir, output string
+	var replace bool
+	addImageSharedFlags(fs, &packageName, &editID, &locale, &imageType)
+	fs.StringVar(&dir, "dir", "", "Directory containing image files (PNG/JPEG)")
+	fs.BoolVar(&replace, "replace", false, "Delete existing images for this locale/type before uploading")
+	fs.StringVar(&output, "output", "", "Output format: json")
+
+	return &ffcli.Command{
+		Name:      "upload-dir",
+		ShortHelp: "Upload all image files from a directory inside an edit",
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, _ []string) error {
+			if strings.TrimSpace(output) != "" && shared.ResolveOutput(output) != "json" {
+				resolved := shared.ResolveOutput(output)
+				return shared.UsageErrorf("unsupported output format %q", resolved)
+			}
+
+			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName, true)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+
+			editID = strings.TrimSpace(editID)
+			if editID == "" {
+				return shared.UsageErrorf("--edit-id is required")
+			}
+			locale = strings.TrimSpace(locale)
+			if locale == "" {
+				return shared.UsageErrorf("--locale is required")
+			}
+			imageType, err = validateImageType(imageType)
+			if err != nil {
+				return err
+			}
+			dir = strings.TrimSpace(dir)
+			if dir == "" {
+				return shared.UsageErrorf("--dir is required")
+			}
+
+			files, err := collectImageUploadFiles(dir)
+			if err != nil {
+				return err
+			}
+			for _, imagePath := range files {
+				if err := validateImageUploadFile(imageType, imagePath); err != nil {
+					return err
+				}
+			}
+
+			deleted := []gpc.ImageInfo(nil)
+			if replace {
+				deleted, err = client.DeleteAllImages(requestCtx, pkg, editID, locale, imageType)
+				if err != nil {
+					return fmt.Errorf("failed to replace images: %w", err)
+				}
+			}
+
+			uploaded := make([]gpc.ImageInfo, 0, len(files))
+			for _, imagePath := range files {
+				imageInfo, err := client.UploadImage(requestCtx, pkg, editID, locale, imageType, imagePath)
+				if err != nil {
+					return fmt.Errorf("failed to upload image %q: %w", imagePath, err)
+				}
+				uploaded = append(uploaded, imageInfo)
+			}
+
+			return shared.WriteJSON(deps.Stdout, map[string]any{
+				"packageName": pkg,
+				"editId":      editID,
+				"locale":      locale,
+				"imageType":   imageType,
+				"dir":         dir,
+				"replace":     replace,
+				"uploadCount": len(uploaded),
+				"images":      uploaded,
+				"deleted":     deleted,
 				"status":      "uploaded",
 			})
 		},
@@ -1163,6 +1254,45 @@ func validateImageUploadFile(imageType, imagePath string) error {
 
 func ValidateImageUploadFile(imageType, imagePath string) error {
 	return validateImageUploadFile(imageType, imagePath)
+}
+
+func collectImageUploadFiles(dir string) ([]string, error) {
+	info, err := os.Stat(dir)
+	if err != nil {
+		return nil, fmt.Errorf("stat --dir: %w", err)
+	}
+	if !info.IsDir() {
+		return nil, shared.UsageErrorf("--dir must point to a directory")
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("read --dir: %w", err)
+	}
+
+	files := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		if entry.IsDir() {
+			return nil, shared.UsageErrorf("--dir must contain image files only; nested directory %q is not supported", entry.Name())
+		}
+
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		switch ext {
+		case ".png", ".jpg", ".jpeg":
+			files = append(files, filepath.Join(dir, entry.Name()))
+		default:
+			return nil, shared.UsageErrorf("--dir contains unsupported file %q; only .png, .jpg, and .jpeg are allowed", entry.Name())
+		}
+	}
+
+	sort.Strings(files)
+	if len(files) == 0 {
+		return nil, shared.UsageErrorf("--dir must contain at least one image file")
+	}
+	return files, nil
 }
 
 func isScreenshotImageType(imageType string) bool {

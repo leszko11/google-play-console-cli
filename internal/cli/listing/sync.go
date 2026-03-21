@@ -17,7 +17,7 @@ type Client interface {
 	CreateEdit(ctx context.Context, packageName string) (gpc.EditInfo, error)
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	ValidateEdit(ctx context.Context, packageName, editID string) error
-	CommitEdit(ctx context.Context, packageName, editID string) (gpc.EditInfo, error)
+	CommitEdit(ctx context.Context, packageName, editID string, changesNotSentForReview bool) (gpc.EditInfo, error)
 	ListListings(ctx context.Context, packageName, editID string) ([]gpc.ListingInfo, error)
 	UpdateListing(ctx context.Context, packageName, editID, language string, update gpc.ListingUpdate) (gpc.ListingInfo, error)
 	DeleteListing(ctx context.Context, packageName, editID, language string) error
@@ -26,15 +26,17 @@ type Client interface {
 }
 
 type syncResult struct {
-	PackageName      string   `json:"packageName"`
-	Dir              string   `json:"dir"`
-	Status           string   `json:"status"`
-	LocaleCount      int      `json:"localeCount"`
-	ImageUploadCount int      `json:"imageUploadCount"`
-	DeletedLocales   []string `json:"deletedLocales,omitempty"`
-	PlannedActions   []string `json:"plannedActions,omitempty"`
-	Committed        bool     `json:"committed"`
-	CleanupPerformed bool     `json:"cleanupPerformed"`
+	PackageName             string   `json:"packageName"`
+	Dir                     string   `json:"dir"`
+	Status                  string   `json:"status"`
+	LocaleCount             int      `json:"localeCount"`
+	ImageUploadCount        int      `json:"imageUploadCount"`
+	DeletedLocales          []string `json:"deletedLocales,omitempty"`
+	PlannedActions          []string `json:"plannedActions,omitempty"`
+	Committed               bool     `json:"committed"`
+	CleanupPerformed        bool     `json:"cleanupPerformed"`
+	ChangesNotSentForReview bool     `json:"changesNotSentForReview,omitempty"`
+	CommitRetried           bool     `json:"commitRetried,omitempty"`
 }
 
 type syncOptions struct {
@@ -179,9 +181,12 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 	if err := client.ValidateEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
 		return fail(fmt.Errorf("failed to validate edit: %w", err))
 	}
-	if _, err := client.CommitEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
+	commit, err := shared.CommitEditWithReviewFallback(requestCtx, client, opts.PackageName, edit.ID, false)
+	if err != nil {
 		return fail(fmt.Errorf("failed to commit edit: %w", err))
 	}
+	result.ChangesNotSentForReview = commit.ChangesNotSentForReview
+	result.CommitRetried = commit.RetriedWithChangesNotSentForReview
 	result.Committed = true
 	result.Status = "committed"
 	return shared.WriteJSON(out, result)

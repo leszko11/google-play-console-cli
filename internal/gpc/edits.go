@@ -66,7 +66,7 @@ func (c *Client) ValidateEdit(ctx context.Context, packageName, editID string) e
 	return nil
 }
 
-func (c *Client) CommitEdit(ctx context.Context, packageName, editID string) (EditInfo, error) {
+func (c *Client) CommitEdit(ctx context.Context, packageName, editID string, changesNotSentForReview bool) (EditInfo, error) {
 	packageName = strings.TrimSpace(packageName)
 	if packageName == "" {
 		return EditInfo{}, fmt.Errorf("package name is required")
@@ -79,7 +79,11 @@ func (c *Client) CommitEdit(ctx context.Context, packageName, editID string) (Ed
 		return EditInfo{}, ErrInvalidCredentials
 	}
 
-	edit, err := c.service.Edits.Commit(packageName, editID).Context(ctx).Do()
+	call := c.service.Edits.Commit(packageName, editID)
+	if changesNotSentForReview {
+		call = call.ChangesNotSentForReview(true)
+	}
+	edit, err := call.Context(ctx).Do()
 	if err != nil {
 		return EditInfo{}, mapGoogleAPIError(err)
 	}

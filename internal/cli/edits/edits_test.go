@@ -26,7 +26,7 @@ type fakeClient struct {
 	validateFn         func(packageName, editID string) error
 	commit             gpc.EditInfo
 	commitErr          error
-	commitFn           func(packageName, editID string) (gpc.EditInfo, error)
+	commitFn           func(packageName, editID string, changesNotSentForReview bool) (gpc.EditInfo, error)
 	deleteErr          error
 	deleteFn           func(packageName, editID string) error
 	appDetails         gpc.AppDetailsInfo
@@ -59,6 +59,7 @@ type fakeClient struct {
 	deleteImageErr     error
 	deleteAllImgErr    error
 	uploadImageFn      func(packageName, editID, language, imageType, imagePath string) (gpc.ImageInfo, error)
+	deleteAllImagesFn  func(packageName, editID, language, imageType string) ([]gpc.ImageInfo, error)
 	expansionFile      gpc.ExpansionFileInfo
 	expansionFileErr   error
 	uploadExpansionErr error
@@ -85,9 +86,9 @@ func (f fakeClient) ValidateEdit(_ context.Context, packageName, editID string) 
 	}
 	return f.validate
 }
-func (f fakeClient) CommitEdit(_ context.Context, packageName, editID string) (gpc.EditInfo, error) {
+func (f fakeClient) CommitEdit(_ context.Context, packageName, editID string, changesNotSentForReview bool) (gpc.EditInfo, error) {
 	if f.commitFn != nil {
-		return f.commitFn(packageName, editID)
+		return f.commitFn(packageName, editID, changesNotSentForReview)
 	}
 	return f.commit, f.commitErr
 }
@@ -162,7 +163,10 @@ func (f fakeClient) UploadImage(_ context.Context, packageName, editID, language
 func (f fakeClient) DeleteImage(_ context.Context, _, _, _, _, _ string) error {
 	return f.deleteImageErr
 }
-func (f fakeClient) DeleteAllImages(_ context.Context, _, _, _, _ string) ([]gpc.ImageInfo, error) {
+func (f fakeClient) DeleteAllImages(_ context.Context, packageName, editID, language, imageType string) ([]gpc.ImageInfo, error) {
+	if f.deleteAllImagesFn != nil {
+		return f.deleteAllImagesFn(packageName, editID, language, imageType)
+	}
 	return f.images, f.deleteAllImgErr
 }
 func (f fakeClient) GetExpansionFile(_ context.Context, packageName, editID string, apkVersionCode int64, expansionFileType string) (gpc.ExpansionFileInfo, error) {
@@ -195,6 +199,14 @@ func runEdits(t *testing.T, deps Deps, args ...string) (string, error) {
 	var out bytes.Buffer
 	deps.Stdout = &out
 	deps.Stderr = &bytes.Buffer{}
+	if deps.LookupEnv == nil {
+		deps.LookupEnv = func(key string) string {
+			if key == "GPC_BYPASS_KEYCHAIN" {
+				return "1"
+			}
+			return ""
+		}
+	}
 	cmd := NewCommand(deps)
 	err := cmd.ParseAndRun(context.Background(), args)
 	return out.String(), err
@@ -290,7 +302,7 @@ func TestEditsCommit_DryRunValidatesWithoutCommitting(t *testing.T) {
 					}
 					return nil
 				},
-				commitFn: func(string, string) (gpc.EditInfo, error) {
+				commitFn: func(string, string, bool) (gpc.EditInfo, error) {
 					commitCalls++
 					return gpc.EditInfo{}, nil
 				},
@@ -310,6 +322,45 @@ func TestEditsCommit_DryRunValidatesWithoutCommitting(t *testing.T) {
 	}
 	if !strings.Contains(out, `"status":"dry-run"`) || !strings.Contains(out, `"validated":true`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestEditsCommit_PassesChangesNotSentForReview(t *testing.T) {
+	var commitFlags []bool
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				commitFn: func(packageName, editID string, changesNotSentForReview bool) (gpc.EditInfo, error) {
+					if packageName != "com.example.app" || editID != "edit-1" {
+						t.Fatalf("unexpected commit target %q %q", packageName, editID)
+					}
+					commitFlags = append(commitFlags, changesNotSentForReview)
+					return gpc.EditInfo{ID: "edit-1"}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"commit",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--confirm",
+		"--changes-not-sent-for-review",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if len(commitFlags) != 1 || !commitFlags[0] {
+		t.Fatalf("unexpected commit flags: %+v", commitFlags)
+	}
+	for _, want := range []string{`"status":"committed"`, `"changesNotSentForReview":true`, `"commitRetried":false`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
 	}
 }
 
@@ -1080,6 +1131,150 @@ func TestEditsImagesUpload_RejectsWrongDimensionsForIcon(t *testing.T) {
 	}
 }
 
+func TestEditsImagesUploadDir_SortsFilesAndReplaces(t *testing.T) {
+	dir := t.TempDir()
+	second := writePNGFile(t, dir, "02.png", 320, 320)
+	first := writePNGFile(t, dir, "01.png", 320, 320)
+
+	var uploaded []string
+	var deleteCalls int
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				deleteAllImagesFn: func(packageName, editID, language, imageType string) ([]gpc.ImageInfo, error) {
+					deleteCalls++
+					if packageName != "com.example.app" || editID != "edit-1" || language != "en-US" || imageType != "phoneScreenshots" {
+						t.Fatalf("unexpected delete-all args: %q %q %q %q", packageName, editID, language, imageType)
+					}
+					return []gpc.ImageInfo{{ID: "old-1"}}, nil
+				},
+				uploadImageFn: func(_, _, _, _, imagePath string) (gpc.ImageInfo, error) {
+					uploaded = append(uploaded, imagePath)
+					return gpc.ImageInfo{ID: filepath.Base(imagePath)}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"images",
+		"upload-dir",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+		"--image-type", "phoneScreenshots",
+		"--dir", dir,
+		"--replace",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if deleteCalls != 1 {
+		t.Fatalf("expected one delete-all call, got %d", deleteCalls)
+	}
+	if len(uploaded) != 2 || uploaded[0] != first || uploaded[1] != second {
+		t.Fatalf("unexpected upload order: %+v", uploaded)
+	}
+	for _, want := range []string{`"uploadCount":2`, `"replace":true`, `"id":"old-1"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+}
+
+func TestEditsImagesUploadDir_RejectsEmptyDirectory(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(
+		t,
+		deps,
+		"images",
+		"upload-dir",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+		"--image-type", "phoneScreenshots",
+		"--dir", t.TempDir(),
+	)
+	if err == nil || !strings.Contains(err.Error(), "must contain at least one image file") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEditsImagesUploadDir_RejectsUnsupportedFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "notes.txt")
+	if err := os.WriteFile(path, []byte("nope"), 0o600); err != nil {
+		t.Fatalf("write text file: %v", err)
+	}
+
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runEdits(
+		t,
+		deps,
+		"images",
+		"upload-dir",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+		"--image-type", "phoneScreenshots",
+		"--dir", dir,
+	)
+	if err == nil || !strings.Contains(err.Error(), "unsupported file") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEditsImagesUploadDir_ValidatesBeforeUpload(t *testing.T) {
+	dir := t.TempDir()
+	writePNGFile(t, dir, "01.png", 320, 320)
+
+	var uploadCalls int
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				uploadImageFn: func(_, _, _, _, _ string) (gpc.ImageInfo, error) {
+					uploadCalls++
+					return gpc.ImageInfo{}, nil
+				},
+			}, nil
+		},
+	}
+
+	_, err := runEdits(
+		t,
+		deps,
+		"images",
+		"upload-dir",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--locale", "en-US",
+		"--image-type", "icon",
+		"--dir", dir,
+	)
+	if err == nil || !strings.Contains(err.Error(), "requires dimensions 512x512") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if uploadCalls != 0 {
+		t.Fatalf("expected validation failure before uploads, got %d upload calls", uploadCalls)
+	}
+}
+
 func TestEditsImagesDelete_ReturnsDeleted(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
@@ -1262,6 +1457,29 @@ func writePNG(t *testing.T, width, height int) string {
 	}
 
 	path := filepath.Join(t.TempDir(), "test.png")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create png: %v", err)
+	}
+	defer file.Close()
+	if err := png.Encode(file, img); err != nil {
+		t.Fatalf("encode png: %v", err)
+	}
+
+	return path
+}
+
+func writePNGFile(t *testing.T, dir, name string, width, height int) string {
+	t.Helper()
+
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{R: 0x22, G: 0x44, B: 0x88, A: 0xff})
+		}
+	}
+
+	path := filepath.Join(dir, name)
 	file, err := os.Create(path)
 	if err != nil {
 		t.Fatalf("create png: %v", err)
