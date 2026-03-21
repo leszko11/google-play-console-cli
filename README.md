@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://fonts.gstatic.com/s/i/productlogos/play_console/v10/192px.svg" width="96" alt="Google Play Console" />
-</p>
-
 <h1 align="center">gpc</h1>
 
 <p align="center">
