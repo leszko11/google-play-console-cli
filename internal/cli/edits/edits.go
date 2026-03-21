@@ -243,9 +243,9 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 				return fmt.Errorf("failed to commit edit: %w", err)
 			}
 			return shared.WriteJSON(deps.Stdout, map[string]any{
-				"packageName": pkg,
-				"edit":        commit.Edit,
-				"status":      "committed",
+				"packageName":             pkg,
+				"edit":                    commit.Edit,
+				"status":                  "committed",
 				"changesNotSentForReview": commit.ChangesNotSentForReview,
 				"commitRetried":           commit.RetriedWithChangesNotSentForReview,
 			})

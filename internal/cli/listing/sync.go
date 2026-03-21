@@ -26,17 +26,17 @@ type Client interface {
 }
 
 type syncResult struct {
-	PackageName      string   `json:"packageName"`
-	Dir              string   `json:"dir"`
-	Status           string   `json:"status"`
-	LocaleCount      int      `json:"localeCount"`
-	ImageUploadCount int      `json:"imageUploadCount"`
-	DeletedLocales   []string `json:"deletedLocales,omitempty"`
-	PlannedActions   []string `json:"plannedActions,omitempty"`
-	Committed        bool     `json:"committed"`
-	CleanupPerformed bool     `json:"cleanupPerformed"`
-	ChangesNotSentForReview bool `json:"changesNotSentForReview,omitempty"`
-	CommitRetried bool `json:"commitRetried,omitempty"`
+	PackageName             string   `json:"packageName"`
+	Dir                     string   `json:"dir"`
+	Status                  string   `json:"status"`
+	LocaleCount             int      `json:"localeCount"`
+	ImageUploadCount        int      `json:"imageUploadCount"`
+	DeletedLocales          []string `json:"deletedLocales,omitempty"`
+	PlannedActions          []string `json:"plannedActions,omitempty"`
+	Committed               bool     `json:"committed"`
+	CleanupPerformed        bool     `json:"cleanupPerformed"`
+	ChangesNotSentForReview bool     `json:"changesNotSentForReview,omitempty"`
+	CommitRetried           bool     `json:"commitRetried,omitempty"`
 }
 
 type syncOptions struct {

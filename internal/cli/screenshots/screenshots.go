@@ -43,18 +43,18 @@ type syncOptions struct {
 }
 
 type syncResult struct {
-	PackageName               string   `json:"packageName"`
-	Dir                       string   `json:"dir"`
-	Status                    string   `json:"status"`
-	LocaleCount               int      `json:"localeCount"`
-	ImageTypeCount            int      `json:"imageTypeCount"`
-	ImageUploadCount          int      `json:"imageUploadCount"`
-	ReplaceCount              int      `json:"replaceCount"`
-	PlannedActions            []string `json:"plannedActions,omitempty"`
-	Committed                 bool     `json:"committed"`
-	CleanupPerformed          bool     `json:"cleanupPerformed"`
-	ChangesNotSentForReview   bool     `json:"changesNotSentForReview,omitempty"`
-	CommitRetried             bool     `json:"commitRetried,omitempty"`
+	PackageName             string   `json:"packageName"`
+	Dir                     string   `json:"dir"`
+	Status                  string   `json:"status"`
+	LocaleCount             int      `json:"localeCount"`
+	ImageTypeCount          int      `json:"imageTypeCount"`
+	ImageUploadCount        int      `json:"imageUploadCount"`
+	ReplaceCount            int      `json:"replaceCount"`
+	PlannedActions          []string `json:"plannedActions,omitempty"`
+	Committed               bool     `json:"committed"`
+	CleanupPerformed        bool     `json:"cleanupPerformed"`
+	ChangesNotSentForReview bool     `json:"changesNotSentForReview,omitempty"`
+	CommitRetried           bool     `json:"commitRetried,omitempty"`
 }
 
 type localeScreenshots struct {
@@ -63,23 +63,23 @@ type localeScreenshots struct {
 }
 
 var screenshotDirAliases = map[string]string{
-	"phone":                 "phoneScreenshots",
-	"phonescreenshots":      "phoneScreenshots",
-	"phone-screenshots":     "phoneScreenshots",
-	"seven-inch":            "sevenInchScreenshots",
-	"seven_inch":            "sevenInchScreenshots",
-	"seveninchscreenshots":  "sevenInchScreenshots",
-	"seven-inch-screenshots":"sevenInchScreenshots",
-	"ten-inch":              "tenInchScreenshots",
-	"ten_inch":              "tenInchScreenshots",
-	"teninchscreenshots":    "tenInchScreenshots",
-	"ten-inch-screenshots":  "tenInchScreenshots",
-	"tv":                    "tvScreenshots",
-	"tvscreenshots":         "tvScreenshots",
-	"tv-screenshots":        "tvScreenshots",
-	"wear":                  "wearScreenshots",
-	"wearscreenshots":       "wearScreenshots",
-	"wear-screenshots":      "wearScreenshots",
+	"phone":                  "phoneScreenshots",
+	"phonescreenshots":       "phoneScreenshots",
+	"phone-screenshots":      "phoneScreenshots",
+	"seven-inch":             "sevenInchScreenshots",
+	"seven_inch":             "sevenInchScreenshots",
+	"seveninchscreenshots":   "sevenInchScreenshots",
+	"seven-inch-screenshots": "sevenInchScreenshots",
+	"ten-inch":               "tenInchScreenshots",
+	"ten_inch":               "tenInchScreenshots",
+	"teninchscreenshots":     "tenInchScreenshots",
+	"ten-inch-screenshots":   "tenInchScreenshots",
+	"tv":                     "tvScreenshots",
+	"tvscreenshots":          "tvScreenshots",
+	"tv-screenshots":         "tvScreenshots",
+	"wear":                   "wearScreenshots",
+	"wearscreenshots":        "wearScreenshots",
+	"wear-screenshots":       "wearScreenshots",
 }
 
 var screenshotImageTypes = map[string]struct{}{

@@ -13,8 +13,8 @@ type EditCommitClient interface {
 }
 
 type EditCommitResult struct {
-	Edit                              gpc.EditInfo
-	ChangesNotSentForReview           bool
+	Edit                               gpc.EditInfo
+	ChangesNotSentForReview            bool
 	RetriedWithChangesNotSentForReview bool
 }
 
