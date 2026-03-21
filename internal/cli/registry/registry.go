@@ -5,6 +5,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/appinit"
 	"github.com/leszko11/google-play-console-cli/internal/cli/apprecoveries"
 	"github.com/leszko11/google-play-console-cli/internal/cli/apps"
+	"github.com/leszko11/google-play-console-cli/internal/cli/audit"
 	"github.com/leszko11/google-play-console-cli/internal/cli/auth"
 	"github.com/leszko11/google-play-console-cli/internal/cli/bundles"
 	"github.com/leszko11/google-play-console-cli/internal/cli/changelog"
@@ -59,6 +60,7 @@ func Register(root *ffcli.Command, deps Deps) {
 	_ = deps
 
 	root.Subcommands = []*ffcli.Command{
+		audit.NewCommand(audit.Deps{}),
 		auth.NewCommand(auth.Deps{}),
 		appinit.NewBootstrapCommand(appinit.Deps{}),
 		appinit.NewCommand(appinit.Deps{}),

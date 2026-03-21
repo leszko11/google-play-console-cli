@@ -17,6 +17,9 @@ make generate-command-docs
 
 ## Command Paths
 
+- `gpc audit`
+- `gpc audit log`
+- `gpc audit show`
 - `gpc auth`
 - `gpc auth init`
 - `gpc auth status`
@@ -294,6 +297,7 @@ USAGE
   gpc [flags] <command>
 
 SUBCOMMANDS
+  audit                  View and manage the local CLI audit trail
   auth                   Manage authentication profiles
   bootstrap              Export current Play state into a local bootstrap workspace
   appinit                Bootstrap app store presence from a manifest
@@ -355,6 +359,50 @@ FLAGS
   -timeout 0s              Request timeout
   -upload-timeout 0s       Upload request timeout
   -version=false           Show build version information
+```
+
+## `gpc audit --help`
+
+```text
+DESCRIPTION
+  View and manage the local CLI audit trail
+
+USAGE
+  audit
+
+SUBCOMMANDS
+  log   Append an entry to the audit trail
+  show  Display the audit trail
+```
+
+## `gpc audit log --help`
+
+```text
+DESCRIPTION
+  Append an entry to the audit trail
+
+USAGE
+  log
+
+FLAGS
+  -command string       Command that was executed
+  -detail string        Additional detail (optional)
+  -package-name string  Package name (optional)
+  -user string          User who ran the command (optional)
+```
+
+## `gpc audit show --help`
+
+```text
+DESCRIPTION
+  Display the audit trail
+
+USAGE
+  show
+
+FLAGS
+  -last 0         Show only the last N entries
+  -output string  Output format: json, table, markdown
 ```
 
 ## `gpc auth --help`
