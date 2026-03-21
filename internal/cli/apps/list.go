@@ -26,7 +26,7 @@ func NewListCommand(deps Deps) *ffcli.Command {
 		output string
 	)
 	fs.BoolVar(&verify, "verify", false, "Verify API access for each configured package")
-	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, yaml, csv, tsv")
+	fs.StringVar(&output, "output", "", "Output format: json, table, markdown, yaml, csv, tsv, minimal")
 
 	return &ffcli.Command{
 		Name:      "list",
@@ -113,6 +113,12 @@ func writeListOutput(deps Deps, output string, items []listItem) error {
 			rows = append(rows, []string{item.PackageName, status})
 		}
 		return shared.WriteMarkdownTable(deps.Stdout, []string{"package", "status"}, rows)
+	case "minimal":
+		values := make([]string, 0, len(items))
+		for _, item := range items {
+			values = append(values, item.PackageName)
+		}
+		return shared.WriteMinimal(deps.Stdout, values)
 	default:
 		return shared.UsageErrorf("unsupported output format %q", output)
 	}

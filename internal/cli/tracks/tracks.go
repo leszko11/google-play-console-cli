@@ -73,9 +73,10 @@ func withDefaults(deps Deps) Deps {
 func newListCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
-	var packageName, editID string
+	var packageName, editID, output string
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
+	fs.StringVar(&output, "output", "", "Output format: json, minimal")
 
 	return &ffcli.Command{
 		Name:      "list",
@@ -92,11 +93,22 @@ func newListCommand(deps Deps) *ffcli.Command {
 			if err != nil {
 				return fmt.Errorf("failed to list tracks: %w", err)
 			}
-			return shared.WriteJSON(deps.Stdout, map[string]any{
-				"packageName": pkg,
-				"editId":      eid,
-				"tracks":      tracks,
-			})
+			switch shared.ResolveOutput(output) {
+			case "json":
+				return shared.WriteJSON(deps.Stdout, map[string]any{
+					"packageName": pkg,
+					"editId":      eid,
+					"tracks":      tracks,
+				})
+			case "minimal":
+				values := make([]string, 0, len(tracks))
+				for _, t := range tracks {
+					values = append(values, t.Name)
+				}
+				return shared.WriteMinimal(deps.Stdout, values)
+			default:
+				return shared.UsageErrorf("unsupported output format %q", shared.ResolveOutput(output))
+			}
 		},
 	}
 }

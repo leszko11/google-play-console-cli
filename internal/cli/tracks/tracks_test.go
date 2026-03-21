@@ -145,6 +145,42 @@ func TestTracksList_ReturnsTracks(t *testing.T) {
 	}
 }
 
+func TestTracksList_MinimalOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				list: []gpc.TrackInfo{
+					{Name: "internal"},
+					{Name: "production"},
+				},
+			}, nil
+		},
+	}
+
+	out, err := runTracks(t, deps, "list", "--package-name", "com.example.app", "--edit-id", "edit-1", "--output", "minimal")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if out != "internal\nproduction\n" {
+		t.Fatalf("unexpected output: %q", out)
+	}
+}
+
+func TestTracksList_RejectsUnsupportedOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{}, nil
+		},
+	}
+
+	_, err := runTracks(t, deps, "list", "--package-name", "com.example.app", "--edit-id", "edit-1", "--output", "table")
+	if err == nil || !strings.Contains(err.Error(), `unsupported output format "table"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestTracksGet_RequiresTrack(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },

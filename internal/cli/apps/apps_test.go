@@ -73,6 +73,23 @@ func TestAppsList_DefaultJSON(t *testing.T) {
 	}
 }
 
+func TestAppsList_MinimalOutput(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{Packages: []string{"com.example.one", "com.example.two"}}, nil
+		},
+	}
+
+	out, err := runApps(t, deps, "list", "--output", "minimal")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	want := "com.example.one\ncom.example.two\n"
+	if out != want {
+		t.Fatalf("unexpected minimal output %q, want %q", out, want)
+	}
+}
+
 func TestAppsListVerify_IncludesStatus(t *testing.T) {
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) {

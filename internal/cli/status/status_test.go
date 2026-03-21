@@ -231,6 +231,24 @@ func TestStatusMarkdownOutput(t *testing.T) {
 	}
 }
 
+func TestStatusMinimalOutput(t *testing.T) {
+	client := &fakeClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runCommand(t, deps, "--package-name", "com.example.app", "--output", "minimal")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// The fake client returns reviews with pending replies, so status should be "warn".
+	want := "warn\n"
+	if out != want {
+		t.Fatalf("unexpected output %q, want %q", out, want)
+	}
+}
+
 func TestStatusYAMLOutput(t *testing.T) {
 	client := &fakeClient{}
 	deps := Deps{
