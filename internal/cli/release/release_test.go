@@ -20,16 +20,19 @@ import (
 type fakeReleaseClient struct {
 	verifyErr error
 
-	createEditIDs   []string
-	createEditErr   error
-	deleteEditErr   error
-	validateEditErr error
-	commitEditErr   error
-	uploadBundle    gpc.BundleInfo
-	uploadBundleErr error
-	updateTrackErr  error
-	getTrackInfo    gpc.TrackInfo
-	getTrackErr     error
+	createEditIDs    []string
+	createEditErr    error
+	deleteEditErr    error
+	validateEditErr  error
+	validateEditErrs []error
+	commitEditErr    error
+	uploadBundle     gpc.BundleInfo
+	uploadBundleErr  error
+	updateTrackErr   error
+	getTrackInfo     gpc.TrackInfo
+	getTrackErr      error
+	listProducts     gpc.OneTimeProductsListInfo
+	listSubs         gpc.SubscriptionsListInfo
 
 	commitCalls   int
 	deleteCalls   int
@@ -59,6 +62,11 @@ func (f *fakeReleaseClient) DeleteEdit(_ context.Context, _, _ string) error {
 }
 
 func (f *fakeReleaseClient) ValidateEdit(_ context.Context, _, _ string) error {
+	if len(f.validateEditErrs) > 0 {
+		err := f.validateEditErrs[0]
+		f.validateEditErrs = f.validateEditErrs[1:]
+		return err
+	}
 	return f.validateEditErr
 }
 
@@ -107,6 +115,20 @@ func (f *fakeReleaseClient) GetTrack(_ context.Context, _, _, _ string) (gpc.Tra
 	return f.getTrackInfo, nil
 }
 
+func (f *fakeReleaseClient) ListOneTimeProducts(_ context.Context, _ string, _ int64, _ string, _ bool) (gpc.OneTimeProductsListInfo, error) {
+	if len(f.listProducts.Products) == 0 {
+		return gpc.OneTimeProductsListInfo{Products: []gpc.OneTimeProductInfo{{ProductID: "coins_100"}}}, nil
+	}
+	return f.listProducts, nil
+}
+
+func (f *fakeReleaseClient) ListSubscriptions(_ context.Context, _ string, _ int64, _ string, _ bool) (gpc.SubscriptionsListInfo, error) {
+	if len(f.listSubs.Subscriptions) == 0 {
+		return gpc.SubscriptionsListInfo{Subscriptions: []gpc.SubscriptionInfo{{ProductID: "premium_monthly"}}}, nil
+	}
+	return f.listSubs, nil
+}
+
 type fakeReleaseReportingClient struct {
 	queryResults    []gpc.ReportingVitalsQueryResult
 	queryErr        error
@@ -129,6 +151,10 @@ func (f *fakeReleaseReportingClient) QueryVitalsMetricSet(_ context.Context, pac
 		return f.queryResults[f.queryCalls-1], nil
 	}
 	return f.queryResults[len(f.queryResults)-1], nil
+}
+
+func (f *fakeReleaseReportingClient) SearchApps(_ context.Context, _ int64, _ string, _ bool) (gpc.ReportingAppsListInfo, error) {
+	return gpc.ReportingAppsListInfo{Apps: []*gpc.ReportingApp{{Name: "apps/com.example.app"}}}, nil
 }
 
 func baseReleaseDeps(t *testing.T, client *fakeReleaseClient) Deps {

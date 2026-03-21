@@ -11,15 +11,22 @@ import (
 const projectConfigName = ".gpc.yaml"
 
 type ProjectConfig struct {
-	PackageName     string `json:"packageName,omitempty" yaml:"package-name"`
-	Profile         string `json:"profile,omitempty" yaml:"profile"`
-	Output          string `json:"output,omitempty" yaml:"output"`
-	DefaultTrack    string `json:"defaultTrack,omitempty" yaml:"default-track"`
-	DefaultLocale   string `json:"defaultLocale,omitempty" yaml:"default-locale"`
-	ListingDir      string `json:"listingDir,omitempty" yaml:"listing-dir"`
-	ChangelogDir    string `json:"changelogDir,omitempty" yaml:"changelog-dir"`
-	AppInitManifest string `json:"appInitManifest,omitempty" yaml:"appinit-manifest"`
-	ReleaseManifest string `json:"releaseManifest,omitempty" yaml:"release-manifest"`
+	PackageName       string `json:"packageName,omitempty" yaml:"package-name"`
+	Profile           string `json:"profile,omitempty" yaml:"profile"`
+	Output            string `json:"output,omitempty" yaml:"output"`
+	DefaultTrack      string `json:"defaultTrack,omitempty" yaml:"default-track"`
+	DefaultLocale     string `json:"defaultLocale,omitempty" yaml:"default-locale"`
+	ListingDir        string `json:"listingDir,omitempty" yaml:"listing-dir"`
+	ScreenshotsDir    string `json:"screenshotsDir,omitempty" yaml:"screenshots-dir"`
+	ProductsDir       string `json:"productsDir,omitempty" yaml:"products-dir"`
+	SubscriptionsDir  string `json:"subscriptionsDir,omitempty" yaml:"subscriptions-dir"`
+	ChangelogDir      string `json:"changelogDir,omitempty" yaml:"changelog-dir"`
+	AndroidProjectDir string `json:"androidProjectDir,omitempty" yaml:"android-project-dir"`
+	BuildTask         string `json:"buildTask,omitempty" yaml:"build-task"`
+	ArtifactPath      string `json:"artifactPath,omitempty" yaml:"artifact-path"`
+	NotesFile         string `json:"notesFile,omitempty" yaml:"notes-file"`
+	AppInitManifest   string `json:"appInitManifest,omitempty" yaml:"appinit-manifest"`
+	ReleaseManifest   string `json:"releaseManifest,omitempty" yaml:"release-manifest"`
 }
 
 type ProjectConfigInfo struct {
@@ -85,7 +92,14 @@ func parseProjectConfig(path string, raw []byte) (ProjectConfig, error) {
 	cfg.DefaultTrack = strings.TrimSpace(cfg.DefaultTrack)
 	cfg.DefaultLocale = strings.TrimSpace(cfg.DefaultLocale)
 	cfg.ListingDir = resolveProjectPath(baseDir, cfg.ListingDir)
+	cfg.ScreenshotsDir = resolveProjectPath(baseDir, cfg.ScreenshotsDir)
+	cfg.ProductsDir = resolveProjectPath(baseDir, cfg.ProductsDir)
+	cfg.SubscriptionsDir = resolveProjectPath(baseDir, cfg.SubscriptionsDir)
 	cfg.ChangelogDir = resolveProjectPath(baseDir, cfg.ChangelogDir)
+	cfg.AndroidProjectDir = resolveProjectPath(baseDir, cfg.AndroidProjectDir)
+	cfg.BuildTask = strings.TrimSpace(cfg.BuildTask)
+	cfg.ArtifactPath = resolveProjectPath(baseDir, cfg.ArtifactPath)
+	cfg.NotesFile = resolveProjectPath(baseDir, cfg.NotesFile)
 	cfg.AppInitManifest = resolveProjectPath(baseDir, cfg.AppInitManifest)
 	cfg.ReleaseManifest = resolveProjectPath(baseDir, cfg.ReleaseManifest)
 	return cfg, nil

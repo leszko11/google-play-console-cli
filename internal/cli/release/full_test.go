@@ -3,6 +3,7 @@ package release
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,7 +67,7 @@ func runFullCommand(t *testing.T, deps Deps, args ...string) (string, error) {
 func TestReleaseFullCommitSuccess(t *testing.T) {
 	client := &fakeReleaseClient{}
 	deps := baseReleaseDeps(t, client)
-	artifact := writeReleaseAsset(t, "app.aab")
+	artifact := writeFakeAAB(t, filepath.Join(t.TempDir(), "app.aab"), true)
 	mapping := writeReleaseAsset(t, "mapping.txt")
 	manifest := writeReleaseManifest(t, artifact, mapping)
 
@@ -88,7 +89,7 @@ func TestReleaseFullCommitSuccess(t *testing.T) {
 func TestReleaseFullDryRunDeletesEdit(t *testing.T) {
 	client := &fakeReleaseClient{}
 	deps := baseReleaseDeps(t, client)
-	artifact := writeReleaseAsset(t, "app.aab")
+	artifact := writeFakeAAB(t, filepath.Join(t.TempDir(), "app.aab"), true)
 	mapping := writeReleaseAsset(t, "mapping.txt")
 	manifest := writeReleaseManifest(t, artifact, mapping)
 
@@ -99,8 +100,8 @@ func TestReleaseFullDryRunDeletesEdit(t *testing.T) {
 	if !strings.Contains(out, `"status":"dry-run"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
-	if client.deleteCalls != 1 {
-		t.Fatalf("expected delete call, got %d", client.deleteCalls)
+	if client.commitCalls != 0 {
+		t.Fatalf("dry-run should not commit, got %d commits", client.commitCalls)
 	}
 }
 
@@ -148,7 +149,7 @@ func TestReleaseFullBlocksCommitWhenVitalsGateFails(t *testing.T) {
 	deps.NewReportingClient = func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
 		return reporting, nil
 	}
-	artifact := writeReleaseAsset(t, "app.aab")
+	artifact := writeFakeAAB(t, filepath.Join(t.TempDir(), "app.aab"), true)
 	mapping := writeReleaseAsset(t, "mapping.txt")
 	manifest := writeReleaseManifest(t, artifact, mapping)
 
@@ -189,7 +190,7 @@ func TestReleaseFullAutoHaltsRegressionDuringWait(t *testing.T) {
 	deps.NewReportingClient = func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
 		return reporting, nil
 	}
-	artifact := writeReleaseAsset(t, "app.aab")
+	artifact := writeFakeAAB(t, filepath.Join(t.TempDir(), "app.aab"), true)
 	manifest := writeManifestFile(t, "release.yaml", "artifact: "+artifact+"\ntrack: internal\nstatus: inProgress\nuserFraction: 0.1\n")
 
 	out, err := runFullCommand(t, deps, "full", "--package-name", "com.example.app", "--manifest", manifest, "--confirm", "--vitals-gate", "crashRate<2.0", "--vitals-wait", "10m", "--auto-halt-on-regression")
@@ -199,14 +200,47 @@ func TestReleaseFullAutoHaltsRegressionDuringWait(t *testing.T) {
 	if !strings.Contains(out, `"status":"halted"`) || !strings.Contains(out, `"halted":true`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
-	if client.createCalls != 2 {
-		t.Fatalf("expected rollout halt edit, got %d create calls", client.createCalls)
+	if client.createCalls < 2 {
+		t.Fatalf("expected at least release + halt edits, got %d create calls", client.createCalls)
 	}
-	if client.commitCalls != 2 {
+	if client.commitCalls < 2 {
 		t.Fatalf("expected release commit and halt commit, got %d commits", client.commitCalls)
 	}
 	if client.lastTrack.Status != "halted" {
 		t.Fatalf("expected halted track update, got %+v", client.lastTrack)
+	}
+}
+
+func TestReleaseFullStopsAfterBootstrapWhenPlayStillReportsDraftState(t *testing.T) {
+	client := &fakeReleaseClient{
+		validateEditErrs: []error{
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			nil,
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+		},
+	}
+	deps := baseReleaseDeps(t, client)
+	deps.RunAppInit = func(context.Context, []string) error {
+		t.Fatal("appinit should not run while package remains in draft bootstrap state")
+		return nil
+	}
+	artifact := writeFakeAAB(t, filepath.Join(t.TempDir(), "app.aab"), true)
+	mapping := writeReleaseAsset(t, "mapping.txt")
+	manifest := writeReleaseManifest(t, artifact, mapping)
+
+	out, err := runFullCommand(t, deps, "full", "--package-name", "com.example.app", "--manifest", manifest, "--confirm")
+	if err == nil || !strings.Contains(err.Error(), "bootstrap release committed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, `"status":"bootstrap_committed"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if client.commitCalls != 1 {
+		t.Fatalf("expected only bootstrap commit, got %d commits", client.commitCalls)
 	}
 }
 

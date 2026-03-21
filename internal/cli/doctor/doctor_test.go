@@ -18,6 +18,8 @@ import (
 
 type fakeClient struct {
 	verifyPackageAccessErr  error
+	usersList               gpc.UsersListInfo
+	usersListErr            error
 	subscriptionDiagnostic  gpc.SubscriptionDiagnosticInfo
 	subscriptionErr         error
 	oneTimeProductDiag      gpc.OneTimeProductDiagnosticInfo
@@ -42,6 +44,22 @@ type fakeClient struct {
 
 func (f *fakeClient) VerifyPackageAccess(_ context.Context, _ string) error {
 	return f.verifyPackageAccessErr
+}
+
+func (f *fakeClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, error) {
+	return gpc.EditInfo{ID: "edit-1"}, nil
+}
+
+func (f *fakeClient) DeleteEdit(_ context.Context, _, _ string) error {
+	return nil
+}
+
+func (f *fakeClient) ValidateEdit(_ context.Context, _, _ string) error {
+	return nil
+}
+
+func (f *fakeClient) ListUsers(_ context.Context, _ string, _ int64, _ string, _ bool) (gpc.UsersListInfo, error) {
+	return f.usersList, f.usersListErr
 }
 
 func (f *fakeClient) GetSubscriptionDiagnostic(_ context.Context, _, _ string) (gpc.SubscriptionDiagnosticInfo, error) {
@@ -125,8 +143,37 @@ func TestRunWithoutPackageNameAuthOnly(t *testing.T) {
 	if checkStatus(res, "auth") != "ok" {
 		t.Fatalf("expected auth check ok, got %+v", res.Checks)
 	}
+	if checkStatus(res, "developer_id") != "ok" {
+		t.Fatalf("expected developer_id check ok, got %+v", res.Checks)
+	}
 	if checkStatus(res, "package_access") != "skipped" {
 		t.Fatalf("expected package_access skipped, got %+v", res.Checks)
+	}
+}
+
+func TestRunWarnsWhenConfiguredDeveloperIDIsInvalid(t *testing.T) {
+	resetGlobalFlags(t, shared.GlobalFlags{})
+	cfg, lookupEnv := validConfig(t)
+
+	res, err := run(context.Background(), Deps{
+		LoadConfig: func() (config.Config, error) { return cfg, nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{usersListErr: fmt.Errorf("invalid developer id")}, nil
+		},
+		NewReportingClient: func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
+			return &fakeReportingClient{}, nil
+		},
+		LookupEnv: lookupEnv,
+	}, options{})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	if checkStatus(res, "developer_id") != "warn" {
+		t.Fatalf("expected developer_id warn, got %+v", res.Checks)
+	}
+	if !containsSubstring(res.NextSteps, "gpc auth init --developer-id <id>") {
+		t.Fatalf("expected developer id next step, got %+v", res.NextSteps)
 	}
 }
 

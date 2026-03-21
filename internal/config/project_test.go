@@ -15,7 +15,7 @@ func TestLoadProjectFromDirFindsNearestConfig(t *testing.T) {
 	}
 
 	cfgPath := filepath.Join(project, projectConfigName)
-	raw := []byte("package-name: com.example.app\nprofile: work\nlisting-dir: ./listing\n")
+	raw := []byte("package-name: com.example.app\nprofile: work\nlisting-dir: ./listing\nscreenshots-dir: ./screenshots\nproducts-dir: ./products\nsubscriptions-dir: ./subscriptions\nandroid-project-dir: ./android\nartifact-path: ./android/app.aab\nnotes-file: ./play/notes.txt\n")
 	if err := os.WriteFile(cfgPath, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -32,6 +32,24 @@ func TestLoadProjectFromDirFindsNearestConfig(t *testing.T) {
 	}
 	if want := filepath.Join(project, "listing"); info.Config.ListingDir != want {
 		t.Fatalf("listing dir = %q, want %q", info.Config.ListingDir, want)
+	}
+	if want := filepath.Join(project, "screenshots"); info.Config.ScreenshotsDir != want {
+		t.Fatalf("screenshots dir = %q, want %q", info.Config.ScreenshotsDir, want)
+	}
+	if want := filepath.Join(project, "products"); info.Config.ProductsDir != want {
+		t.Fatalf("products dir = %q, want %q", info.Config.ProductsDir, want)
+	}
+	if want := filepath.Join(project, "subscriptions"); info.Config.SubscriptionsDir != want {
+		t.Fatalf("subscriptions dir = %q, want %q", info.Config.SubscriptionsDir, want)
+	}
+	if want := filepath.Join(project, "android"); info.Config.AndroidProjectDir != want {
+		t.Fatalf("android project dir = %q, want %q", info.Config.AndroidProjectDir, want)
+	}
+	if want := filepath.Join(project, "android", "app.aab"); info.Config.ArtifactPath != want {
+		t.Fatalf("artifact path = %q, want %q", info.Config.ArtifactPath, want)
+	}
+	if want := filepath.Join(project, "play", "notes.txt"); info.Config.NotesFile != want {
+		t.Fatalf("notes file = %q, want %q", info.Config.NotesFile, want)
 	}
 }
 

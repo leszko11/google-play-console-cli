@@ -177,6 +177,10 @@ func validateSyncOptions(opts syncOptions) (syncOptions, error) {
 		return syncOptions{}, err
 	}
 	opts.PackageName = pkg
+	opts.Dir, err = shared.ResolveProjectPath(opts.Dir, func(cfg config.ProjectConfig) string { return cfg.ScreenshotsDir })
+	if err != nil {
+		return syncOptions{}, err
+	}
 	opts.Dir = strings.TrimSpace(opts.Dir)
 	if opts.Dir == "" {
 		return syncOptions{}, shared.UsageErrorf("--dir is required")

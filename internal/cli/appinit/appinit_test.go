@@ -23,20 +23,27 @@ type fakeClient struct {
 	createSubscriptionErr   error
 	createOfferErr          map[string]error
 	createEditErr           error
+	listImagesErr           map[string]error
 
-	createEditCalls     int
-	deleteEditCalls     int
-	validateEditCalls   int
-	commitEditCalls     int
-	updateListingCalls  int
-	deleteImagesCalls   int
-	uploadImageCalls    int
-	updateDetailsCalls  int
-	createSubCalls      int
-	createOfferCalls    int
-	createdSubscription *androidpublisher.Subscription
-	createdOffers       []*androidpublisher.SubscriptionOffer
-	appDetailsUpdate    gpc.AppDetailsUpdate
+	createEditCalls      int
+	deleteEditCalls      int
+	validateEditCalls    int
+	commitEditCalls      int
+	updateListingCalls   int
+	deleteImagesCalls    int
+	uploadImageCalls     int
+	updateDetailsCalls   int
+	createSubCalls       int
+	batchUpdateSubCalls  int
+	createProductCalls   int
+	createOfferCalls     int
+	deleteProductCalls   int
+	deleteSubCalls       int
+	createdSubscription  *androidpublisher.Subscription
+	createdProducts      []*androidpublisher.OneTimeProduct
+	updatedSubscriptions []*androidpublisher.UpdateSubscriptionRequest
+	createdOffers        []*androidpublisher.SubscriptionOffer
+	appDetailsUpdate     gpc.AppDetailsUpdate
 }
 
 func (f *fakeClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, error) {
@@ -96,7 +103,10 @@ func (f *fakeClient) UploadImage(_ context.Context, _, _, _, _, _ string) (gpc.I
 	return gpc.ImageInfo{}, nil
 }
 
-func (f *fakeClient) ListImages(_ context.Context, _, _, _, _ string) ([]gpc.ImageInfo, error) {
+func (f *fakeClient) ListImages(_ context.Context, _, _, language, imageType string) ([]gpc.ImageInfo, error) {
+	if err := f.listImagesErr[language+"/"+imageType]; err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 
@@ -106,6 +116,17 @@ func (f *fakeClient) ListTracks(_ context.Context, _, _ string) ([]gpc.TrackInfo
 
 func (f *fakeClient) ListOneTimeProducts(_ context.Context, _ string, _ int64, _ string, _ bool) (gpc.OneTimeProductsListInfo, error) {
 	return f.listProductsResult, nil
+}
+
+func (f *fakeClient) CreateOneTimeProduct(_ context.Context, _ string, product *androidpublisher.OneTimeProduct) (gpc.OneTimeProductInfo, error) {
+	f.createProductCalls++
+	f.createdProducts = append(f.createdProducts, product)
+	return gpc.OneTimeProductInfo{ProductID: product.ProductId}, nil
+}
+
+func (f *fakeClient) DeleteOneTimeProduct(_ context.Context, _, _ string) error {
+	f.deleteProductCalls++
+	return nil
 }
 
 func (f *fakeClient) GetOneTimeProductResource(_ context.Context, _, productID string) (*androidpublisher.OneTimeProduct, error) {
@@ -140,8 +161,25 @@ func (f *fakeClient) GetSubscriptionRaw(_ context.Context, _, _ string) (*androi
 	return nil, nil
 }
 
+func (f *fakeClient) BatchUpdateSubscriptions(_ context.Context, _ string, requests []*androidpublisher.UpdateSubscriptionRequest) (gpc.SubscriptionsListInfo, error) {
+	f.batchUpdateSubCalls++
+	f.updatedSubscriptions = append(f.updatedSubscriptions, requests...)
+	result := gpc.SubscriptionsListInfo{Subscriptions: make([]gpc.SubscriptionInfo, 0, len(requests))}
+	for _, req := range requests {
+		if req != nil && req.Subscription != nil {
+			result.Subscriptions = append(result.Subscriptions, gpc.SubscriptionInfo{ProductID: req.Subscription.ProductId})
+		}
+	}
+	return result, nil
+}
+
 func (f *fakeClient) UpdateSubscription(_ context.Context, _, _ string, subscription *androidpublisher.Subscription) (gpc.SubscriptionInfo, error) {
 	return gpc.SubscriptionInfo{ProductID: subscription.ProductId}, nil
+}
+
+func (f *fakeClient) DeleteSubscription(_ context.Context, _, _ string) error {
+	f.deleteSubCalls++
+	return nil
 }
 
 func (f *fakeClient) ActivateSubscriptionBasePlan(_ context.Context, _, _, _ string) ([]gpc.SubscriptionInfo, error) {
@@ -233,6 +271,61 @@ subscription:
 	return path
 }
 
+func writeProductsFixture(t *testing.T, root string) string {
+	t.Helper()
+	dir := filepath.Join(root, "products")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir products: %v", err)
+	}
+	raw := `{
+  "packageName": "com.example.app",
+  "productId": "coins_100",
+  "listings": [
+    { "languageCode": "en-US", "title": "100 Coins", "description": "Test pack" }
+  ],
+  "purchaseOptions": [
+    { "purchaseOptionId": "buy", "buyOnceOption": {} }
+  ]
+}`
+	path := filepath.Join(dir, "coins_100.json")
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatalf("write product fixture: %v", err)
+	}
+	return dir
+}
+
+func writeSubscriptionsFixture(t *testing.T, root string) string {
+	t.Helper()
+	dir := filepath.Join(root, "subscriptions")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir subscriptions: %v", err)
+	}
+	raw := `{
+  "subscription": {
+    "packageName": "com.example.app",
+    "productId": "premium_monthly",
+    "listings": [
+      { "languageCode": "en-US", "title": "Premium", "description": "Unlock all features" }
+    ],
+    "basePlans": [
+      {
+        "basePlanId": "monthly",
+        "autoRenewingBasePlanType": { "billingPeriodDuration": "P1M" },
+        "regionalConfigs": [
+          { "regionCode": "US", "newSubscriberAvailability": true, "price": { "currencyCode": "USD", "units": "9", "nanos": 990000000 } }
+        ]
+      }
+    ]
+  },
+  "regionsVersion": "2026/01"
+}`
+	path := filepath.Join(dir, "premium_monthly.json")
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatalf("write subscription fixture: %v", err)
+	}
+	return dir
+}
+
 func writeAppInitManifest(t *testing.T, root string) string {
 	t.Helper()
 	path := filepath.Join(root, "app-init.yaml")
@@ -245,6 +338,26 @@ listing:
 monetization:
   manifest: ./monetization.yaml
   activate: true
+`
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatalf("write app init manifest: %v", err)
+	}
+	return path
+}
+
+func writeRoundTripAppInitManifest(t *testing.T, root string) string {
+	t.Helper()
+	path := filepath.Join(root, "app-init-roundtrip.yaml")
+	contents := `
+appDetails:
+  defaultLanguage: en-US
+  contactEmail: support@example.com
+listing:
+  dir: ./listings
+products:
+  dir: ./products
+subscriptions:
+  dir: ./subscriptions
 `
 	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatalf("write app init manifest: %v", err)
@@ -327,8 +440,8 @@ func TestAppInitDryRun(t *testing.T) {
 	if client.updateDetailsCalls != 1 || client.createEditCalls != 2 || client.deleteEditCalls != 2 {
 		t.Fatalf("unexpected dry-run edit flow: %+v", client)
 	}
-	if client.updateListingCalls != 0 || client.createSubCalls != 0 || client.createOfferCalls != 0 {
-		t.Fatalf("dry-run should not apply listing/monetization writes: %+v", client)
+	if client.updateListingCalls != 1 || client.uploadImageCalls != 1 || client.createSubCalls != 0 || client.createOfferCalls != 0 {
+		t.Fatalf("dry-run should stage listing changes but avoid monetization writes: %+v", client)
 	}
 }
 
@@ -361,6 +474,33 @@ func TestAppInitCommit(t *testing.T) {
 	}
 	if client.appDetailsUpdate.ContactEmail != "support@example.com" {
 		t.Fatalf("unexpected app details update: %+v", client.appDetailsUpdate)
+	}
+}
+
+func TestAppInitCommitSyncsProductsAndSubscriptions(t *testing.T) {
+	root := t.TempDir()
+	writeListingFixture(t, root)
+	writeProductsFixture(t, root)
+	writeSubscriptionsFixture(t, root)
+	manifestPath := writeRoundTripAppInitManifest(t, root)
+	client := &fakeClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runCommand(t, deps, "--package-name", "com.example.app", "--manifest", manifestPath, "--confirm")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, `"completedSections":["appDetails","listing","products","subscriptions"]`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if client.createProductCalls != 1 {
+		t.Fatalf("expected product sync write, got %+v", client)
+	}
+	if client.batchUpdateSubCalls != 1 || len(client.updatedSubscriptions) != 1 {
+		t.Fatalf("expected subscription sync write, got %+v", client)
 	}
 }
 
@@ -446,8 +586,40 @@ func TestAppInitExportWritesRoundTripFiles(t *testing.T) {
 	if !strings.Contains(out, `"sections":["app-details","changelog","listing","products","subscriptions"]`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
+	appInitRaw, err := os.ReadFile(filepath.Join(root, "appinit.yaml"))
+	if err != nil {
+		t.Fatalf("read appinit manifest: %v", err)
+	}
+	for _, want := range []string{"products:", "dir: ./products", "subscriptions:", "dir: ./subscriptions"} {
+		if !strings.Contains(string(appInitRaw), want) {
+			t.Fatalf("expected %q in appinit manifest:\n%s", want, string(appInitRaw))
+		}
+	}
 	if client.deleteEditCalls != 1 {
 		t.Fatalf("expected export cleanup edit delete, got %d", client.deleteEditCalls)
+	}
+}
+
+func TestAppInitExportSkipsUnsupportedImageTypeErrors(t *testing.T) {
+	root := t.TempDir()
+	client := &fakeClient{
+		listListingsResult: []gpc.ListingInfo{
+			{Language: "en-US", Title: "Title", ShortDescription: "Short", FullDescription: "Full"},
+		},
+		listImagesErr: map[string]error{
+			"en-US/promoGraphic": fmt.Errorf("androidpublisher api error (400): Invalid value at 'image_type' (type.googleapis.com/google.play.publishingapi.v3.AppImageType), \"promoGraphic\""),
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	if _, err := runCommand(t, deps, "export", "--package-name", "com.example.app", "--dir", root); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "listing", "en-US", "title.txt")); err != nil {
+		t.Fatalf("expected listing export to succeed: %v", err)
 	}
 }
 
@@ -471,7 +643,7 @@ func TestAppInitUsesProjectConfigManifestDefault(t *testing.T) {
 		t.Fatalf("unexpected error using project manifest default %s: %v", manifestPath, err)
 	}
 	if client.commitEditCalls != 2 {
-		t.Fatalf("expected appinit to commit both sections, got %+v", client)
+		t.Fatalf("expected appinit to commit edit-backed sections, got %+v", client)
 	}
 }
 
@@ -529,12 +701,28 @@ func TestBootstrapWritesDefaultWorkspace(t *testing.T) {
 		filepath.Join(root, "products", "coins_100.json"),
 		filepath.Join(root, "subscriptions", "premium_monthly.json"),
 	} {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatalf("expected bootstrap to skip %s, got err=%v", path, err)
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected bootstrap file %s: %v", path, err)
 		}
 	}
-	if !strings.Contains(out, `"sections":["app-details","changelog","listing"]`) {
+	if !strings.Contains(out, `"sections":["app-details","changelog","listing","products","subscriptions"]`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+	projectCfgRaw, err := os.ReadFile(filepath.Join(root, ".gpc.yaml"))
+	if err != nil {
+		t.Fatalf("read project config: %v", err)
+	}
+	projectCfg := string(projectCfgRaw)
+	if !strings.Contains(projectCfg, "default-locale: en-US") {
+		t.Fatalf("expected default locale in project config, got %s", projectCfg)
+	}
+	appInitRaw, err := os.ReadFile(filepath.Join(root, "appinit.yaml"))
+	if err != nil {
+		t.Fatalf("read appinit manifest: %v", err)
+	}
+	appInit := string(appInitRaw)
+	if strings.Contains(appInit, `contactPhone: ""`) || strings.Contains(appInit, `contactWebsite: ""`) || strings.Contains(appInit, "monetization: null") {
+		t.Fatalf("expected empty appinit fields to be omitted, got %s", appInit)
 	}
 }
 

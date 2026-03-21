@@ -9,7 +9,11 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/leszko11/google-play-console-cli/internal/cli/appinit"
+	productscmd "github.com/leszko11/google-play-console-cli/internal/cli/products"
+	"github.com/leszko11/google-play-console-cli/internal/cli/screenshots"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	subscriptionscmd "github.com/leszko11/google-play-console-cli/internal/cli/subscriptions"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
@@ -33,24 +37,34 @@ type Client interface {
 	UploadAPK(ctx context.Context, packageName, editID, apkPath string) (gpc.APKInfo, error)
 	UploadDeobfuscationFile(ctx context.Context, packageName, editID string, versionCode int64, fileType, filePath string) (gpc.DeobfuscationFileInfo, error)
 	GetTrack(ctx context.Context, packageName, editID, trackName string) (gpc.TrackInfo, error)
+	ListOneTimeProducts(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.OneTimeProductsListInfo, error)
+	ListSubscriptions(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionsListInfo, error)
 }
 
 type ReportingClient interface {
 	QueryVitalsMetricSet(ctx context.Context, packageName string, metricSet gpc.ReportingVitalsMetricSet, request *gpc.ReportingVitalsQueryRequest) (gpc.ReportingVitalsQueryResult, error)
+	SearchApps(ctx context.Context, pageSize int64, pageToken string, paginate bool) (gpc.ReportingAppsListInfo, error)
 }
 
 type RunCommandFunc func(ctx context.Context, dir, name string, args ...string) (string, error)
+type RunSubcommandFunc func(ctx context.Context, args []string) error
 
 type Deps struct {
-	LoadConfig         func() (config.Config, error)
-	NewClient          func(context.Context, gpc.CredentialInput) (Client, error)
-	NewReportingClient func(context.Context, gpc.CredentialInput) (ReportingClient, error)
-	LookupEnv          func(string) string
-	RunCommand         RunCommandFunc
-	Now                func() time.Time
-	Sleep              func(context.Context, time.Duration) error
-	Stdout             io.Writer
-	Stderr             io.Writer
+	LoadConfig           func() (config.Config, error)
+	NewClient            func(context.Context, gpc.CredentialInput) (Client, error)
+	NewReportingClient   func(context.Context, gpc.CredentialInput) (ReportingClient, error)
+	RunBootstrap         RunSubcommandFunc
+	RunAppInit           RunSubcommandFunc
+	RunScreenshotsSync   RunSubcommandFunc
+	RunProductsSync      RunSubcommandFunc
+	RunSubscriptionsSync RunSubcommandFunc
+	LookupEnv            func(string) string
+	RunCommand           RunCommandFunc
+	Now                  func() time.Time
+	Sleep                func(context.Context, time.Duration) error
+	Stdin                io.Reader
+	Stdout               io.Writer
+	Stderr               io.Writer
 }
 
 func NewCommand(deps Deps) *ffcli.Command {
@@ -61,6 +75,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		ShortHelp: "Release workflows for staged Google Play deploys",
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
+			newInitCommand(deps),
 			newVerifyCommand(deps),
 			newAlphaCommand(deps),
 			newFullCommand(deps),
@@ -83,6 +98,61 @@ func withDefaults(deps Deps) Deps {
 			return gpc.NewReportingClient(ctx, creds)
 		}
 	}
+	if deps.RunBootstrap == nil {
+		deps.RunBootstrap = func(ctx context.Context, args []string) error {
+			cmd := appinit.NewBootstrapCommand(appinit.Deps{
+				LoadConfig: deps.LoadConfig,
+				LookupEnv:  deps.LookupEnv,
+				Stdout:     io.Discard,
+				Stderr:     deps.Stderr,
+			})
+			return cmd.ParseAndRun(ctx, args)
+		}
+	}
+	if deps.RunAppInit == nil {
+		deps.RunAppInit = func(ctx context.Context, args []string) error {
+			cmd := appinit.NewCommand(appinit.Deps{
+				LoadConfig: deps.LoadConfig,
+				LookupEnv:  deps.LookupEnv,
+				Stdout:     io.Discard,
+				Stderr:     deps.Stderr,
+			})
+			return cmd.ParseAndRun(ctx, args)
+		}
+	}
+	if deps.RunScreenshotsSync == nil {
+		deps.RunScreenshotsSync = func(ctx context.Context, args []string) error {
+			cmd := screenshots.NewCommand(screenshots.Deps{
+				LoadConfig: deps.LoadConfig,
+				LookupEnv:  deps.LookupEnv,
+				Stdout:     io.Discard,
+				Stderr:     deps.Stderr,
+			})
+			return cmd.ParseAndRun(ctx, append([]string{"sync"}, args...))
+		}
+	}
+	if deps.RunProductsSync == nil {
+		deps.RunProductsSync = func(ctx context.Context, args []string) error {
+			cmd := productscmd.NewCommand(productscmd.Deps{
+				LoadConfig: deps.LoadConfig,
+				LookupEnv:  deps.LookupEnv,
+				Stdout:     io.Discard,
+				Stderr:     deps.Stderr,
+			})
+			return cmd.ParseAndRun(ctx, append([]string{"sync"}, args...))
+		}
+	}
+	if deps.RunSubscriptionsSync == nil {
+		deps.RunSubscriptionsSync = func(ctx context.Context, args []string) error {
+			cmd := subscriptionscmd.NewCommand(subscriptionscmd.Deps{
+				LoadConfig: deps.LoadConfig,
+				LookupEnv:  deps.LookupEnv,
+				Stdout:     io.Discard,
+				Stderr:     deps.Stderr,
+			})
+			return cmd.ParseAndRun(ctx, append([]string{"sync"}, args...))
+		}
+	}
 	if deps.LookupEnv == nil {
 		deps.LookupEnv = os.Getenv
 	}
@@ -94,6 +164,9 @@ func withDefaults(deps Deps) Deps {
 	}
 	if deps.Sleep == nil {
 		deps.Sleep = sleepContext
+	}
+	if deps.Stdin == nil {
+		deps.Stdin = os.Stdin
 	}
 	if deps.Stdout == nil {
 		deps.Stdout = os.Stdout

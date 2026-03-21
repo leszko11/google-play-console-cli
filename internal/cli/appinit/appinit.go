@@ -12,7 +12,9 @@ import (
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/listing"
 	"github.com/leszko11/google-play-console-cli/internal/cli/monetization"
+	productscmd "github.com/leszko11/google-play-console-cli/internal/cli/products"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	subscriptionscmd "github.com/leszko11/google-play-console-cli/internal/cli/subscriptions"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
@@ -28,6 +30,8 @@ const (
 type Client interface {
 	listing.Client
 	monetization.Client
+	productscmd.SyncClient
+	subscriptionscmd.SyncClient
 	CreateEdit(ctx context.Context, packageName string) (gpc.EditInfo, error)
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	ValidateEdit(ctx context.Context, packageName, editID string) error
@@ -65,26 +69,33 @@ type options struct {
 }
 
 type appInitManifest struct {
-	AppDetails   *appDetailsSection   `json:"appDetails" yaml:"appDetails"`
-	Listing      *listingSection      `json:"listing" yaml:"listing"`
-	Monetization *monetizationSection `json:"monetization" yaml:"monetization"`
+	AppDetails    *appDetailsSection   `json:"appDetails,omitempty" yaml:"appDetails,omitempty"`
+	Listing       *listingSection      `json:"listing,omitempty" yaml:"listing,omitempty"`
+	Products      *syncSection         `json:"products,omitempty" yaml:"products,omitempty"`
+	Subscriptions *syncSection         `json:"subscriptions,omitempty" yaml:"subscriptions,omitempty"`
+	Monetization  *monetizationSection `json:"monetization,omitempty" yaml:"monetization,omitempty"`
 }
 
 type appDetailsSection struct {
-	DefaultLanguage string `json:"defaultLanguage" yaml:"defaultLanguage"`
-	ContactEmail    string `json:"contactEmail" yaml:"contactEmail"`
-	ContactPhone    string `json:"contactPhone" yaml:"contactPhone"`
-	ContactWebsite  string `json:"contactWebsite" yaml:"contactWebsite"`
+	DefaultLanguage string `json:"defaultLanguage,omitempty" yaml:"defaultLanguage,omitempty"`
+	ContactEmail    string `json:"contactEmail,omitempty" yaml:"contactEmail,omitempty"`
+	ContactPhone    string `json:"contactPhone,omitempty" yaml:"contactPhone,omitempty"`
+	ContactWebsite  string `json:"contactWebsite,omitempty" yaml:"contactWebsite,omitempty"`
 }
 
 type listingSection struct {
-	Dir           string `json:"dir" yaml:"dir"`
-	DeleteMissing bool   `json:"deleteMissing" yaml:"deleteMissing"`
+	Dir           string `json:"dir,omitempty" yaml:"dir,omitempty"`
+	DeleteMissing bool   `json:"deleteMissing,omitempty" yaml:"deleteMissing,omitempty"`
+}
+
+type syncSection struct {
+	Dir           string `json:"dir,omitempty" yaml:"dir,omitempty"`
+	DeleteMissing bool   `json:"deleteMissing,omitempty" yaml:"deleteMissing,omitempty"`
 }
 
 type monetizationSection struct {
-	Manifest string `json:"manifest" yaml:"manifest"`
-	Activate bool   `json:"activate" yaml:"activate"`
+	Manifest string `json:"manifest,omitempty" yaml:"manifest,omitempty"`
+	Activate bool   `json:"activate,omitempty" yaml:"activate,omitempty"`
 }
 
 type result struct {
@@ -205,14 +216,26 @@ func loadManifest(path string) (appInitManifest, error) {
 			return appInitManifest{}, shared.UsageErrorf("listing.dir is required")
 		}
 	}
+	if manifest.Products != nil {
+		manifest.Products.Dir = resolveManifestPath(baseDir, manifest.Products.Dir)
+		if strings.TrimSpace(manifest.Products.Dir) == "" {
+			return appInitManifest{}, shared.UsageErrorf("products.dir is required")
+		}
+	}
+	if manifest.Subscriptions != nil {
+		manifest.Subscriptions.Dir = resolveManifestPath(baseDir, manifest.Subscriptions.Dir)
+		if strings.TrimSpace(manifest.Subscriptions.Dir) == "" {
+			return appInitManifest{}, shared.UsageErrorf("subscriptions.dir is required")
+		}
+	}
 	if manifest.Monetization != nil {
 		manifest.Monetization.Manifest = resolveManifestPath(baseDir, manifest.Monetization.Manifest)
 		if strings.TrimSpace(manifest.Monetization.Manifest) == "" {
 			return appInitManifest{}, shared.UsageErrorf("monetization.manifest is required")
 		}
 	}
-	if manifest.AppDetails == nil && manifest.Listing == nil && manifest.Monetization == nil {
-		return appInitManifest{}, shared.UsageErrorf("manifest must include at least one of: appDetails, listing, monetization")
+	if manifest.AppDetails == nil && manifest.Listing == nil && manifest.Products == nil && manifest.Subscriptions == nil && manifest.Monetization == nil {
+		return appInitManifest{}, shared.UsageErrorf("manifest must include at least one of: appDetails, listing, products, subscriptions, monetization")
 	}
 
 	return manifest, nil
@@ -270,6 +293,36 @@ func runAppInit(parentCtx, requestCtx context.Context, client Client, out io.Wri
 		result.Steps = append(result.Steps, stepResult{Name: "listing_sync", Status: "ok"})
 	}
 
+	if manifest.Products != nil {
+		var productsOut bytes.Buffer
+		if err := productscmd.RunSync(parentCtx, requestCtx, client, &productsOut, productscmd.SyncOptions{
+			PackageName:   opts.PackageName,
+			Dir:           manifest.Products.Dir,
+			Confirm:       !opts.DryRun,
+			DryRun:        opts.DryRun,
+			DeleteMissing: manifest.Products.DeleteMissing,
+		}); err != nil {
+			return fail("products_sync", err)
+		}
+		result.CompletedSections = append(result.CompletedSections, "products")
+		result.Steps = append(result.Steps, stepResult{Name: "products_sync", Status: "ok"})
+	}
+
+	if manifest.Subscriptions != nil {
+		var subscriptionsOut bytes.Buffer
+		if err := subscriptionscmd.RunSync(requestCtx, client, &subscriptionsOut, subscriptionscmd.SyncOptions{
+			PackageName:   opts.PackageName,
+			Dir:           manifest.Subscriptions.Dir,
+			Confirm:       !opts.DryRun,
+			DryRun:        opts.DryRun,
+			DeleteMissing: manifest.Subscriptions.DeleteMissing,
+		}); err != nil {
+			return fail("subscriptions_sync", err)
+		}
+		result.CompletedSections = append(result.CompletedSections, "subscriptions")
+		result.Steps = append(result.Steps, stepResult{Name: "subscriptions_sync", Status: "ok"})
+	}
+
 	if manifest.Monetization != nil {
 		monetizationManifest, err := monetization.LoadManifest(manifest.Monetization.Manifest)
 		if err != nil {
@@ -300,12 +353,18 @@ func runAppInit(parentCtx, requestCtx context.Context, client Client, out io.Wri
 }
 
 func plannedSections(manifest appInitManifest) []string {
-	sections := make([]string, 0, 3)
+	sections := make([]string, 0, 5)
 	if manifest.AppDetails != nil {
 		sections = append(sections, "appDetails")
 	}
 	if manifest.Listing != nil {
 		sections = append(sections, "listing")
+	}
+	if manifest.Products != nil {
+		sections = append(sections, "products")
+	}
+	if manifest.Subscriptions != nil {
+		sections = append(sections, "subscriptions")
 	}
 	if manifest.Monetization != nil {
 		sections = append(sections, "monetization")

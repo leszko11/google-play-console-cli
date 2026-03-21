@@ -85,7 +85,7 @@ func TestCommitEditWithReviewFallback_ExplainsDraftTrackConflict(t *testing.T) {
 	for _, want := range []string{
 		`Only releases with status draft may be created on draft app`,
 		`track release with status "completed"`,
-		`Automatic track fixes are not applied by gpc`,
+		"`gpc release init --package-name <package> --dir ./play`",
 	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("missing %q in error: %v", want, err)

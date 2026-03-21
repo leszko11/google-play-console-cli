@@ -67,7 +67,7 @@ func explainDraftAppCommitError(err error) error {
 
 	lower := strings.ToLower(err.Error())
 	if strings.Contains(lower, "only releases with status draft may be created on draft app") {
-		return fmt.Errorf("%w\nhint: this draft app still has a track release with status \"completed\". Update the internal track release to \"draft\" in Play Console, then retry. Automatic track fixes are not applied by gpc.", err)
+		return fmt.Errorf("%w\nhint: this draft app still has a track release with status \"completed\". Update the internal track release to \"draft\" in Play Console, or run `gpc release init --package-name <package> --dir ./play` to generate the bootstrap release workflow.", err)
 	}
 	return err
 }
