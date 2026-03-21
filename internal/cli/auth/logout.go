@@ -41,8 +41,10 @@ func NewLogoutCommand(deps Deps) *ffcli.Command {
 
 			removed := []string{}
 			if all {
+				managedPaths := make([]string, 0, len(cfg.Profiles))
 				for name := range cfg.Profiles {
 					removed = append(removed, name)
+					managedPaths = append(managedPaths, cfg.Profiles[name].ServiceAccountPath)
 				}
 				cfg.Profiles = map[string]config.Profile{}
 				cfg.ActiveProfile = ""
@@ -50,6 +52,9 @@ func NewLogoutCommand(deps Deps) *ffcli.Command {
 					if err := authresolver.RemoveAllProfileCredentials(); err != nil && !authresolver.IsKeyringUnavailable(err) {
 						return err
 					}
+				}
+				for _, managedPath := range managedPaths {
+					removeManagedPathIfOwned(managedPath)
 				}
 			} else {
 				target := profile
@@ -60,8 +65,10 @@ func NewLogoutCommand(deps Deps) *ffcli.Command {
 					return shared.UsageErrorf("no profile selected")
 				}
 
+				var removedProfile config.Profile
 				if cfg.Profiles != nil {
-					if _, ok := cfg.Profiles[target]; ok {
+					if profile, ok := cfg.Profiles[target]; ok {
+						removedProfile = profile
 						delete(cfg.Profiles, target)
 						removed = append(removed, target)
 					}
@@ -77,6 +84,7 @@ func NewLogoutCommand(deps Deps) *ffcli.Command {
 						return err
 					}
 				}
+				removeManagedPathIfOwned(removedProfile.ServiceAccountPath)
 				if len(removed) == 0 {
 					removed = append(removed, target)
 				}

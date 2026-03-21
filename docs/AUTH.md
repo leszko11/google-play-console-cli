@@ -4,10 +4,17 @@
 
 ## Credential Storage
 
-- Preferred backend: system keychain entry `gpc:credential:<profile>`.
-- Stored value: full service account JSON payload bytes.
-- Config fallback: profile metadata in `~/.gpc/config.json` with `serviceAccountPath`, `lastValidatedAt`, and optional `developerId`.
+- Profile metadata lives in `~/.gpc/config.json` with `serviceAccountPath`, `storage`, `lastValidatedAt`, and optional `developerId`.
+- Managed path backend stores service-account JSON in `~/.gpc/credentials/<profile>.json`.
+- Keychain backend stores service-account JSON in system keychain entry `gpc:credential:<profile>`.
+- `config.json` never stores the full service-account JSON payload.
 - Backward compatibility: existing path-only profiles continue to work; no destructive migration.
+
+Supported storage backends:
+
+- `path`: use `serviceAccountPath` from config as the active credential source.
+- `keychain`: use keychain as the active credential source for that profile.
+- `auto`: input mode for `auth init` / `setup`; currently resolves to managed path storage for new profiles.
 
 ## Profile Selection
 
@@ -20,6 +27,7 @@ Use:
 
 ```bash
 gpc auth init --profile work --service-account /path/work-sa.json
+gpc auth init --profile work --service-account /path/work-sa.json --storage keychain
 gpc auth init --profile personal --service-account /path/personal-sa.json
 gpc auth switch --profile work
 gpc --profile personal auth status --output json
@@ -32,13 +40,22 @@ Credential source precedence:
 
 1. `--service-account` flag
 2. `GPC_SERVICE_ACCOUNT_PATH`
+3. persisted profile backend
+
+For explicit storage profiles, `gpc` does not probe the other backend during normal resolution.
+Legacy profiles without `storage` keep the previous behavior:
+
+1. `--service-account` flag
+2. `GPC_SERVICE_ACCOUNT_PATH`
 3. keychain credential for resolved profile
 4. profile `serviceAccountPath` from config
 
 `gpc auth status` reports:
 
 - `source`: resolved credential source (`flag`, `env`, `keychain`, `config`)
-- `storageBackend`: effective backend (`keychain` or `config`)
+- `storageBackend`: effective backend used for the current resolution (`keychain` or `path`)
+- `profileStorage`: persisted per-profile storage (`path` or `keychain`) when configured
+- `managedCredentialPath`: managed `~/.gpc/credentials/...` path when relevant
 - `warnings`: fallback/bypass/unavailable notes
 
 `authenticated=true` is only returned when credentials are locally valid:
@@ -58,7 +75,8 @@ When strict mode is enabled and multiple credential sources are present, command
 ## Keychain Controls
 
 - `GPC_BYPASS_KEYCHAIN=1` disables keychain reads/writes for the current process.
-- On unsupported systems or unavailable keychain backend, `gpc` falls back to config-path metadata and reports warnings.
+- For `path` profiles, bypass is effectively a no-op because those profiles do not use keychain during normal resolution.
+- On unsupported systems or unavailable keychain backend, explicit `keychain` profiles can fall back to their saved `serviceAccountPath` metadata and report warnings.
 
 Truthy values for keychain bypass:
 
@@ -75,7 +93,10 @@ Truthy values for keychain bypass:
 
 - validates the service-account file is readable JSON
 - writes profile metadata to config
-- stores JSON in keychain when available (unless bypassed)
+- accepts `--storage auto|keychain|path`
+- with default `--storage auto`, writes a managed credential copy to `~/.gpc/credentials/<profile>.json`
+- with `--storage keychain`, imports JSON into keychain and keeps only non-secret metadata in config
+- with `--storage path`, keeps the provided `--service-account` path as the persisted profile path
 - sets `activeProfile`
 
 ### Switch
@@ -91,7 +112,9 @@ Truthy values for keychain bypass:
 - `authenticated`
 - `source`
 - `storageBackend`
+- `profileStorage`
 - `serviceAccountPath` (when path-backed)
+- `managedCredentialPath` (when using a managed `~/.gpc/credentials/...` file)
 - `lastValidatedAt`
 - `developerId`
 - `warnings`

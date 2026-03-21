@@ -2,8 +2,9 @@ BINARY_NAME := gpc
 VERSION ?= dev
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+GO ?= go
 LDFLAGS := -X 'github.com/leszko11/google-play-console-cli/cmd.Version=$(VERSION)' -X 'github.com/leszko11/google-play-console-cli/cmd.Commit=$(COMMIT)' -X 'github.com/leszko11/google-play-console-cli/cmd.Date=$(DATE)'
-GO_BUILD := go build -ldflags "$(LDFLAGS)"
+GO_BUILD := $(GO) build -ldflags "$(LDFLAGS)"
 
 .PHONY: build test lint format coverage benchmark generate-command-docs check-command-docs generate-llms-txt check-llms-txt generate-openapi-paths generate-openapi-coverage check-openapi-coverage check-openapi-drift dev
 
@@ -11,14 +12,14 @@ build:
 	$(GO_BUILD) -o build/$(BINARY_NAME) .
 
 test:
-	go test ./...
+	GPC_BYPASS_KEYCHAIN=1 $(GO) test ./...
 
 coverage:
-	go test -coverprofile=coverage.out ./...
-	go tool cover -func=coverage.out
+	GPC_BYPASS_KEYCHAIN=1 $(GO) test -coverprofile=coverage.out ./...
+	$(GO) tool cover -func=coverage.out
 
 benchmark:
-	go test -run=^$$ -bench=. -benchmem ./internal/cli/shared ./internal/cli/listing ./internal/cli/release
+	GPC_BYPASS_KEYCHAIN=1 $(GO) test -run=^$$ -bench=. -benchmem ./internal/cli/shared ./internal/cli/listing ./internal/cli/release
 
 lint:
 	go vet ./...

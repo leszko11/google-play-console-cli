@@ -5,7 +5,7 @@ This repo ships GitHub Actions workflows for its own validation, but `gpc` is de
 - install a released `gpc` binary
 - write service-account JSON from a masked secret to a temp file
 - set `GPC_DEFAULT_OUTPUT=json` for automation-safe output
-- set `GPC_BYPASS_KEYCHAIN=1` so CI uses config-path auth instead of OS keychains
+- set `GPC_BYPASS_KEYCHAIN=1` so CI avoids OS keychains entirely
 - run `gpc auth init`, then your read-only verification or release steps
 
 ## Shared Environment Contract
@@ -16,7 +16,7 @@ Use the same environment variable names across CI providers:
 - `GPC_SERVICE_ACCOUNT_JSON`: full JSON content of the service-account key
 - `GPC_TEST_PACKAGE`: package used for smoke verification
 - `GPC_DEFAULT_OUTPUT=json`: keep stdout machine-readable
-- `GPC_BYPASS_KEYCHAIN=1`: force deterministic config-file auth storage in CI
+- `GPC_BYPASS_KEYCHAIN=1`: force deterministic non-keychain auth resolution in CI
 
 The example configs in this repo live under `examples/ci/`:
 

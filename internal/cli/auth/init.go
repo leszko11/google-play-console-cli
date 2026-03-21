@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
@@ -31,6 +30,7 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 		packageName        string
 		developerID        string
 		promptDeveloperID  bool
+		storageChoice      string
 	)
 
 	fs.StringVar(&serviceAccountPath, "service-account", "", "Path to service account JSON")
@@ -38,6 +38,7 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&packageName, "package-name", "", "Verify package access for this package")
 	fs.StringVar(&developerID, "developer-id", "", "Optional developer account ID (numeric or developers/<id>)")
 	fs.BoolVar(&promptDeveloperID, "prompt-developer-id", false, "Prompt for developer ID when missing (interactive terminals only)")
+	fs.StringVar(&storageChoice, "storage", storageAuto, "Credential storage backend: auto, keychain, path")
 
 	return &ffcli.Command{
 		Name:      "init",
@@ -49,6 +50,12 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 			if profile == "" {
 				return shared.UsageErrorf("--profile is required")
 			}
+			normalizedStorage, err := normalizeStorageChoice(storageChoice)
+			if err != nil {
+				return shared.UsageErrorf("%v", err)
+			}
+			resolvedStorage := resolveStorageChoice(normalizedStorage)
+			managePath := normalizedStorage == storageAuto
 
 			if strings.TrimSpace(serviceAccountPath) == "" {
 				serviceAccountPath = strings.TrimSpace(shared.ActiveGlobalFlags().ServiceAccount)
@@ -99,34 +106,31 @@ func NewInitCommand(deps Deps) *ffcli.Command {
 			}
 
 			cfg.Profiles[profile] = config.Profile{
-				ServiceAccountPath: serviceAccountPath,
+				ServiceAccountPath: current.ServiceAccountPath,
+				Storage:            current.Storage,
 				LastValidatedAt:    deps.Now().UTC().Format(time.RFC3339),
 				DeveloperID:        resolvedDeveloperID,
 			}
+			nextProfile, warnings, err := storeProfileForBackend(profile, current, resolvedStorage, serviceAccountPath, serviceAccountJSON, managePath, deps.LookupEnv)
+			if err != nil {
+				return err
+			}
+			nextProfile.LastValidatedAt = deps.Now().UTC().Format(time.RFC3339)
+			nextProfile.DeveloperID = resolvedDeveloperID
+			cfg.Profiles[profile] = nextProfile
 			cfg.ActiveProfile = profile
 
 			if err := deps.SaveConfig(cfg); err != nil {
 				return err
 			}
 
-			storageBackend := "config"
-			warnings := []string{}
-			if authresolver.ShouldBypassKeychain(deps.LookupEnv) {
-				warnings = append(warnings, "keychain bypassed via GPC_BYPASS_KEYCHAIN")
-			} else {
-				if err := authresolver.StoreProfileCredential(profile, serviceAccountJSON); err == nil {
-					storageBackend = "keychain"
-				} else if authresolver.IsKeyringUnavailable(err) {
-					warnings = append(warnings, "system keychain unavailable; profile stored with config path metadata")
-				} else {
-					return fmt.Errorf("failed to store profile credential: %w", err)
-				}
-			}
-
 			out := map[string]any{
-				"activeProfile":      cfg.ActiveProfile,
-				"serviceAccountPath": serviceAccountPath,
-				"storageBackend":     storageBackend,
+				"activeProfile":  cfg.ActiveProfile,
+				"profileStorage": nextProfile.Storage,
+				"storageBackend": nextProfile.Storage,
+			}
+			if strings.TrimSpace(nextProfile.ServiceAccountPath) != "" {
+				out["serviceAccountPath"] = nextProfile.ServiceAccountPath
 			}
 			if resolvedDeveloperID != "" {
 				out["developerId"] = resolvedDeveloperID

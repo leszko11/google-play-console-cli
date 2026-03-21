@@ -81,7 +81,15 @@ func writeServiceAccountFile(t *testing.T) string {
 	return path
 }
 
+func useTempConfigPath(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("GPC_CONFIG_PATH", path)
+	return path
+}
+
 func TestAuthInitStoresProfileMetadata(t *testing.T) {
+	useTempConfigPath(t)
 	var stored config.Config
 	var saved bool
 
@@ -107,8 +115,15 @@ func TestAuthInitStoresProfileMetadata(t *testing.T) {
 	if stored.ActiveProfile != "default" {
 		t.Fatalf("unexpected active profile: %q", stored.ActiveProfile)
 	}
-	if stored.Profiles["default"].ServiceAccountPath != saPath {
+	managedPath, err := config.ManagedServiceAccountPath("default")
+	if err != nil {
+		t.Fatalf("managed path: %v", err)
+	}
+	if stored.Profiles["default"].ServiceAccountPath != managedPath {
 		t.Fatalf("unexpected path: %+v", stored.Profiles["default"])
+	}
+	if stored.Profiles["default"].Storage != config.StoragePath {
+		t.Fatalf("unexpected storage: %+v", stored.Profiles["default"])
 	}
 	if stored.Profiles["default"].DeveloperID != "" {
 		t.Fatalf("expected empty developer id, got %+v", stored.Profiles["default"])
@@ -116,6 +131,7 @@ func TestAuthInitStoresProfileMetadata(t *testing.T) {
 }
 
 func TestAuthInitStoresDeveloperID(t *testing.T) {
+	useTempConfigPath(t)
 	var stored config.Config
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return stored, nil },
@@ -137,7 +153,97 @@ func TestAuthInitStoresDeveloperID(t *testing.T) {
 	}
 }
 
+func TestAuthInitStoragePathKeepsExplicitPath(t *testing.T) {
+	useTempConfigPath(t)
+	var stored config.Config
+
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return stored, nil },
+		SaveConfig: func(cfg config.Config) error {
+			stored = cfg
+			return nil
+		},
+		NewClient: func(context.Context, gpc.CredentialInput) (PackageVerifier, error) {
+			return fakeClient{}, nil
+		},
+		Now: func() time.Time { return time.Date(2026, 2, 6, 1, 2, 3, 0, time.UTC) },
+	}
+
+	saPath := writeServiceAccountFile(t)
+	runAuth(t, deps, "init", "--service-account", saPath, "--storage", "path")
+
+	if stored.Profiles["default"].ServiceAccountPath != saPath {
+		t.Fatalf("unexpected explicit path storage: %+v", stored.Profiles["default"])
+	}
+	if stored.Profiles["default"].Storage != config.StoragePath {
+		t.Fatalf("unexpected storage: %+v", stored.Profiles["default"])
+	}
+}
+
+func TestAuthInitStorageKeychainStoresCredential(t *testing.T) {
+	useTempConfigPath(t)
+	var stored config.Config
+	var storedProfile string
+	var storedPayload []byte
+
+	prevBypass := storageShouldBypassKeychain
+	prevStore := storageStoreProfileCredential
+	prevRemove := storageRemoveProfileCredential
+	prevNotFound := storageIsCredentialNotFound
+	prevUnavailable := storageIsKeyringUnavailable
+	t.Cleanup(func() {
+		storageShouldBypassKeychain = prevBypass
+		storageStoreProfileCredential = prevStore
+		storageRemoveProfileCredential = prevRemove
+		storageIsCredentialNotFound = prevNotFound
+		storageIsKeyringUnavailable = prevUnavailable
+	})
+
+	storageShouldBypassKeychain = func(func(string) string) bool { return false }
+	storageStoreProfileCredential = func(profile string, payload []byte) error {
+		storedProfile = profile
+		storedPayload = append([]byte(nil), payload...)
+		return nil
+	}
+	storageRemoveProfileCredential = func(string) error { return authresolver.ErrCredentialNotFound }
+	storageIsCredentialNotFound = func(err error) bool { return err == authresolver.ErrCredentialNotFound }
+	storageIsKeyringUnavailable = func(error) bool { return false }
+
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return stored, nil },
+		SaveConfig: func(cfg config.Config) error {
+			stored = cfg
+			return nil
+		},
+		NewClient: func(context.Context, gpc.CredentialInput) (PackageVerifier, error) {
+			return fakeClient{}, nil
+		},
+		Now: func() time.Time { return time.Date(2026, 2, 6, 1, 2, 3, 0, time.UTC) },
+	}
+
+	saPath := writeServiceAccountFile(t)
+	runAuth(t, deps, "init", "--service-account", saPath, "--storage", "keychain")
+
+	if storedProfile != "default" || !bytes.Contains(storedPayload, []byte(`"type":"service_account"`)) {
+		t.Fatalf("expected keychain store call, got profile=%q payload=%q", storedProfile, string(storedPayload))
+	}
+	if stored.Profiles["default"].Storage != config.StorageKeychain {
+		t.Fatalf("unexpected storage: %+v", stored.Profiles["default"])
+	}
+	if stored.Profiles["default"].ServiceAccountPath != saPath {
+		t.Fatalf("unexpected persisted path: %+v", stored.Profiles["default"])
+	}
+	managedPath, err := config.ManagedServiceAccountPath("default")
+	if err != nil {
+		t.Fatalf("managed path: %v", err)
+	}
+	if _, err := os.Stat(managedPath); !os.IsNotExist(err) {
+		t.Fatalf("expected no managed secret file, got err=%v", err)
+	}
+}
+
 func TestAuthInitPromptsForDeveloperID(t *testing.T) {
+	useTempConfigPath(t)
 	var stored config.Config
 	deps := Deps{
 		LoadConfig: func() (config.Config, error) { return stored, nil },
@@ -163,6 +269,7 @@ func TestAuthInitPromptsForDeveloperID(t *testing.T) {
 }
 
 func TestAuthInitDoesNotPromptByDefault(t *testing.T) {
+	useTempConfigPath(t)
 	var stored config.Config
 	promptCalled := false
 	deps := Deps{
@@ -296,8 +403,8 @@ func TestAuthProfilesList_CSVOutput(t *testing.T) {
 			return config.Config{
 				ActiveProfile: "work",
 				Profiles: map[string]config.Profile{
-					"default": {ServiceAccountPath: "/tmp/default.json"},
-					"work":    {ServiceAccountPath: "/tmp/work.json"},
+					"default": {ServiceAccountPath: "/tmp/default.json", Storage: config.StoragePath},
+					"work":    {ServiceAccountPath: "/tmp/work.json", Storage: config.StoragePath},
 				},
 			}, nil
 		},
@@ -307,7 +414,7 @@ func TestAuthProfilesList_CSVOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
-	want := "profile,active,storage\ndefault,false,config\nwork,true,config\n"
+	want := "profile,active,storage,serviceAccountPath\ndefault,false,path,/tmp/default.json\nwork,true,path,/tmp/work.json\n"
 	if out != want {
 		t.Fatalf("unexpected csv output %q, want %q", out, want)
 	}
@@ -322,8 +429,8 @@ func TestAuthProfilesList_MarkdownOutput(t *testing.T) {
 			return config.Config{
 				ActiveProfile: "work",
 				Profiles: map[string]config.Profile{
-					"default": {ServiceAccountPath: "/tmp/default.json"},
-					"work":    {ServiceAccountPath: "/tmp/work.json"},
+					"default": {ServiceAccountPath: "/tmp/default.json", Storage: config.StoragePath},
+					"work":    {ServiceAccountPath: "/tmp/work.json", Storage: config.StoragePath},
 				},
 			}, nil
 		},
@@ -334,9 +441,9 @@ func TestAuthProfilesList_MarkdownOutput(t *testing.T) {
 		t.Fatalf("command failed: %v", err)
 	}
 	for _, want := range []string{
-		"| profile | active | storage |",
-		"| default | false | config |",
-		"| work | true | config |",
+		"| profile | active | storage | serviceAccountPath |",
+		"| default | false | path | /tmp/default.json |",
+		"| work | true | path | /tmp/work.json |",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in output: %s", want, out)
@@ -353,8 +460,8 @@ func TestAuthProfilesList_YAMLOutput(t *testing.T) {
 			return config.Config{
 				ActiveProfile: "work",
 				Profiles: map[string]config.Profile{
-					"default": {ServiceAccountPath: "/tmp/default.json"},
-					"work":    {ServiceAccountPath: "/tmp/work.json"},
+					"default": {ServiceAccountPath: "/tmp/default.json", Storage: config.StoragePath},
+					"work":    {ServiceAccountPath: "/tmp/work.json", Storage: config.StoragePath},
 				},
 			}, nil
 		},

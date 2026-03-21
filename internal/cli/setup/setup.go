@@ -15,6 +15,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/appinit"
 	"github.com/leszko11/google-play-console-cli/internal/cli/auth"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
@@ -44,9 +45,11 @@ type options struct {
 	PackageName           string
 	Profile               string
 	DeveloperID           string
+	Storage               string
 	ServiceAccountName    string
 	ServiceAccountDisplay string
 	ServiceAccountKey     string
+	serviceAccountKeyAuto bool
 	Dir                   string
 	SkipBootstrap         bool
 	WriteProjectConfig    bool
@@ -86,6 +89,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&opts.PackageName, "package-name", "", "Optional package name to verify and bootstrap")
 	fs.StringVar(&opts.Profile, "profile", "default", "Auth profile name")
 	fs.StringVar(&opts.DeveloperID, "developer-id", "", "Optional developer account ID")
+	fs.StringVar(&opts.Storage, "storage", "auto", "Credential storage backend: auto, keychain, path")
 	fs.StringVar(&opts.ServiceAccountName, "service-account-name", "", "Service account name (defaults to gpc-<profile>)")
 	fs.StringVar(&opts.ServiceAccountDisplay, "service-account-display-name", "", "Service account display name")
 	fs.StringVar(&opts.ServiceAccountKey, "service-account-key", "", "Path to write or reuse the service account key JSON")
@@ -160,15 +164,23 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 	if err != nil {
 		return res, err
 	}
+	effectiveStorage := resolveSetupStorage(resolved.Storage)
 	res.ProjectID = resolved.ProjectID
 	res.PackageName = resolved.PackageName
-	res.ServiceAccountPath = resolved.ServiceAccountKey
+	if effectiveStorage != config.StorageKeychain || !resolved.serviceAccountKeyAuto {
+		res.ServiceAccountPath = resolved.ServiceAccountKey
+	}
 	res.BootstrapDir = resolved.Dir
 	res.ServiceAccountEmail = serviceAccountEmail(resolved.ServiceAccountName, resolved.ProjectID)
 
 	fail := func(step string, err error) (result, error) {
 		res.Steps = append(res.Steps, setupStep{Name: step, Status: "error", Error: err.Error()})
 		return res, err
+	}
+	if effectiveStorage == config.StorageKeychain && resolved.serviceAccountKeyAuto {
+		defer func() {
+			_ = os.Remove(resolved.ServiceAccountKey)
+		}()
 	}
 
 	if _, err := deps.RunCommand(ctx, "", "gcloud", "--version"); err != nil {
@@ -203,7 +215,7 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 		res.Steps = append(res.Steps, setupStep{Name: "create_service_account_key", Status: "ok", Detail: resolved.ServiceAccountKey})
 	}
 
-	authArgs := []string{"--service-account", resolved.ServiceAccountKey, "--profile", resolved.Profile}
+	authArgs := []string{"--service-account", resolved.ServiceAccountKey, "--profile", resolved.Profile, "--storage", resolved.Storage}
 	if strings.TrimSpace(resolved.DeveloperID) != "" {
 		authArgs = append(authArgs, "--developer-id", strings.TrimSpace(resolved.DeveloperID))
 	}
@@ -260,6 +272,7 @@ func resolveOptions(deps Deps, opts options) (options, error) {
 	opts.PackageName = strings.TrimSpace(opts.PackageName)
 	opts.Profile = strings.TrimSpace(opts.Profile)
 	opts.DeveloperID = strings.TrimSpace(opts.DeveloperID)
+	opts.Storage = strings.ToLower(strings.TrimSpace(opts.Storage))
 	opts.ServiceAccountName = strings.TrimSpace(opts.ServiceAccountName)
 	opts.ServiceAccountDisplay = strings.TrimSpace(opts.ServiceAccountDisplay)
 	opts.ServiceAccountKey = strings.TrimSpace(opts.ServiceAccountKey)
@@ -267,6 +280,13 @@ func resolveOptions(deps Deps, opts options) (options, error) {
 
 	if opts.Profile == "" {
 		opts.Profile = "default"
+	}
+	switch opts.Storage {
+	case "", "auto":
+		opts.Storage = "auto"
+	case config.StorageKeychain, config.StoragePath:
+	default:
+		return options{}, shared.UsageErrorf("unsupported --storage %q (expected auto, keychain, or path)", opts.Storage)
 	}
 
 	if !opts.Auto {
@@ -294,12 +314,35 @@ func resolveOptions(deps Deps, opts options) (options, error) {
 		opts.ServiceAccountDisplay = "Google Play Console CLI (" + opts.Profile + ")"
 	}
 	if opts.ServiceAccountKey == "" {
-		opts.ServiceAccountKey = filepath.Join(".gpc", opts.Profile+"-service-account.json")
+		opts.serviceAccountKeyAuto = true
+		if resolveSetupStorage(opts.Storage) == config.StorageKeychain {
+			tempFile, err := os.CreateTemp("", "gpc-setup-*.json")
+			if err != nil {
+				return options{}, fmt.Errorf("failed to create temp service account path: %w", err)
+			}
+			if err := tempFile.Close(); err != nil {
+				return options{}, fmt.Errorf("failed to prepare temp service account path: %w", err)
+			}
+			opts.ServiceAccountKey = tempFile.Name()
+		} else {
+			managedPath, err := config.ManagedServiceAccountPath(opts.Profile)
+			if err != nil {
+				return options{}, err
+			}
+			opts.ServiceAccountKey = managedPath
+		}
 	}
 	if opts.Dir == "" {
 		opts.Dir = "./play"
 	}
 	return opts, nil
+}
+
+func resolveSetupStorage(value string) string {
+	if strings.TrimSpace(value) == config.StorageKeychain {
+		return config.StorageKeychain
+	}
+	return config.StoragePath
 }
 
 func writeResult(out io.Writer, res result) error {

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -61,5 +62,44 @@ func TestLoad_EmptyConfigFileReturnsZeroConfig(t *testing.T) {
 	}
 	if len(got.Packages) != 0 {
 		t.Fatalf("expected no packages, got %v", got.Packages)
+	}
+}
+
+func TestWriteManagedServiceAccount_UsesConfigBaseDir(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "nested", "config.json")
+	t.Setenv("GPC_CONFIG_PATH", cfgPath)
+
+	path, err := WriteManagedServiceAccount("work", []byte(`{"type":"service_account"}`))
+	if err != nil {
+		t.Fatalf("write managed service account: %v", err)
+	}
+
+	wantPath := filepath.Join(filepath.Dir(cfgPath), "credentials", "work.json")
+	if path != wantPath {
+		t.Fatalf("unexpected managed path: got %q want %q", path, wantPath)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat managed service account: %v", err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Fatalf("unexpected file mode: %o", info.Mode().Perm())
+	}
+
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read managed service account: %v", err)
+	}
+	if string(payload) != "{\"type\":\"service_account\"}\n" {
+		t.Fatalf("unexpected managed payload: %q", string(payload))
+	}
+
+	dirInfo, err := os.Stat(filepath.Dir(path))
+	if err != nil {
+		t.Fatalf("stat managed credentials dir: %v", err)
+	}
+	if runtime.GOOS != "windows" && dirInfo.Mode().Perm() != 0o700 {
+		t.Fatalf("unexpected dir mode: %o", dirInfo.Mode().Perm())
 	}
 }

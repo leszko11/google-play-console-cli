@@ -127,8 +127,11 @@ Use workflow-dispatch inputs `run_phase3` / `run_phase5` to enable optional depl
 # Check build metadata
 gpc --version
 
-# Initialize credentials
+# Initialize credentials (default: managed prompt-free path storage)
 gpc auth init --service-account /path/to/service-account.json
+
+# Opt into keychain-backed storage for a profile
+gpc auth init --service-account /path/to/service-account.json --storage keychain
 
 # Provision a GCP service account key, store the auth profile, and bootstrap a local workspace
 gpc setup --auto --project-id play-prod --package-name com.example.app --dir ./play
@@ -571,8 +574,7 @@ Credential source precedence:
 
 1. `--service-account`
 2. `GPC_SERVICE_ACCOUNT_PATH`
-3. keychain credential for selected profile
-4. profile `serviceAccountPath` in config
+3. persisted profile backend
 
 Profile selection precedence:
 
@@ -592,7 +594,14 @@ gpc auth logout --all
 Keychain controls:
 
 - `GPC_BYPASS_KEYCHAIN=1` disables keychain usage for current process.
-- if keychain is unavailable, CLI falls back to config-path metadata and reports warnings in auth output.
+- explicit `path` profiles do not hit keychain during normal resolution.
+- explicit `keychain` profiles fall back to saved path metadata only when keychain is bypassed or unavailable.
+
+Storage defaults:
+
+- `gpc auth init` and `gpc setup` accept `--storage auto|keychain|path`.
+- default `auto` stores credentials under `~/.gpc/credentials/<profile>.json` and keeps metadata in `~/.gpc/config.json`.
+- use `--storage keychain` when you explicitly want OS keychain-backed storage.
 
 Strict source policy:
 

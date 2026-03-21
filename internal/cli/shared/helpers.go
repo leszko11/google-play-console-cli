@@ -31,6 +31,7 @@ type ResolvedCredentials struct {
 	Input              gpc.CredentialInput
 	Source             authresolver.SourceKind
 	Profile            string
+	ProfileStorage     string
 	ServiceAccountPath string
 	Warnings           []string
 }
@@ -143,14 +144,39 @@ func ResolveCredentials(cfg config.Config, lookupEnv func(string) string) (Resol
 	}
 
 	profileName := ResolveProfileName(cfg)
-	var cfgPath string
+	var (
+		cfgPath         string
+		profileStorage  string
+		profileDeclared bool
+	)
 	if profileName != "" && cfg.Profiles != nil {
 		if profile, ok := cfg.Profiles[profileName]; ok {
 			cfgPath = strings.TrimSpace(profile.ServiceAccountPath)
+			profileStorage = strings.TrimSpace(profile.Storage)
+			profileDeclared = true
 		}
 	}
 
+	flagPath := strings.TrimSpace(ActiveGlobalFlags().ServiceAccount)
+	envPath := strings.TrimSpace(lookupEnv(EnvServiceAccountPath))
+	strict := ResolveStrictAuth(lookupEnv)
 	warnings := []string{}
+	if profileDeclared && (profileStorage == config.StorageKeychain || profileStorage == config.StoragePath) {
+		resolved, err := resolveExplicitProfileCredentials(profileName, profileStorage, flagPath, envPath, cfgPath, strict, lookupEnv)
+		if err != nil {
+			if errors.Is(err, authresolver.ErrNoCredentialSources) {
+				return ResolvedCredentials{}, fmt.Errorf("%w: no service account configured", gpc.ErrInvalidCredentials)
+			}
+			if errors.Is(err, authresolver.ErrMultipleSources) {
+				return ResolvedCredentials{}, UsageErrorf("%v", err)
+			}
+			return ResolvedCredentials{}, err
+		}
+		resolved.Profile = profileName
+		resolved.ProfileStorage = profileStorage
+		return resolved, nil
+	}
+
 	var keychainJSON []byte
 	if profileName != "" {
 		if resolveCredentialsShouldBypassKeychain(lookupEnv) {
@@ -170,11 +196,11 @@ func ResolveCredentials(cfg config.Config, lookupEnv func(string) string) (Resol
 	}
 
 	source, err := resolveCredentialsResolveSource(authresolver.Input{
-		FlagPath:     strings.TrimSpace(ActiveGlobalFlags().ServiceAccount),
-		EnvPath:      strings.TrimSpace(lookupEnv(EnvServiceAccountPath)),
+		FlagPath:     flagPath,
+		EnvPath:      envPath,
 		ConfigPath:   cfgPath,
 		KeychainJSON: keychainJSON,
-		Strict:       ResolveStrictAuth(lookupEnv),
+		Strict:       strict,
 	})
 	if err != nil {
 		if errors.Is(err, authresolver.ErrNoCredentialSources) {
@@ -227,6 +253,105 @@ func WriteJSON(out io.Writer, v any) error {
 	}
 	_, err = out.Write(b)
 	return err
+}
+
+func resolveExplicitProfileCredentials(profileName, storage, flagPath, envPath, cfgPath string, strict bool, lookupEnv func(string) string) (ResolvedCredentials, error) {
+	explicitSources := 0
+	if flagPath != "" {
+		explicitSources++
+	}
+	if envPath != "" {
+		explicitSources++
+	}
+
+	profileSourceAvailable := false
+	switch storage {
+	case config.StoragePath:
+		profileSourceAvailable = cfgPath != ""
+	case config.StorageKeychain:
+		if resolveCredentialsShouldBypassKeychain(lookupEnv) {
+			profileSourceAvailable = cfgPath != ""
+		} else {
+			profileSourceAvailable = profileName != ""
+		}
+	}
+
+	if strict && explicitSources > 0 && profileSourceAvailable {
+		return ResolvedCredentials{}, fmt.Errorf("%w: found %d", authresolver.ErrMultipleSources, explicitSources+1)
+	}
+	if strict && explicitSources > 1 {
+		return ResolvedCredentials{}, fmt.Errorf("%w: found %d", authresolver.ErrMultipleSources, explicitSources)
+	}
+
+	if flagPath != "" {
+		return ResolvedCredentials{
+			Input:              gpc.CredentialInput{ServiceAccountPath: flagPath},
+			Source:             authresolver.SourceFlag,
+			ServiceAccountPath: flagPath,
+			ProfileStorage:     storage,
+		}, nil
+	}
+	if envPath != "" {
+		return ResolvedCredentials{
+			Input:              gpc.CredentialInput{ServiceAccountPath: envPath},
+			Source:             authresolver.SourceEnv,
+			ServiceAccountPath: envPath,
+			ProfileStorage:     storage,
+		}, nil
+	}
+
+	switch storage {
+	case config.StoragePath:
+		if cfgPath == "" {
+			return ResolvedCredentials{}, authresolver.ErrNoCredentialSources
+		}
+		return ResolvedCredentials{
+			Input:              gpc.CredentialInput{ServiceAccountPath: cfgPath},
+			Source:             authresolver.SourceConfig,
+			ServiceAccountPath: cfgPath,
+			ProfileStorage:     storage,
+		}, nil
+	case config.StorageKeychain:
+		if resolveCredentialsShouldBypassKeychain(lookupEnv) {
+			if cfgPath == "" {
+				return ResolvedCredentials{}, authresolver.ErrNoCredentialSources
+			}
+			return ResolvedCredentials{
+				Input:              gpc.CredentialInput{ServiceAccountPath: cfgPath},
+				Source:             authresolver.SourceConfig,
+				ServiceAccountPath: cfgPath,
+				ProfileStorage:     storage,
+				Warnings:           []string{"keychain bypassed via GPC_BYPASS_KEYCHAIN"},
+			}, nil
+		}
+
+		payload, err := resolveCredentialsLoadProfileCredential(profileName)
+		if err == nil {
+			return ResolvedCredentials{
+				Input:          gpc.CredentialInput{ServiceAccountJSON: payload},
+				Source:         authresolver.SourceKeychain,
+				ProfileStorage: storage,
+			}, nil
+		}
+		if resolveCredentialsIsCredentialNotFound(err) {
+			return ResolvedCredentials{}, authresolver.ErrNoCredentialSources
+		}
+		if resolveCredentialsIsKeyringUnavailable(err) {
+			if cfgPath == "" {
+				return ResolvedCredentials{}, authresolver.ErrNoCredentialSources
+			}
+			return ResolvedCredentials{
+				Input:              gpc.CredentialInput{ServiceAccountPath: cfgPath},
+				Source:             authresolver.SourceConfig,
+				ServiceAccountPath: cfgPath,
+				ProfileStorage:     storage,
+				Warnings:           []string{"system keychain unavailable; using profile service-account path"},
+			}, nil
+		}
+		return ResolvedCredentials{}, err
+	default:
+		return ResolvedCredentials{}, authresolver.ErrNoCredentialSources
+	}
 }
 
 func WriteYAML(out io.Writer, v any) error {
