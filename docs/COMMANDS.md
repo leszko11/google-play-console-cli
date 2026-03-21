@@ -280,6 +280,7 @@ make generate-command-docs
 - `gpc internal-sharing upload`
 - `gpc integrity`
 - `gpc integrity decode`
+- `gpc watch`
 - `gpc update`
 - `gpc completion`
 - `gpc completion bash`
@@ -342,6 +343,7 @@ SUBCOMMANDS
   grants                 Manage per-app user grants
   internal-sharing       Upload artifacts for internal app sharing
   integrity              Decode and inspect Play Integrity tokens
+  watch                  Monitor release status and review health at regular intervals
   update                 Check for and install newer gpc releases
   completion             Generate shell completion script
 
@@ -4567,6 +4569,21 @@ FLAGS
   -input string         Path to a file containing the integrity token (use - for stdin)
   -package-name string  Package name
   -token string         Integrity token
+```
+
+## `gpc watch --help`
+
+```text
+DESCRIPTION
+  Monitor release status and review health at regular intervals
+
+USAGE
+  watch
+
+FLAGS
+  -interval 300         Poll interval in seconds
+  -output string        Output format: json, table
+  -package-name string  Package name
 ```
 
 ## `gpc update --help`
