@@ -276,6 +276,7 @@ make generate-command-docs
 - `gpc grants create`
 - `gpc grants update`
 - `gpc grants delete`
+- `gpc health`
 - `gpc internal-sharing`
 - `gpc internal-sharing upload`
 - `gpc integrity`
@@ -341,6 +342,7 @@ SUBCOMMANDS
   validate               Run pre-submission validation checks
   workflow               Run declarative gpc workflows from .gpc/workflow.yml
   grants                 Manage per-app user grants
+  health                 Show composite health score for an app
   internal-sharing       Upload artifacts for internal app sharing
   integrity              Decode and inspect Play Integrity tokens
   watch                  Monitor release status and review health at regular intervals
@@ -4513,6 +4515,20 @@ FLAGS
   -name string          Grant resource name (developers/<developer-id>/users/<email>/grants/<package-name>)
   -package-name string  Package name for grant name synthesis
   -user-email string    User email for grant name synthesis
+```
+
+## `gpc health --help`
+
+```text
+DESCRIPTION
+  Show composite health score for an app
+
+USAGE
+  health
+
+FLAGS
+  -output string        Output format: json, table, markdown, yaml
+  -package-name string  Package name
 ```
 
 ## `gpc internal-sharing --help`
