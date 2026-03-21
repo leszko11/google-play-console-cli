@@ -685,6 +685,7 @@ gpc grants --help
 gpc internal-sharing --help
 gpc integrity --help
 gpc update --help
+gpc audit --help
 gpc completion --help
 ```
 
