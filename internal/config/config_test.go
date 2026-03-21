@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -82,15 +83,23 @@ func TestWriteManagedServiceAccount_UsesConfigBaseDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat managed service account: %v", err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("unexpected file mode: %o", info.Mode().Perm())
+	}
+
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read managed service account: %v", err)
+	}
+	if string(payload) != "{\"type\":\"service_account\"}\n" {
+		t.Fatalf("unexpected managed payload: %q", string(payload))
 	}
 
 	dirInfo, err := os.Stat(filepath.Dir(path))
 	if err != nil {
 		t.Fatalf("stat managed credentials dir: %v", err)
 	}
-	if dirInfo.Mode().Perm() != 0o700 {
+	if runtime.GOOS != "windows" && dirInfo.Mode().Perm() != 0o700 {
 		t.Fatalf("unexpected dir mode: %o", dirInfo.Mode().Perm())
 	}
 }
