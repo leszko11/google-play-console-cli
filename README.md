@@ -659,6 +659,7 @@ gpc validate --help
 gpc e2e --help
 gpc release --help
 gpc rollback --help
+gpc screenshots --help
 gpc status --help
 gpc reviews --help
 gpc reports --help
