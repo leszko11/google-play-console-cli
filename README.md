@@ -687,6 +687,7 @@ gpc integrity --help
 gpc update --help
 gpc audit --help
 gpc watch --help
+gpc health --help
 gpc completion --help
 ```
 
