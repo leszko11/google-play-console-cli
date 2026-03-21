@@ -686,6 +686,7 @@ gpc internal-sharing --help
 gpc integrity --help
 gpc update --help
 gpc audit --help
+gpc watch --help
 gpc completion --help
 ```
 

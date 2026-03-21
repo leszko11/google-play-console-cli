@@ -47,6 +47,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/updatecmd"
 	"github.com/leszko11/google-play-console-cli/internal/cli/users"
 	"github.com/leszko11/google-play-console-cli/internal/cli/validatecmd"
+	"github.com/leszko11/google-play-console-cli/internal/cli/watch"
 	"github.com/leszko11/google-play-console-cli/internal/cli/workflow"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
@@ -105,6 +106,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		grants.NewCommand(grants.Deps{}),
 		internalsharing.NewCommand(internalsharing.Deps{}),
 		integrity.NewCommand(integrity.Deps{}),
+		watch.NewCommand(watch.Deps{}),
 		updatecmd.NewCommand(updatecmd.Deps{CurrentVersion: deps.CurrentVersion}),
 		completion.NewCommand(root),
 	}
