@@ -1,0 +1,11 @@
+.git
+build/
+.github/
+docs/
+scripts/
+*.md
+!go.mod
+!go.sum
+.DS_Store
+coverage.*
+.goreleaser.yml
