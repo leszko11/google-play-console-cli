@@ -104,6 +104,7 @@ make generate-command-docs
 - `gpc e2e fixtures`
 - `gpc e2e fixtures status`
 - `gpc release`
+- `gpc release init`
 - `gpc release verify`
 - `gpc release alpha`
 - `gpc release full`
@@ -1743,10 +1744,34 @@ USAGE
   release
 
 SUBCOMMANDS
+  init     Initialize a local Android release workspace from package state
   verify   Run non-mutating release readiness checks
   alpha    Build staging AAB and deploy to alpha track in one flow
   full     Deploy a release from a YAML or JSON manifest
   promote  Promote the latest releasable release from one track to another
+```
+
+## `gpc release init --help`
+
+```text
+DESCRIPTION
+  Initialize a local Android release workspace from package state
+
+USAGE
+  init
+
+FLAGS
+  -android-project-dir string  Android project directory
+  -artifact-path string        Release artifact path
+  -build-task string           Gradle build task used for release verification
+  -default-locale string       Default store locale
+  -dir ./play                  Workspace directory to generate
+  -guided=false                Prompt for missing values when running in a TTY
+  -notes-file string           Release notes file path
+  -package-name string         Target package name
+  -strict-export=false         Fail when exported release content is not ready to release
+  -track internal              Default non-production release track
+  -write-project-config=true   Write .gpc.yaml in the repo root
 ```
 
 ## `gpc release verify --help`
@@ -1760,14 +1785,14 @@ USAGE
 
 FLAGS
   -aab string                            Path to prebuilt .aab for artifact validation
-  -build-task :app:bundleStagingRelease  Gradle build task for release bundle
+  -build-task string                     Gradle build task for release bundle
   -notes-file string                     Release notes file path when notes-mode=file
   -notes-locale en-US                    Release notes locale
   -notes-mode git                        Release notes mode: git, file, none
   -notes-text string                     Inline release notes text override
   -package-name com.example.app.staging  Target package name
   -probe-track=false                     Create temporary edit and probe target track
-  -project-dir .                         Android project directory
+  -project-dir string                    Android project directory
   -track alpha                           Target track name
 ```
 

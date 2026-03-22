@@ -438,16 +438,21 @@ func TestResolveCredentials_KeychainSource(t *testing.T) {
 	prevLoad := resolveCredentialsLoadProfileCredential
 	prevNotFound := resolveCredentialsIsCredentialNotFound
 	prevUnavailable := resolveCredentialsIsKeyringUnavailable
+	prevProbe := resolveCredentialsProbeKeychainAccess
 	defer func() {
 		boundGlobalFlags = prevGlobals
 		resolveCredentialsShouldBypassKeychain = prevBypass
 		resolveCredentialsLoadProfileCredential = prevLoad
 		resolveCredentialsIsCredentialNotFound = prevNotFound
 		resolveCredentialsIsKeyringUnavailable = prevUnavailable
+		resolveCredentialsProbeKeychainAccess = prevProbe
 	}()
 
 	boundGlobalFlags = &GlobalFlags{}
 	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return false }
+	resolveCredentialsProbeKeychainAccess = func(func(string) string) authresolver.KeychainProbeResult {
+		return authresolver.KeychainProbeResult{Available: true}
+	}
 	resolveCredentialsLoadProfileCredential = func(profile string) ([]byte, error) {
 		if profile != "default" {
 			t.Fatalf("unexpected profile: %q", profile)
