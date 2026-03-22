@@ -235,6 +235,11 @@ func TestReleaseFullStopsAfterBootstrapWhenPlayStillReportsDraftState(t *testing
 			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
 			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
 			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
 		},
 	}
 	deps := baseReleaseDeps(t, client)
@@ -270,6 +275,11 @@ func TestReleaseFullReusesExistingBootstrapDraftRelease(t *testing.T) {
 			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
 			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
 			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
 		},
 		getTrackInfo: gpc.TrackInfo{
 			Name: "internal",
@@ -293,8 +303,18 @@ func TestReleaseFullReusesExistingBootstrapDraftRelease(t *testing.T) {
 	if !strings.Contains(out, `Existing internal draft release already uses versionCode(s) 2026032202.`) {
 		t.Fatalf("expected reuse hint in output: %s", out)
 	}
+	if !strings.Contains(out, `"bootstrapDraftExists":true`) {
+		t.Fatalf("expected bootstrap summary in output: %s", out)
+	}
 	if client.commitCalls != 0 {
 		t.Fatalf("expected no new bootstrap commit, got %d", client.commitCalls)
+	}
+	stateRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifest), "bootstrap-state.json"))
+	if err != nil {
+		t.Fatalf("read bootstrap state: %v", err)
+	}
+	if !strings.Contains(string(stateRaw), `"bootstrapDraftExists": true`) {
+		t.Fatalf("unexpected bootstrap state: %s", string(stateRaw))
 	}
 }
 
@@ -336,6 +356,21 @@ func TestReleaseFullNormalizesRetryableUploadFailures(t *testing.T) {
 	}
 	if !strings.Contains(out, `"status":"failed"`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestReleaseFullNormalizesUsedVersionCodeFailures(t *testing.T) {
+	client := &fakeReleaseClient{
+		uploadBundleErr: errors.New("androidpublisher api error (403): Version code 2026032202 has already been used."),
+	}
+	deps := baseReleaseDeps(t, client)
+	artifact := writeFakeAAB(t, filepath.Join(t.TempDir(), "app.aab"), true)
+	mapping := writeReleaseAsset(t, "mapping.txt")
+	manifest := writeReleaseManifest(t, artifact, mapping)
+
+	_, err := runFullCommand(t, deps, "full", "--package-name", "com.example.app", "--manifest", manifest, "--confirm")
+	if err == nil || !strings.Contains(err.Error(), "artifact version code already exists in Play") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

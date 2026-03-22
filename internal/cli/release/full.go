@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -24,19 +25,24 @@ type fullStep struct {
 }
 
 type fullResult struct {
-	PackageName          string                `json:"packageName"`
-	PackageReadiness     string                `json:"packageReadiness,omitempty"`
-	Manifest             string                `json:"manifest"`
-	Track                string                `json:"track"`
-	Status               string                `json:"status"`
-	UploadedArtifactType string                `json:"uploadedArtifactType,omitempty"`
-	VersionCode          int64                 `json:"versionCode,omitempty"`
-	Committed            bool                  `json:"committed"`
-	CleanupPerformed     bool                  `json:"cleanupPerformed"`
-	VitalsGate           *fullVitalsGateResult `json:"vitalsGate,omitempty"`
-	Warnings             []string              `json:"warnings,omitempty"`
-	NextSteps            []string              `json:"nextSteps,omitempty"`
-	Steps                []fullStep            `json:"steps"`
+	PackageName            string                `json:"packageName"`
+	PackageReadiness       string                `json:"packageReadiness,omitempty"`
+	BootstrapDraftExists   bool                  `json:"bootstrapDraftExists,omitempty"`
+	BootstrapVersionCodes  []int64               `json:"bootstrapVersionCodes,omitempty"`
+	LastKnownReadiness     string                `json:"lastKnownReadiness,omitempty"`
+	RecommendedNextCommand string                `json:"recommendedNextCommand,omitempty"`
+	BootstrapStatePath     string                `json:"bootstrapStatePath,omitempty"`
+	Manifest               string                `json:"manifest"`
+	Track                  string                `json:"track"`
+	Status                 string                `json:"status"`
+	UploadedArtifactType   string                `json:"uploadedArtifactType,omitempty"`
+	VersionCode            int64                 `json:"versionCode,omitempty"`
+	Committed              bool                  `json:"committed"`
+	CleanupPerformed       bool                  `json:"cleanupPerformed"`
+	VitalsGate             *fullVitalsGateResult `json:"vitalsGate,omitempty"`
+	Warnings               []string              `json:"warnings,omitempty"`
+	NextSteps              []string              `json:"nextSteps,omitempty"`
+	Steps                  []fullStep            `json:"steps"`
 }
 
 type fullOptions struct {
@@ -49,12 +55,6 @@ type fullOptions struct {
 	VitalsGate           []vitalsGateCondition
 	VitalsWait           time.Duration
 	AutoHaltOnRegression bool
-}
-
-type bootstrapDraftState struct {
-	Exists       bool
-	TrackName    string
-	VersionCodes []int64
 }
 
 const (
@@ -159,6 +159,28 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 		Status:      "failed",
 		Steps:       make([]fullStep, 0, 16),
 	}
+	result.BootstrapStatePath = shared.BootstrapStatePathFromReleaseManifest(opts.ManifestPath)
+	result.RecommendedNextCommand = shared.RecommendedReleaseCommand(opts.PackageName, result.PackageReadiness, filepath.Dir(opts.ManifestPath), opts.ManifestPath)
+	stateInfo, err := shared.ReadBootstrapState(result.BootstrapStatePath)
+	if err != nil {
+		return err
+	}
+	bootstrapState := stateInfo.State
+	if strings.TrimSpace(bootstrapState.LastReadinessRecheck) != "" {
+		result.LastKnownReadiness = bootstrapState.LastReadinessRecheck
+	}
+	defer func() {
+		bootstrapState.PackageName = result.PackageName
+		if strings.TrimSpace(result.PackageReadiness) != "" {
+			bootstrapState.PackageReadiness = result.PackageReadiness
+			bootstrapState.LastReadinessRecheck = result.PackageReadiness
+		}
+		bootstrapState.BootstrapDraftExists = result.BootstrapDraftExists
+		if len(result.BootstrapVersionCodes) > 0 {
+			bootstrapState.BootstrapVersionCodes = append([]int64(nil), result.BootstrapVersionCodes...)
+		}
+		_ = shared.WriteBootstrapState(result.BootstrapStatePath, bootstrapState)
+	}()
 
 	verify, _ := runVerify(parentCtx, deps, verifyOptions{
 		PackageName: opts.PackageName,
@@ -171,6 +193,10 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 		NotesFile:   "",
 	})
 	result.PackageReadiness = verify.PackageReadiness
+	if result.LastKnownReadiness == "" {
+		result.LastKnownReadiness = result.PackageReadiness
+	}
+	result.RecommendedNextCommand = shared.RecommendedReleaseCommand(opts.PackageName, result.PackageReadiness, filepath.Dir(opts.ManifestPath), opts.ManifestPath)
 	if verify.Status != "ok" && verify.PackageReadiness != string(shared.PackageReadinessDraftBootstrapRequired) {
 		result.Steps = append(result.Steps, fullStep{Name: "preflight_verify", Status: "error", Error: "release verification failed"})
 		result.NextSteps = append(result.NextSteps, "Run `gpc release verify --package-name "+opts.PackageName+" --track "+manifest.Track+" --aab "+manifest.ArtifactPath+"` or `gpc doctor --package-name "+opts.PackageName+"` for details.")
@@ -196,17 +222,22 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 	}
 
 	if result.PackageReadiness == string(shared.PackageReadinessDraftBootstrapRequired) {
-		existingDraft, err := detectExistingBootstrapDraft(requestCtx, client, opts.PackageName)
+		existingDraft, err := shared.DetectBootstrapDraftState(requestCtx, client, opts.PackageName)
 		if err != nil {
 			result.Steps = append(result.Steps, fullStep{Name: "bootstrap_existing_draft", Status: "error", Error: err.Error()})
 			_ = shared.WriteJSON(out, result)
 			return err
 		}
+		result.BootstrapDraftExists = existingDraft.Exists
+		result.BootstrapVersionCodes = append([]int64(nil), existingDraft.VersionCodes...)
+		if !result.BootstrapDraftExists && len(bootstrapState.BootstrapVersionCodes) > 0 {
+			result.BootstrapVersionCodes = append([]int64(nil), bootstrapState.BootstrapVersionCodes...)
+		}
 		if existingDraft.Exists {
 			result.Steps = append(result.Steps, fullStep{Name: "bootstrap_existing_draft", Status: "ok"})
 			writeFullProgress(deps.Stderr, "bootstrap_release", "reusing existing internal draft bootstrap release")
 			if len(existingDraft.VersionCodes) > 0 {
-				result.NextSteps = append(result.NextSteps, "Existing internal draft release already uses versionCode(s) "+joinVersionCodes(existingDraft.VersionCodes)+".")
+				result.NextSteps = append(result.NextSteps, "Existing internal draft release already uses versionCode(s) "+shared.JoinVersionCodes(existingDraft.VersionCodes)+".")
 			}
 		} else {
 			writeFullProgress(deps.Stderr, "bootstrap_release", "uploading internal draft bootstrap release")
@@ -218,6 +249,11 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 				return err
 			}
 			result.Steps = append(result.Steps, fullStep{Name: "bootstrap_release", Status: "ok"})
+			result.BootstrapDraftExists = true
+			if result.VersionCode > 0 {
+				result.BootstrapVersionCodes = []int64{result.VersionCode}
+				bootstrapState.LastBootstrapCommittedAt = deps.Now().UTC().Format(time.RFC3339)
+			}
 		}
 		writeFullProgress(deps.Stderr, "post_bootstrap_recheck", "waiting for Play to leave draft bootstrap state")
 		bootstrapReadiness, err := waitForReadyAfterBootstrap(requestCtx, deps, client, opts.PackageName)
@@ -227,6 +263,8 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 			return err
 		}
 		result.PackageReadiness = string(bootstrapReadiness.Status)
+		result.LastKnownReadiness = result.PackageReadiness
+		result.RecommendedNextCommand = shared.RecommendedReleaseCommand(opts.PackageName, result.PackageReadiness, filepath.Dir(opts.ManifestPath), opts.ManifestPath)
 		if bootstrapReadiness.Status != shared.PackageReadinessReady {
 			result.Status = fullStatusBootstrapCommitted
 			result.Steps = append(result.Steps, fullStep{Name: "post_bootstrap_recheck", Status: "warning", Error: bootstrapReadiness.Detail})
@@ -282,7 +320,8 @@ func plannedFullSteps(readiness string) []string {
 }
 
 func waitForReadyAfterBootstrap(ctx context.Context, deps Deps, client Client, packageName string) (shared.PackageReadinessResult, error) {
-	const attempts = 8
+	const attempts = 12
+	startedAt := deps.Now()
 	for attempt := 0; attempt < attempts; attempt++ {
 		readiness, err := shared.DetectPackageReadiness(ctx, client, packageName)
 		if err != nil {
@@ -294,6 +333,11 @@ func waitForReadyAfterBootstrap(ctx context.Context, deps Deps, client Client, p
 		if attempt == attempts-1 {
 			return readiness, nil
 		}
+		elapsed := deps.Now().Sub(startedAt).Round(time.Second)
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		writeFullProgress(deps.Stderr, "post_bootstrap_recheck", fmt.Sprintf("still waiting after %s (attempt %d/%d)", elapsed, attempt+1, attempts))
 		if err := deps.Sleep(ctx, 5*time.Second); err != nil {
 			return shared.PackageReadinessResult{}, err
 		}
@@ -493,51 +537,15 @@ func normalizeUploadError(err error) error {
 		return nil
 	}
 	lower := strings.ToLower(err.Error())
+	if strings.Contains(lower, "version code") && strings.Contains(lower, "has already been used") {
+		return fmt.Errorf("artifact version code already exists in Play: rerun readiness first and rebuild only if a new upload is actually required (%w)", err)
+	}
 	if strings.Contains(lower, "http2: client connection lost") ||
 		strings.Contains(lower, "broken pipe") ||
 		strings.Contains(lower, "connection reset by peer") {
 		return fmt.Errorf("retryable upload failure: artifact upload lost its network connection; rerun the same `gpc release full` command (%w)", err)
 	}
 	return err
-}
-
-func detectExistingBootstrapDraft(ctx context.Context, client Client, packageName string) (bootstrapDraftState, error) {
-	edit, err := client.CreateEdit(ctx, packageName)
-	if err != nil {
-		return bootstrapDraftState{}, fmt.Errorf("failed to inspect internal bootstrap track: %w", err)
-	}
-	defer client.DeleteEdit(ctx, packageName, edit.ID)
-
-	track, err := client.GetTrack(ctx, packageName, edit.ID, "internal")
-	if err != nil {
-		lower := strings.ToLower(err.Error())
-		if strings.Contains(lower, "not found") {
-			return bootstrapDraftState{}, nil
-		}
-		return bootstrapDraftState{}, fmt.Errorf("failed to inspect internal bootstrap track: %w", err)
-	}
-
-	for _, release := range track.Releases {
-		if strings.EqualFold(strings.TrimSpace(release.Status), "draft") {
-			return bootstrapDraftState{
-				Exists:       true,
-				TrackName:    track.Name,
-				VersionCodes: append([]int64(nil), release.VersionCodes...),
-			}, nil
-		}
-	}
-	return bootstrapDraftState{}, nil
-}
-
-func joinVersionCodes(values []int64) string {
-	if len(values) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(values))
-	for _, value := range values {
-		parts = append(parts, fmt.Sprintf("%d", value))
-	}
-	return strings.Join(parts, ", ")
 }
 
 func runPostReleaseChecks(ctx context.Context, client Client, deps Deps, packageName, track string, result *fullResult) error {

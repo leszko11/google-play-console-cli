@@ -141,6 +141,13 @@ When you pass `--package-name`, `doctor` also reports package readiness:
 
 That readiness state is the same one used by `gpc release init`, `gpc release verify`, and `gpc release full`.
 
+When a project has `release-manifest` configured, `doctor` also reports bootstrap rerun context from `./play/bootstrap-state.json`:
+
+- whether an internal draft bootstrap release is already present
+- the version code(s) already associated with that bootstrap draft
+- the last known readiness result
+- the recommended next command for the current state
+
 ### Logout
 
 `gpc auth logout` defaults to removing the selected profile.

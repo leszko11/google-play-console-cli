@@ -85,4 +85,10 @@ Keep CI stages read-only until credentials, package access, and artifact wiring 
 
 Use `gpc release init` once per repo to generate `.gpc.yaml`, `./play/release.yaml`, `./play/appinit.yaml`, and the exported store state. After that, repeat releases can stay on `gpc release full --manifest ./play/release.yaml`.
 
-If the package is still in Play's draft bootstrap state, edit-only validations can fail with `Only releases with status draft may be created on draft app`. In that case, `gpc release full` handles the internal draft bootstrap release before continuing. For greenfield public apps that are not initialized in Play yet, keep the first Console upload manual and use the generated `./play/MANUAL_FIRST_UPLOAD.md` bridge.
+If the package is still in Play's draft bootstrap state, edit-only validations can fail with `Only releases with status draft may be created on draft app`. In that case, `gpc release full` handles the internal draft bootstrap release before continuing.
+
+CI guidance by journey:
+
+- Greenfield public app: keep the first Console upload manual and use `./play/MANUAL_FIRST_UPLOAD.md` for the web-only steps.
+- Existing Play app: rely on `./play/bootstrap-state.json` plus `gpc doctor` to decide whether bootstrap is already seeded.
+- Repeat release / CI: if bootstrap draft already exists, rerun readiness first and rebuild only if another upload is actually needed.

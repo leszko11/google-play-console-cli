@@ -242,6 +242,8 @@ gpc doctor --package-name com.example.app
 
 `release init` exports the current Play state into `./play`, writes `.gpc.yaml`, and generates `.gpc/workflow.yml`.
 
+It also writes `./play/bootstrap-state.json`, which records the last known package readiness and whether an internal draft bootstrap release already exists.
+
 ### First public app upload bridge
 
 ```bash
@@ -252,9 +254,9 @@ gpc release init \
 
 If the package is not initialized yet, `gpc` does not pretend it can complete that step. It writes `./play/MANUAL_FIRST_UPLOAD.md` with:
 
-- the package name
-- the expected Android build command
-- the exact first Console upload bridge
+- what `gpc` can already prepare locally
+- the exact Play Console steps that must still be done on the web
+- the CLI limitations for public apps
 - the rerun command after that first upload
 
 ### Staged rollout with vitals gating
@@ -278,6 +280,16 @@ gpc release full --manifest ./play/release.yaml --confirm
 ```
 
 `release full` applies app details, listing metadata, screenshots, products, subscriptions, uploads the artifact, and runs post-release checks. If Play still treats the package as a draft app, `release full` seeds the bootstrap release first and then continues.
+
+If `./play/bootstrap-state.json` or the internal track already shows a draft bootstrap release, reruns reuse that state and recheck readiness before attempting another upload.
+
+### Web vs CLI
+
+| Surface | Tasks |
+| --- | --- |
+| Web only | Create or initialize a public Play app entry, upload the first public-app artifact, wait for Play processing to clear draft bootstrap |
+| CLI only | Export Play state, sync local listing/screenshots/products/subscriptions, verify release inputs, run non-production release orchestration |
+| Either | Review release metadata, inspect track state, rerun readiness checks after Play finishes processing |
 
 ### Sync store listings from local files
 

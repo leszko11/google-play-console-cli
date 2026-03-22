@@ -40,20 +40,25 @@ type initStep struct {
 }
 
 type initResult struct {
-	Status             string      `json:"status"`
-	PackageName        string      `json:"packageName"`
-	PackageReadiness   string      `json:"packageReadiness,omitempty"`
-	WorkspaceReadiness string      `json:"workspaceReadiness,omitempty"`
-	WorkspaceDir       string      `json:"workspaceDir,omitempty"`
-	ProjectConfigPath  string      `json:"projectConfigPath,omitempty"`
-	ReleaseManifest    string      `json:"releaseManifest,omitempty"`
-	WorkflowPath       string      `json:"workflowPath,omitempty"`
-	ManualBridgePath   string      `json:"manualBridgePath,omitempty"`
-	BootstrapNotePath  string      `json:"bootstrapNotePath,omitempty"`
-	Issues             []initIssue `json:"issues,omitempty"`
-	Steps              []initStep  `json:"steps"`
-	Warnings           []string    `json:"warnings,omitempty"`
-	NextSteps          []string    `json:"nextSteps,omitempty"`
+	Status                 string      `json:"status"`
+	PackageName            string      `json:"packageName"`
+	PackageReadiness       string      `json:"packageReadiness,omitempty"`
+	WorkspaceReadiness     string      `json:"workspaceReadiness,omitempty"`
+	BootstrapDraftExists   bool        `json:"bootstrapDraftExists,omitempty"`
+	BootstrapVersionCodes  []int64     `json:"bootstrapVersionCodes,omitempty"`
+	LastKnownReadiness     string      `json:"lastKnownReadiness,omitempty"`
+	RecommendedNextCommand string      `json:"recommendedNextCommand,omitempty"`
+	WorkspaceDir           string      `json:"workspaceDir,omitempty"`
+	ProjectConfigPath      string      `json:"projectConfigPath,omitempty"`
+	ReleaseManifest        string      `json:"releaseManifest,omitempty"`
+	WorkflowPath           string      `json:"workflowPath,omitempty"`
+	ManualBridgePath       string      `json:"manualBridgePath,omitempty"`
+	BootstrapNotePath      string      `json:"bootstrapNotePath,omitempty"`
+	BootstrapStatePath     string      `json:"bootstrapStatePath,omitempty"`
+	Issues                 []initIssue `json:"issues,omitempty"`
+	Steps                  []initStep  `json:"steps"`
+	Warnings               []string    `json:"warnings,omitempty"`
+	NextSteps              []string    `json:"nextSteps,omitempty"`
 }
 
 type initIssue struct {
@@ -108,6 +113,7 @@ func runInit(ctx context.Context, deps Deps, opts initOptions) (initResult, erro
 	}
 	res.PackageName = opts.PackageName
 	res.WorkspaceDir = opts.Dir
+	res.BootstrapStatePath = shared.BootstrapStatePathForWorkspace(opts.Dir)
 
 	cfg, err := deps.LoadConfig()
 	if err != nil {
@@ -178,6 +184,31 @@ func runInit(ctx context.Context, deps Deps, opts initOptions) (initResult, erro
 	}
 	res.ReleaseManifest = filepath.Join(opts.Dir, "release.yaml")
 	res.WorkflowPath = filepath.Join(repoRootForWorkspace(opts.Dir), ".gpc", "workflow.yml")
+	res.RecommendedNextCommand = shared.RecommendedReleaseCommand(opts.PackageName, res.PackageReadiness, opts.Dir, res.ReleaseManifest)
+
+	stateInfo, err := shared.ReadBootstrapState(res.BootstrapStatePath)
+	if err != nil {
+		return res, err
+	}
+	if strings.TrimSpace(stateInfo.State.LastReadinessRecheck) != "" {
+		res.LastKnownReadiness = stateInfo.State.LastReadinessRecheck
+	}
+
+	bootstrapDraft := shared.BootstrapDraftInfo{}
+	if readiness.Status != shared.PackageReadinessUninitialized {
+		bootstrapDraft, err = shared.DetectBootstrapDraftState(requestCtx, client, opts.PackageName)
+		if err != nil {
+			return res, err
+		}
+		res.BootstrapDraftExists = bootstrapDraft.Exists
+		res.BootstrapVersionCodes = append([]int64(nil), bootstrapDraft.VersionCodes...)
+		if !bootstrapDraft.Exists && len(stateInfo.State.BootstrapVersionCodes) > 0 {
+			res.BootstrapVersionCodes = append([]int64(nil), stateInfo.State.BootstrapVersionCodes...)
+		}
+	}
+	if res.LastKnownReadiness == "" {
+		res.LastKnownReadiness = res.PackageReadiness
+	}
 
 	if readiness.Status != shared.PackageReadinessUninitialized {
 		workspaceReadiness, issues, warnings := auditInitWorkspace(opts)
@@ -208,7 +239,9 @@ func runInit(ctx context.Context, deps Deps, opts initOptions) (initResult, erro
 		res.BootstrapNotePath = notePath
 		res.NextSteps = append(res.NextSteps, readiness.NextStep)
 		res.NextSteps = append(res.NextSteps, "Review "+notePath+" for the draft bootstrap handoff and rerun guidance.")
-		res.NextSteps = append(res.NextSteps, "After the draft bootstrap deploy, use `gpc release full --manifest "+filepath.Join(opts.Dir, "release.yaml")+" --confirm`.")
+		if res.RecommendedNextCommand != "" {
+			res.NextSteps = append(res.NextSteps, "After the draft bootstrap deploy, use `"+res.RecommendedNextCommand+"`.")
+		}
 	default:
 		res.Status = "ready"
 		if res.WorkspaceReadiness == "" {
@@ -219,7 +252,19 @@ func runInit(ctx context.Context, deps Deps, opts initOptions) (initResult, erro
 				res.Warnings = append(res.Warnings, warnings...)
 			}
 		}
-		res.NextSteps = append(res.NextSteps, "Run `gpc release full --manifest "+filepath.Join(opts.Dir, "release.yaml")+" --confirm` for the next internal or alpha release.")
+		if res.RecommendedNextCommand != "" {
+			res.NextSteps = append(res.NextSteps, "Run `"+res.RecommendedNextCommand+"` for the next internal or alpha release.")
+		}
+	}
+
+	nextState := stateInfo.State
+	nextState.PackageName = opts.PackageName
+	nextState.PackageReadiness = res.PackageReadiness
+	nextState.BootstrapDraftExists = res.BootstrapDraftExists
+	nextState.BootstrapVersionCodes = append([]int64(nil), res.BootstrapVersionCodes...)
+	nextState.LastReadinessRecheck = res.PackageReadiness
+	if err := shared.WriteBootstrapState(res.BootstrapStatePath, nextState); err != nil {
+		return res, err
 	}
 
 	if opts.StrictExport && (res.WorkspaceReadiness == "needs_content" || res.WorkspaceReadiness == "needs_artifact") {
@@ -399,25 +444,36 @@ func ensureManualBridge(opts initOptions) (string, error) {
 
 Package: %s
 
-## Build the first artifact
+## What gpc can do now
 
 1. Change into the Android project: %s
 2. Run the release build task: ./gradlew %s
 3. Confirm the artifact exists at: %s
+4. Generate and keep this local release workspace.
+5. After the first web upload, rerun:
+   - gpc release init --package-name %s --dir %s
+   - %s
 
-## Manual Play Console bridge
+## What must be done in Play Console
 
-1. Open Google Play Console for package %s.
-2. Create or open the app entry.
-3. Go to a non-production track such as Internal testing.
-4. Upload the first AAB or APK manually.
-5. Save the release so the package is initialized in Play.
+1. Open the public app entry in Google Play Console.
+2. Go to Internal testing.
+3. Create the first release.
+4. Upload the first AAB manually.
+5. Save the release as draft.
+6. Wait for Play to finish processing the first upload.
+
+## What gpc cannot do for public apps
+
+- Create or initialize a public app entry end-to-end.
+- Bypass the first Play Console upload.
+- Force Google Play to leave the draft bootstrap state.
 
 ## Rerun gpc
 
 - Refresh the workspace: gpc release init --package-name %s --dir %s
-- Run the full non-production flow: gpc release full --manifest %s --confirm
-`, opts.PackageName, opts.AndroidProjectDir, opts.BuildTask, opts.ArtifactPath, opts.PackageName, opts.PackageName, opts.Dir, filepath.Join(opts.Dir, "release.yaml"))
+- Continue the non-production flow: %s
+`, opts.PackageName, opts.AndroidProjectDir, opts.BuildTask, opts.ArtifactPath, opts.PackageName, opts.Dir, shared.RecommendedReleaseCommand(opts.PackageName, string(shared.PackageReadinessReady), opts.Dir, filepath.Join(opts.Dir, "release.yaml")), opts.PackageName, opts.Dir, shared.RecommendedReleaseCommand(opts.PackageName, string(shared.PackageReadinessReady), opts.Dir, filepath.Join(opts.Dir, "release.yaml")))
 	return path, os.WriteFile(path, []byte(content), 0o600)
 }
 
@@ -438,6 +494,7 @@ Package: %s
 
 - Google Play may keep the package in draft bootstrap state for several minutes after the first draft upload.
 - While that state persists, metadata-only edits like listing and screenshot sync can still fail validation.
+- gpc cannot force Play to leave this state; it can only poll and tell you when to rerun.
 
 ## Rerun after Play finishes processing
 

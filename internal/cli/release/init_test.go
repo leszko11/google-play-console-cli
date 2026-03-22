@@ -67,11 +67,21 @@ func TestReleaseInitManualRequired(t *testing.T) {
 	for _, path := range []string{
 		filepath.Join(root, "play", "release.yaml"),
 		filepath.Join(root, "play", "MANUAL_FIRST_UPLOAD.md"),
+		filepath.Join(root, "play", "bootstrap-state.json"),
 		filepath.Join(root, ".gpc.yaml"),
 		filepath.Join(root, ".gpc", "workflow.yml"),
 	} {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("expected file %s: %v", path, err)
+		}
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "play", "MANUAL_FIRST_UPLOAD.md"))
+	if err != nil {
+		t.Fatalf("read manual bridge: %v", err)
+	}
+	for _, want := range []string{"## What gpc can do now", "## What must be done in Play Console", "## What gpc cannot do for public apps", "Internal testing", "save the release as draft"} {
+		if !strings.Contains(strings.ToLower(string(raw)), strings.ToLower(want)) {
+			t.Fatalf("missing %q in manual bridge: %s", want, string(raw))
 		}
 	}
 }
@@ -85,6 +95,12 @@ func TestReleaseInitDraftBootstrapRequired(t *testing.T) {
 	deps.NewClient = func(context.Context, gpc.CredentialInput) (Client, error) {
 		return &fakeReleaseClient{
 			validateEditErr: errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			getTrackInfo: gpc.TrackInfo{
+				Name: "internal",
+				Releases: []gpc.TrackReleaseInfo{
+					{Status: "draft", VersionCodes: []int64{321}},
+				},
+			},
 		}, nil
 	}
 	deps.RunBootstrap = func(_ context.Context, _ []string) error {
@@ -103,6 +119,16 @@ func TestReleaseInitDraftBootstrapRequired(t *testing.T) {
 	}
 	if !strings.Contains(out, `DRAFT_BOOTSTRAP.md`) {
 		t.Fatalf("expected bootstrap note in output: %s", out)
+	}
+	if !strings.Contains(out, `"bootstrapDraftExists":true`) || !strings.Contains(out, `"bootstrapVersionCodes":[321]`) {
+		t.Fatalf("expected bootstrap summary in output: %s", out)
+	}
+	stateRaw, err := os.ReadFile(filepath.Join(root, "play", "bootstrap-state.json"))
+	if err != nil {
+		t.Fatalf("read bootstrap state: %v", err)
+	}
+	if !strings.Contains(string(stateRaw), `"bootstrapDraftExists": true`) {
+		t.Fatalf("unexpected bootstrap state: %s", string(stateRaw))
 	}
 }
 

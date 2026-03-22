@@ -22,6 +22,7 @@ type Client interface {
 	CreateEdit(ctx context.Context, packageName string) (gpc.EditInfo, error)
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	ValidateEdit(ctx context.Context, packageName, editID string) error
+	GetTrack(ctx context.Context, packageName, editID, trackName string) (gpc.TrackInfo, error)
 	ListUsers(ctx context.Context, developerID string, pageSize int64, pageToken string, paginate bool) (gpc.UsersListInfo, error)
 	GetSubscriptionDiagnostic(ctx context.Context, packageName, productID string) (gpc.SubscriptionDiagnosticInfo, error)
 	GetOneTimeProductDiagnostic(ctx context.Context, packageName, productID string) (gpc.OneTimeProductDiagnosticInfo, error)
@@ -67,16 +68,21 @@ type doctorCheck struct {
 }
 
 type result struct {
-	Status           string        `json:"status"`
-	PackageName      string        `json:"packageName,omitempty"`
-	AuthHealth       string        `json:"authHealth,omitempty"`
-	PackageReadiness string        `json:"packageReadiness,omitempty"`
-	VersionCode      int64         `json:"versionCode,omitempty"`
-	ProjectConfig    *projectInfo  `json:"projectConfig,omitempty"`
-	Checks           []doctorCheck `json:"checks"`
-	Warnings         []string      `json:"warnings,omitempty"`
-	BlockingIssues   []string      `json:"blockingIssues,omitempty"`
-	NextSteps        []string      `json:"nextSteps,omitempty"`
+	Status                 string        `json:"status"`
+	PackageName            string        `json:"packageName,omitempty"`
+	AuthHealth             string        `json:"authHealth,omitempty"`
+	PackageReadiness       string        `json:"packageReadiness,omitempty"`
+	BootstrapDraftExists   bool          `json:"bootstrapDraftExists,omitempty"`
+	BootstrapVersionCodes  []int64       `json:"bootstrapVersionCodes,omitempty"`
+	LastKnownReadiness     string        `json:"lastKnownReadiness,omitempty"`
+	RecommendedNextCommand string        `json:"recommendedNextCommand,omitempty"`
+	BootstrapStatePath     string        `json:"bootstrapStatePath,omitempty"`
+	VersionCode            int64         `json:"versionCode,omitempty"`
+	ProjectConfig          *projectInfo  `json:"projectConfig,omitempty"`
+	Checks                 []doctorCheck `json:"checks"`
+	Warnings               []string      `json:"warnings,omitempty"`
+	BlockingIssues         []string      `json:"blockingIssues,omitempty"`
+	NextSteps              []string      `json:"nextSteps,omitempty"`
 }
 
 type projectInfo struct {
@@ -199,6 +205,9 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 	}
 	projectCfg, projectErr := config.LoadProject()
 	if projectErr == nil && projectCfg.Path != "" {
+		if strings.TrimSpace(projectCfg.Config.ReleaseManifest) != "" {
+			res.BootstrapStatePath = shared.BootstrapStatePathFromReleaseManifest(projectCfg.Config.ReleaseManifest)
+		}
 		defaultPaths := make([]string, 0, 8)
 		if projectCfg.Config.ListingDir != "" {
 			defaultPaths = append(defaultPaths, "listing-dir="+projectCfg.Config.ListingDir)
@@ -239,6 +248,13 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 			DefaultLocale: projectCfg.Config.DefaultLocale,
 			DefaultPaths:  defaultPaths,
 		}
+	}
+	stateInfo, err := shared.ReadBootstrapState(res.BootstrapStatePath)
+	if err != nil {
+		return result{}, err
+	}
+	if strings.TrimSpace(stateInfo.State.LastReadinessRecheck) != "" {
+		res.LastKnownReadiness = stateInfo.State.LastReadinessRecheck
 	}
 
 	authStatus := shared.BuildAuthStatusSnapshot(cfg, deps.LookupEnv)
@@ -317,6 +333,25 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 		res.addOK("package_access", "package access verified")
 		res.addOK("package_readiness", readiness.Detail)
 	}
+	if res.LastKnownReadiness == "" {
+		res.LastKnownReadiness = res.PackageReadiness
+	}
+
+	if res.PackageName != "" && readinessErr == nil && readiness.Status != shared.PackageReadinessUninitialized {
+		bootstrapDraft, err := shared.DetectBootstrapDraftState(requestCtx, client, res.PackageName)
+		if err == nil {
+			res.BootstrapDraftExists = bootstrapDraft.Exists
+			res.BootstrapVersionCodes = append([]int64(nil), bootstrapDraft.VersionCodes...)
+		}
+	}
+	if !res.BootstrapDraftExists && len(stateInfo.State.BootstrapVersionCodes) > 0 {
+		res.BootstrapVersionCodes = append([]int64(nil), stateInfo.State.BootstrapVersionCodes...)
+	}
+	releaseManifest := ""
+	if projectCfg.Path != "" {
+		releaseManifest = projectCfg.Config.ReleaseManifest
+	}
+	res.RecommendedNextCommand = shared.RecommendedReleaseCommand(res.PackageName, res.PackageReadiness, "./play", releaseManifest)
 
 	reportingClient, err := deps.NewReportingClient(requestCtx, resolved.Input)
 	if err != nil {
