@@ -200,6 +200,7 @@ make generate-command-docs
 - `gpc monetization sync`
 - `gpc migrate`
 - `gpc migrate fastlane`
+- `gpc migrate fastlane diff`
 - `gpc migrate fastlane import`
 - `gpc notify`
 - `gpc notify webhook`
@@ -3269,7 +3270,25 @@ USAGE
   fastlane
 
 SUBCOMMANDS
+  diff    Compare Fastlane metadata against live Play listing and changelog state
   import  Import Fastlane metadata into the local gpc listing/changelog layout
+```
+
+## `gpc migrate fastlane diff --help`
+
+```text
+DESCRIPTION
+  Compare Fastlane metadata against live Play listing and changelog state
+
+USAGE
+  diff
+
+FLAGS
+  -from-dir fastlane    Fastlane metadata root (fastlane, `fastlane/metadata`, or `fastlane/metadata/android`)
+  -output string        Output format: json, table, markdown, yaml
+  -package-name string  Package name
+  -track production     Track name for live release note comparison
+  -version-code 0       Preferred Fastlane changelog version code (falls back to default.txt)
 ```
 
 ## `gpc migrate fastlane import --help`
