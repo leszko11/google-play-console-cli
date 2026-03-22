@@ -205,6 +205,24 @@ func TestScreenshotsSyncDraftTrackConflictHint(t *testing.T) {
 	}
 }
 
+func TestScreenshotsSyncDryRunDraftTrackConflictHint(t *testing.T) {
+	root := t.TempDir()
+	writePNGFile(t, filepath.Join(root, "en-US", "phone", "01.png"), 320, 320)
+
+	client := &fakeClient{
+		validateErr: errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	_, err := runCommand(t, deps, "sync", "--package-name", "com.example.app", "--dir", root, "--dry-run")
+	if err == nil || !strings.Contains(err.Error(), "draft bootstrap state") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func writePNGFile(t *testing.T, path string, width, height int) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

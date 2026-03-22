@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leszko11/google-play-console-cli/internal/cli/listing"
+	screenshotscmd "github.com/leszko11/google-play-console-cli/internal/cli/screenshots"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/peterbourgon/ff/v3/ffcli"
@@ -26,6 +28,7 @@ type initOptions struct {
 	BuildTask          string
 	ArtifactPath       string
 	NotesFile          string
+	StrictExport       bool
 	WriteProjectConfig bool
 }
 
@@ -37,17 +40,28 @@ type initStep struct {
 }
 
 type initResult struct {
-	Status            string     `json:"status"`
-	PackageName       string     `json:"packageName"`
-	PackageReadiness  string     `json:"packageReadiness,omitempty"`
-	WorkspaceDir      string     `json:"workspaceDir,omitempty"`
-	ProjectConfigPath string     `json:"projectConfigPath,omitempty"`
-	ReleaseManifest   string     `json:"releaseManifest,omitempty"`
-	WorkflowPath      string     `json:"workflowPath,omitempty"`
-	ManualBridgePath  string     `json:"manualBridgePath,omitempty"`
-	Steps             []initStep `json:"steps"`
-	Warnings          []string   `json:"warnings,omitempty"`
-	NextSteps         []string   `json:"nextSteps,omitempty"`
+	Status             string      `json:"status"`
+	PackageName        string      `json:"packageName"`
+	PackageReadiness   string      `json:"packageReadiness,omitempty"`
+	WorkspaceReadiness string      `json:"workspaceReadiness,omitempty"`
+	WorkspaceDir       string      `json:"workspaceDir,omitempty"`
+	ProjectConfigPath  string      `json:"projectConfigPath,omitempty"`
+	ReleaseManifest    string      `json:"releaseManifest,omitempty"`
+	WorkflowPath       string      `json:"workflowPath,omitempty"`
+	ManualBridgePath   string      `json:"manualBridgePath,omitempty"`
+	BootstrapNotePath  string      `json:"bootstrapNotePath,omitempty"`
+	Issues             []initIssue `json:"issues,omitempty"`
+	Steps              []initStep  `json:"steps"`
+	Warnings           []string    `json:"warnings,omitempty"`
+	NextSteps          []string    `json:"nextSteps,omitempty"`
+}
+
+type initIssue struct {
+	Code     string `json:"code"`
+	Path     string `json:"path,omitempty"`
+	Detail   string `json:"detail"`
+	NextStep string `json:"nextStep,omitempty"`
+	Blocking bool   `json:"blocking,omitempty"`
 }
 
 func newInitCommand(deps Deps) *ffcli.Command {
@@ -64,6 +78,7 @@ func newInitCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&opts.BuildTask, "build-task", "", "Gradle build task used for release verification")
 	fs.StringVar(&opts.ArtifactPath, "artifact-path", "", "Release artifact path")
 	fs.StringVar(&opts.NotesFile, "notes-file", "", "Release notes file path")
+	fs.BoolVar(&opts.StrictExport, "strict-export", false, "Fail when exported release content is not ready to release")
 	fs.BoolVar(&opts.WriteProjectConfig, "write-project-config", true, "Write .gpc.yaml in the repo root")
 
 	return &ffcli.Command{
@@ -101,7 +116,14 @@ func runInit(ctx context.Context, deps Deps, opts initOptions) (initResult, erro
 	authStatus := shared.BuildAuthStatusSnapshot(cfg, deps.LookupEnv)
 	if !authStatus.Authenticated {
 		res.Steps = append(res.Steps, initStep{Name: "auth", Status: "error", Error: shared.AuthStatusSummary(authStatus)})
-		res.NextSteps = append(res.NextSteps, "Run `gpc auth init --service-account <path>` or `gpc setup --auto --project-id <id> --package-name "+opts.PackageName+"`.")
+		if authStatus.FixCommand != "" {
+			res.NextSteps = append(res.NextSteps, "Run `"+authStatus.FixCommand+"`.")
+		} else {
+			res.NextSteps = append(res.NextSteps, "Run `gpc auth init --service-account <path> --storage path` or `gpc setup --auto --project-id <id> --package-name "+opts.PackageName+"`.")
+		}
+		if authStatus.DiagnosticCommand != "" {
+			res.NextSteps = append(res.NextSteps, "Diagnostic: `"+authStatus.DiagnosticCommand+"`.")
+		}
 		return res, fmt.Errorf("authentication is required before release init")
 	}
 	res.Steps = append(res.Steps, initStep{Name: "auth", Status: "ok", Detail: shared.AuthStatusSummary(authStatus)})
@@ -157,6 +179,13 @@ func runInit(ctx context.Context, deps Deps, opts initOptions) (initResult, erro
 	res.ReleaseManifest = filepath.Join(opts.Dir, "release.yaml")
 	res.WorkflowPath = filepath.Join(repoRootForWorkspace(opts.Dir), ".gpc", "workflow.yml")
 
+	if readiness.Status != shared.PackageReadinessUninitialized {
+		workspaceReadiness, issues, warnings := auditInitWorkspace(opts)
+		res.WorkspaceReadiness = workspaceReadiness
+		res.Issues = issues
+		res.Warnings = append(res.Warnings, warnings...)
+	}
+
 	switch readiness.Status {
 	case shared.PackageReadinessUninitialized:
 		bridgePath, err := ensureManualBridge(opts)
@@ -164,20 +193,37 @@ func runInit(ctx context.Context, deps Deps, opts initOptions) (initResult, erro
 			return res, err
 		}
 		res.Status = "manual_required"
+		res.WorkspaceReadiness = "manual_required"
 		res.ManualBridgePath = bridgePath
 		res.NextSteps = append(res.NextSteps, "Follow "+bridgePath+" for the first Play Console upload.")
 		res.NextSteps = append(res.NextSteps, "Then rerun `gpc release init --package-name "+opts.PackageName+" --dir "+opts.Dir+"`.")
 	case shared.PackageReadinessDraftBootstrapRequired:
 		res.Status = "draft_bootstrap_required"
+		res.WorkspaceReadiness = "draft_bootstrap_required"
 		res.Warnings = append(res.Warnings, readiness.Warning)
+		notePath, err := ensureDraftBootstrapNote(opts)
+		if err != nil {
+			return res, err
+		}
+		res.BootstrapNotePath = notePath
 		res.NextSteps = append(res.NextSteps, readiness.NextStep)
+		res.NextSteps = append(res.NextSteps, "Review "+notePath+" for the draft bootstrap handoff and rerun guidance.")
 		res.NextSteps = append(res.NextSteps, "After the draft bootstrap deploy, use `gpc release full --manifest "+filepath.Join(opts.Dir, "release.yaml")+" --confirm`.")
 	default:
 		res.Status = "ready"
-		if warnings, err := summarizeWorkspaceWarnings(opts); err == nil {
-			res.Warnings = append(res.Warnings, warnings...)
+		if res.WorkspaceReadiness == "" {
+			res.WorkspaceReadiness = "ready"
+		}
+		if res.WorkspaceReadiness == "ready" {
+			if warnings, err := summarizeWorkspaceWarnings(opts); err == nil {
+				res.Warnings = append(res.Warnings, warnings...)
+			}
 		}
 		res.NextSteps = append(res.NextSteps, "Run `gpc release full --manifest "+filepath.Join(opts.Dir, "release.yaml")+" --confirm` for the next internal or alpha release.")
+	}
+
+	if opts.StrictExport && (res.WorkspaceReadiness == "needs_content" || res.WorkspaceReadiness == "needs_artifact") {
+		return res, fmt.Errorf("workspace audit failed; fix the reported issues before releasing")
 	}
 
 	return res, nil
@@ -375,6 +421,32 @@ Package: %s
 	return path, os.WriteFile(path, []byte(content), 0o600)
 }
 
+func ensureDraftBootstrapNote(opts initOptions) (string, error) {
+	path := filepath.Join(opts.Dir, "DRAFT_BOOTSTRAP.md")
+	content := fmt.Sprintf(`# Draft Bootstrap Handoff
+
+Package: %s
+
+## First bootstrap release
+
+1. Build the release artifact so it exists at %s.
+2. Commit the bootstrap release with:
+   gpc release full --manifest %s --confirm
+3. The bootstrap release will be forced to the Internal track with status "draft".
+
+## What to expect next
+
+- Google Play may keep the package in draft bootstrap state for several minutes after the first draft upload.
+- While that state persists, metadata-only edits like listing and screenshot sync can still fail validation.
+
+## Rerun after Play finishes processing
+
+- Rerun:
+  gpc release full --manifest %s --confirm
+`, opts.PackageName, opts.ArtifactPath, filepath.Join(opts.Dir, "release.yaml"), filepath.Join(opts.Dir, "release.yaml"))
+	return path, os.WriteFile(path, []byte(content), 0o600)
+}
+
 func mirrorListingScreenshots(workspaceDir string) error {
 	listingDir := filepath.Join(workspaceDir, "listing")
 	screenshotsDir := filepath.Join(workspaceDir, "screenshots")
@@ -438,6 +510,173 @@ func summarizeWorkspaceWarnings(opts initOptions) ([]string, error) {
 		}
 	}
 	return warnings, nil
+}
+
+func auditInitWorkspace(opts initOptions) (string, []initIssue, []string) {
+	issues := make([]initIssue, 0, 8)
+	warnings := make([]string, 0, 4)
+
+	listingIssues := auditListingWorkspace(filepath.Join(opts.Dir, "listing"))
+	issues = append(issues, listingIssues...)
+
+	if _, err := screenshotscmd.ScanScreenshotsDir(filepath.Join(opts.Dir, "screenshots")); err != nil {
+		issues = append(issues, initIssue{
+			Code:     "screenshots_missing",
+			Path:     filepath.Join(opts.Dir, "screenshots"),
+			Detail:   err.Error(),
+			NextStep: "Add at least one locale/device screenshot set before syncing screenshots.",
+		})
+	}
+
+	if _, err := os.Stat(opts.NotesFile); err != nil {
+		issues = append(issues, initIssue{
+			Code:     "notes_missing",
+			Path:     opts.NotesFile,
+			Detail:   "release notes file is missing",
+			NextStep: "Create the notes file or rerun `gpc release init` to regenerate defaults.",
+		})
+	}
+
+	if strings.TrimSpace(opts.BuildTask) == "" {
+		issues = append(issues, initIssue{
+			Code:     "build_task_missing",
+			Detail:   "build task did not resolve",
+			NextStep: "Set `build-task` in .gpc.yaml or pass `--build-task`.",
+			Blocking: true,
+		})
+	}
+	if _, err := os.Stat(opts.ArtifactPath); err != nil {
+		issues = append(issues, initIssue{
+			Code:     "artifact_missing",
+			Path:     opts.ArtifactPath,
+			Detail:   "release artifact does not exist yet",
+			NextStep: "Build the Android app with `./gradlew " + opts.BuildTask + "` before running `gpc release full`.",
+			Blocking: true,
+		})
+	}
+
+	for _, dirInfo := range []struct {
+		code string
+		path string
+		name string
+	}{
+		{code: "products_dir_missing", path: filepath.Join(opts.Dir, "products"), name: "products"},
+		{code: "subscriptions_dir_missing", path: filepath.Join(opts.Dir, "subscriptions"), name: "subscriptions"},
+	} {
+		if _, err := os.Stat(dirInfo.path); err != nil {
+			issues = append(issues, initIssue{
+				Code:     dirInfo.code,
+				Path:     dirInfo.path,
+				Detail:   dirInfo.name + " export directory is missing",
+				NextStep: "Rerun `gpc release init --package-name " + opts.PackageName + " --dir " + opts.Dir + "` to regenerate the workspace.",
+			})
+		}
+	}
+
+	readiness := "ready"
+	hasContentIssues := false
+	hasArtifactIssues := false
+	for _, issue := range issues {
+		switch issue.Code {
+		case "artifact_missing", "build_task_missing":
+			hasArtifactIssues = true
+		default:
+			hasContentIssues = true
+		}
+	}
+	switch {
+	case hasContentIssues:
+		readiness = "needs_content"
+	case hasArtifactIssues:
+		readiness = "needs_artifact"
+	}
+	if len(issues) == 0 {
+		warnings = append(warnings, "workspace export is release-ready")
+	}
+	return readiness, issues, warnings
+}
+
+func auditListingWorkspace(root string) []initIssue {
+	issues := make([]initIssue, 0, 4)
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return []initIssue{{
+			Code:     "listing_missing",
+			Path:     root,
+			Detail:   "listing directory is missing",
+			NextStep: "Rerun `gpc release init` or add listing metadata under this directory.",
+		}}
+	}
+
+	localeFound := false
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		localeFound = true
+		for _, name := range []string{"title.txt", "short-description.txt", "full-description.txt"} {
+			path := filepath.Join(root, entry.Name(), name)
+			raw, err := os.ReadFile(path)
+			switch {
+			case os.IsNotExist(err):
+				issues = append(issues, initIssue{
+					Code:     "listing_file_missing",
+					Path:     path,
+					Detail:   "required listing file is missing",
+					NextStep: "Populate this file before release validation.",
+				})
+			case err != nil:
+				issues = append(issues, initIssue{
+					Code:     "listing_file_unreadable",
+					Path:     path,
+					Detail:   err.Error(),
+					NextStep: "Fix the file and rerun `gpc release init`.",
+				})
+			case strings.TrimSpace(string(raw)) == "":
+				issues = append(issues, initIssue{
+					Code:     "listing_file_empty",
+					Path:     path,
+					Detail:   "required listing file is empty",
+					NextStep: "Fill in this metadata before release validation.",
+				})
+			}
+		}
+	}
+
+	if !localeFound {
+		issues = append(issues, initIssue{
+			Code:     "listing_locale_missing",
+			Path:     root,
+			Detail:   "no locale directories found in exported listing workspace",
+			NextStep: "Add at least one locale with title, short description, and full description.",
+		})
+	}
+
+	// Keep the stricter parser signal as a final sanity check.
+	if _, err := listing.ScanListingsDir(root); err != nil {
+		issues = append(issues, initIssue{
+			Code:     "listing_validation_failed",
+			Path:     root,
+			Detail:   err.Error(),
+			NextStep: "Fix listing validation errors before release validation.",
+		})
+	}
+
+	return dedupeInitIssues(issues)
+}
+
+func dedupeInitIssues(issues []initIssue) []initIssue {
+	seen := map[string]struct{}{}
+	out := make([]initIssue, 0, len(issues))
+	for _, issue := range issues {
+		key := issue.Code + "|" + issue.Path + "|" + issue.Detail
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, issue)
+	}
+	return out
 }
 
 func repoRootForWorkspace(workspaceDir string) string {

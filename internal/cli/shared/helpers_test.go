@@ -521,14 +521,20 @@ func TestResolveCredentials_KeychainProfileBypassFallsBackToPath(t *testing.T) {
 	prevGlobals := boundGlobalFlags
 	prevBypass := resolveCredentialsShouldBypassKeychain
 	prevLoad := resolveCredentialsLoadProfileCredential
+	prevProbe := resolveCredentialsProbeKeychainAccess
 	defer func() {
 		boundGlobalFlags = prevGlobals
 		resolveCredentialsShouldBypassKeychain = prevBypass
 		resolveCredentialsLoadProfileCredential = prevLoad
+		resolveCredentialsProbeKeychainAccess = prevProbe
 	}()
 
 	boundGlobalFlags = &GlobalFlags{}
 	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return true }
+	resolveCredentialsProbeKeychainAccess = func(func(string) string) authresolver.KeychainProbeResult {
+		t.Fatal("did not expect keychain probe while bypass is enabled")
+		return authresolver.KeychainProbeResult{}
+	}
 	resolveCredentialsLoadProfileCredential = func(string) ([]byte, error) {
 		t.Fatal("did not expect keychain lookup while bypass is enabled")
 		return nil, nil
@@ -550,6 +556,99 @@ func TestResolveCredentials_KeychainProfileBypassFallsBackToPath(t *testing.T) {
 	}
 	if !slices.Contains(resolved.Warnings, "keychain bypassed via GPC_BYPASS_KEYCHAIN") {
 		t.Fatalf("expected bypass warning, got %v", resolved.Warnings)
+	}
+}
+
+func TestResolveCredentials_LegacyProfileBypassPrefersConfigPath(t *testing.T) {
+	prevGlobals := boundGlobalFlags
+	prevBypass := resolveCredentialsShouldBypassKeychain
+	prevLoad := resolveCredentialsLoadProfileCredential
+	prevProbe := resolveCredentialsProbeKeychainAccess
+	defer func() {
+		boundGlobalFlags = prevGlobals
+		resolveCredentialsShouldBypassKeychain = prevBypass
+		resolveCredentialsLoadProfileCredential = prevLoad
+		resolveCredentialsProbeKeychainAccess = prevProbe
+	}()
+
+	boundGlobalFlags = &GlobalFlags{}
+	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return true }
+	resolveCredentialsProbeKeychainAccess = func(func(string) string) authresolver.KeychainProbeResult {
+		t.Fatal("did not expect keychain probe while bypass is enabled")
+		return authresolver.KeychainProbeResult{}
+	}
+	resolveCredentialsLoadProfileCredential = func(string) ([]byte, error) {
+		t.Fatal("did not expect keychain lookup for legacy bypass path")
+		return nil, nil
+	}
+
+	path := filepath.Join(t.TempDir(), "service-account.json")
+	if err := os.WriteFile(path, []byte(`{"type":"service_account"}`), 0o600); err != nil {
+		t.Fatalf("write service account: %v", err)
+	}
+
+	cfg := config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {ServiceAccountPath: path},
+		},
+	}
+
+	resolved, err := ResolveCredentials(cfg, func(string) string { return "" })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolved.Source != authresolver.SourceConfig {
+		t.Fatalf("expected config source, got %q", resolved.Source)
+	}
+	if resolved.ServiceAccountPath != path {
+		t.Fatalf("unexpected path %q", resolved.ServiceAccountPath)
+	}
+}
+
+func TestResolveCredentials_LegacyProfileBlockedKeychainFallsBackToPath(t *testing.T) {
+	prevGlobals := boundGlobalFlags
+	prevBypass := resolveCredentialsShouldBypassKeychain
+	prevLoad := resolveCredentialsLoadProfileCredential
+	prevProbe := resolveCredentialsProbeKeychainAccess
+	defer func() {
+		boundGlobalFlags = prevGlobals
+		resolveCredentialsShouldBypassKeychain = prevBypass
+		resolveCredentialsLoadProfileCredential = prevLoad
+		resolveCredentialsProbeKeychainAccess = prevProbe
+	}()
+
+	boundGlobalFlags = &GlobalFlags{}
+	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return false }
+	resolveCredentialsProbeKeychainAccess = func(func(string) string) authresolver.KeychainProbeResult {
+		return authresolver.KeychainProbeResult{Blocked: true}
+	}
+	resolveCredentialsLoadProfileCredential = func(string) ([]byte, error) {
+		t.Fatal("did not expect keychain lookup when probe says blocked")
+		return nil, nil
+	}
+
+	path := filepath.Join(t.TempDir(), "service-account.json")
+	if err := os.WriteFile(path, []byte(`{"type":"service_account"}`), 0o600); err != nil {
+		t.Fatalf("write service account: %v", err)
+	}
+
+	cfg := config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {ServiceAccountPath: path},
+		},
+	}
+
+	resolved, err := ResolveCredentials(cfg, func(string) string { return "" })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolved.Source != authresolver.SourceConfig {
+		t.Fatalf("expected config source, got %q", resolved.Source)
+	}
+	if !slices.Contains(resolved.Warnings, "system keychain access appears blocked; using config/environment/flags") {
+		t.Fatalf("expected blocked keychain warning, got %v", resolved.Warnings)
 	}
 }
 

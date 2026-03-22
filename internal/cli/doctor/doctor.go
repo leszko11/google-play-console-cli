@@ -69,6 +69,7 @@ type doctorCheck struct {
 type result struct {
 	Status           string        `json:"status"`
 	PackageName      string        `json:"packageName,omitempty"`
+	AuthHealth       string        `json:"authHealth,omitempty"`
 	PackageReadiness string        `json:"packageReadiness,omitempty"`
 	VersionCode      int64         `json:"versionCode,omitempty"`
 	ProjectConfig    *projectInfo  `json:"projectConfig,omitempty"`
@@ -241,6 +242,7 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 	}
 
 	authStatus := shared.BuildAuthStatusSnapshot(cfg, deps.LookupEnv)
+	res.AuthHealth = authStatus.Health
 	authDetail := shared.AuthStatusSummary(authStatus)
 	if authDetail == "" {
 		authDetail = "authentication status unavailable"

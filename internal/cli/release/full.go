@@ -51,6 +51,10 @@ type fullOptions struct {
 	AutoHaltOnRegression bool
 }
 
+const (
+	fullStatusBootstrapCommitted = "bootstrap_committed"
+)
+
 func newFullCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("full", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
@@ -186,6 +190,7 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 	}
 
 	if result.PackageReadiness == string(shared.PackageReadinessDraftBootstrapRequired) {
+		writeFullProgress(deps.Stderr, "bootstrap_release", "uploading internal draft bootstrap release")
 		bootstrapManifest := manifest
 		bootstrapManifest.Track = "internal"
 		bootstrapManifest.Status = "draft"
@@ -194,16 +199,17 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 			return err
 		}
 		result.Steps = append(result.Steps, fullStep{Name: "bootstrap_release", Status: "ok"})
+		writeFullProgress(deps.Stderr, "post_bootstrap_recheck", "waiting for Play to leave draft bootstrap state")
 		bootstrapReadiness, err := waitForReadyAfterBootstrap(requestCtx, deps, client, opts.PackageName)
 		if err != nil {
-			result.Steps = append(result.Steps, fullStep{Name: "post_bootstrap_readiness", Status: "error", Error: err.Error()})
+			result.Steps = append(result.Steps, fullStep{Name: "post_bootstrap_recheck", Status: "error", Error: err.Error()})
 			_ = shared.WriteJSON(out, result)
 			return err
 		}
 		result.PackageReadiness = string(bootstrapReadiness.Status)
 		if bootstrapReadiness.Status != shared.PackageReadinessReady {
-			result.Status = "bootstrap_committed"
-			result.Steps = append(result.Steps, fullStep{Name: "post_bootstrap_readiness", Status: "warning", Error: bootstrapReadiness.Detail})
+			result.Status = fullStatusBootstrapCommitted
+			result.Steps = append(result.Steps, fullStep{Name: "post_bootstrap_recheck", Status: "warning", Error: bootstrapReadiness.Detail})
 			if bootstrapReadiness.Warning != "" {
 				result.Warnings = append(result.Warnings, bootstrapReadiness.Warning)
 			}
@@ -211,19 +217,22 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 			_ = shared.WriteJSON(out, result)
 			return fmt.Errorf("bootstrap release committed, but package is still in Play's draft bootstrap state")
 		}
-		result.Steps = append(result.Steps, fullStep{Name: "post_bootstrap_readiness", Status: "ok"})
+		result.Steps = append(result.Steps, fullStep{Name: "post_bootstrap_recheck", Status: "ok"})
 	}
 
+	writeFullProgress(deps.Stderr, "content_sync", "applying app details, listing, screenshots, products, and subscriptions")
 	if err := runContentSync(parentCtx, deps, opts.PackageName, opts.ManifestPath, &result); err != nil {
 		_ = shared.WriteJSON(out, result)
 		return err
 	}
 
+	writeFullProgress(deps.Stderr, "final_deploy", "uploading the requested track release")
 	if err := runManifestDeploy(parentCtx, requestCtx, client, deps, opts, manifest, &result, "deploy_"); err != nil {
 		_ = shared.WriteJSON(out, result)
 		return err
 	}
 
+	writeFullProgress(deps.Stderr, "post_release_checks", "running post-release verification")
 	if err := runPostReleaseChecks(requestCtx, client, deps, opts.PackageName, manifest.Track, &result); err != nil {
 		result.Warnings = append(result.Warnings, err.Error())
 	}
@@ -247,7 +256,7 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 func plannedFullSteps(readiness string) []string {
 	steps := []string{"preflight_verify"}
 	if readiness == string(shared.PackageReadinessDraftBootstrapRequired) {
-		steps = append(steps, "bootstrap_release", "post_bootstrap_readiness")
+		steps = append(steps, "bootstrap_release", "post_bootstrap_recheck")
 	}
 	return append(steps, "sync_app_details_listing", "sync_screenshots", "sync_products", "sync_subscriptions", "deploy_release", "post_release_checks")
 }
@@ -365,17 +374,19 @@ func runManifestDeploy(parentCtx, requestCtx context.Context, client Client, dep
 	currentEditID = edit.ID
 	result.Steps = append(result.Steps, fullStep{Name: prefix + "create_edit", Status: "ok"})
 
+	writeFullProgress(deps.Stderr, prefix+"upload_artifact", "uploading artifact")
 	uploadCtx, uploadCancel := shared.ContextWithUploadTimeout(parentCtx, shared.ActiveGlobalFlags().UploadTimeout)
 	versionCode, err := uploadManifestArtifact(uploadCtx, client, opts.PackageName, currentEditID, manifest)
 	uploadCancel()
 	if err != nil {
-		return fail("upload_artifact", err)
+		return fail("upload_artifact", normalizeUploadError(err))
 	}
 	result.VersionCode = versionCode
 	result.UploadedArtifactType = manifest.ArtifactType
 	result.Steps = append(result.Steps, fullStep{Name: prefix + "upload_artifact", Status: "ok"})
 
 	if manifest.MappingFile != "" {
+		writeFullProgress(deps.Stderr, prefix+"upload_mapping", "uploading mapping file")
 		mapCtx, mapCancel := shared.ContextWithUploadTimeout(parentCtx, shared.ActiveGlobalFlags().UploadTimeout)
 		_, err := client.UploadDeobfuscationFile(mapCtx, opts.PackageName, currentEditID, versionCode, manifest.MappingType, manifest.MappingFile)
 		mapCancel()
@@ -398,6 +409,7 @@ func runManifestDeploy(parentCtx, requestCtx context.Context, client Client, dep
 	}
 	result.Steps = append(result.Steps, fullStep{Name: prefix + "update_track", Status: "ok"})
 
+	writeFullProgress(deps.Stderr, prefix+"validate_edit", "validating Play edit")
 	if err := client.ValidateEdit(requestCtx, opts.PackageName, currentEditID); err != nil {
 		return fail("validate_edit", fmt.Errorf("failed to validate edit: %w", err))
 	}
@@ -438,6 +450,35 @@ func runManifestDeploy(parentCtx, requestCtx context.Context, client Client, dep
 	result.Status = "committed"
 	result.Steps = append(result.Steps, fullStep{Name: prefix + "commit_edit", Status: "ok"})
 	return nil
+}
+
+func writeFullProgress(stderr io.Writer, step, detail string) {
+	if stderr == nil {
+		return
+	}
+	step = strings.TrimSpace(step)
+	detail = strings.TrimSpace(detail)
+	if step == "" && detail == "" {
+		return
+	}
+	if detail == "" {
+		_, _ = fmt.Fprintf(stderr, "[release full] %s\n", step)
+		return
+	}
+	_, _ = fmt.Fprintf(stderr, "[release full] %s: %s\n", step, detail)
+}
+
+func normalizeUploadError(err error) error {
+	if err == nil {
+		return nil
+	}
+	lower := strings.ToLower(err.Error())
+	if strings.Contains(lower, "http2: client connection lost") ||
+		strings.Contains(lower, "broken pipe") ||
+		strings.Contains(lower, "connection reset by peer") {
+		return fmt.Errorf("retryable upload failure: artifact upload lost its network connection; rerun the same `gpc release full` command (%w)", err)
+	}
+	return err
 }
 
 func runPostReleaseChecks(ctx context.Context, client Client, deps Deps, packageName, track string, result *fullResult) error {

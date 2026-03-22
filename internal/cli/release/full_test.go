@@ -64,6 +64,17 @@ func runFullCommand(t *testing.T, deps Deps, args ...string) (string, error) {
 	return out.String(), err
 }
 
+func runFullCommandWithStderr(t *testing.T, deps Deps, args ...string) (string, string, error) {
+	t.Helper()
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	deps.Stdout = &out
+	deps.Stderr = &stderr
+	cmd := NewCommand(deps)
+	err := cmd.ParseAndRun(context.Background(), args)
+	return out.String(), stderr.String(), err
+}
+
 func TestReleaseFullCommitSuccess(t *testing.T) {
 	client := &fakeReleaseClient{}
 	deps := baseReleaseDeps(t, client)
@@ -241,6 +252,47 @@ func TestReleaseFullStopsAfterBootstrapWhenPlayStillReportsDraftState(t *testing
 	}
 	if client.commitCalls != 1 {
 		t.Fatalf("expected only bootstrap commit, got %d commits", client.commitCalls)
+	}
+}
+
+func TestReleaseFullShowsProgressOnStderr(t *testing.T) {
+	client := &fakeReleaseClient{}
+	deps := baseReleaseDeps(t, client)
+	artifact := writeFakeAAB(t, filepath.Join(t.TempDir(), "app.aab"), true)
+	mapping := writeReleaseAsset(t, "mapping.txt")
+	manifest := writeReleaseManifest(t, artifact, mapping)
+
+	_, stderr, err := runFullCommandWithStderr(t, deps, "full", "--package-name", "com.example.app", "--manifest", manifest, "--confirm")
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{
+		"[release full] content_sync:",
+		"[release full] final_deploy:",
+		"[release full] deploy_upload_artifact:",
+		"[release full] post_release_checks:",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("missing %q in stderr: %s", want, stderr)
+		}
+	}
+}
+
+func TestReleaseFullNormalizesRetryableUploadFailures(t *testing.T) {
+	client := &fakeReleaseClient{
+		uploadBundleErr: errors.New("Post \"https://androidpublisher.googleapis.com/upload\": http2: client connection lost"),
+	}
+	deps := baseReleaseDeps(t, client)
+	artifact := writeFakeAAB(t, filepath.Join(t.TempDir(), "app.aab"), true)
+	mapping := writeReleaseAsset(t, "mapping.txt")
+	manifest := writeReleaseManifest(t, artifact, mapping)
+
+	out, err := runFullCommand(t, deps, "full", "--package-name", "com.example.app", "--manifest", manifest, "--confirm")
+	if err == nil || !strings.Contains(err.Error(), "retryable upload failure") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, `"status":"failed"`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
 

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/99designs/keyring"
 )
@@ -18,6 +20,14 @@ const (
 )
 
 var ErrCredentialNotFound = errors.New("credential not found")
+
+type KeychainProbeResult struct {
+	Available bool
+	Blocked   bool
+	Err       error
+}
+
+var keychainProbeTimeout = 1500 * time.Millisecond
 
 var keyringOpener = func() (keyring.Keyring, error) {
 	return keyring.Open(keyring.Config{
@@ -43,17 +53,47 @@ func ShouldBypassKeychain(lookupEnv func(string) string) bool {
 }
 
 func KeychainAvailable(lookupEnv func(string) string) (bool, error) {
-	if ShouldBypassKeychain(lookupEnv) {
+	probe := ProbeKeychainAccess(lookupEnv)
+	if probe.Blocked {
 		return false, nil
 	}
+	return probe.Available, probe.Err
+}
+
+func ProbeKeychainAccess(lookupEnv func(string) string) KeychainProbeResult {
+	if ShouldBypassKeychain(lookupEnv) {
+		return KeychainProbeResult{}
+	}
+
+	// macOS keychain calls can block on permission prompts; keep the probe bounded.
+	if runtime.GOOS == "darwin" {
+		ch := make(chan error, 1)
+		go func() {
+			_, err := keyringOpener()
+			ch <- err
+		}()
+		select {
+		case err := <-ch:
+			if err == nil {
+				return KeychainProbeResult{Available: true}
+			}
+			if IsKeyringUnavailable(err) {
+				return KeychainProbeResult{}
+			}
+			return KeychainProbeResult{Err: err}
+		case <-time.After(keychainProbeTimeout):
+			return KeychainProbeResult{Blocked: true}
+		}
+	}
+
 	_, err := keyringOpener()
 	if err == nil {
-		return true, nil
+		return KeychainProbeResult{Available: true}
 	}
 	if IsKeyringUnavailable(err) {
-		return false, nil
+		return KeychainProbeResult{}
 	}
-	return false, err
+	return KeychainProbeResult{Err: err}
 }
 
 func StoreProfileCredential(profile string, serviceAccountJSON []byte) error {

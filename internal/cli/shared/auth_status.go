@@ -7,14 +7,29 @@ import (
 
 	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
 	"github.com/leszko11/google-play-console-cli/internal/config"
+	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
 
 var authStatusKeychainAvailable = authresolver.KeychainAvailable
+var authStatusProbeKeychainAccess = authresolver.ProbeKeychainAccess
+
+type AuthHealth string
+
+const (
+	AuthHealthReady           AuthHealth = "ready"
+	AuthHealthMixedSources    AuthHealth = "mixed_sources"
+	AuthHealthStalePath       AuthHealth = "stale_path"
+	AuthHealthKeychainBlocked AuthHealth = "keychain_blocked"
+)
 
 type AuthStatusSnapshot struct {
 	ActiveProfile         string   `json:"activeProfile,omitempty"`
 	SelectedProfile       string   `json:"selectedProfile,omitempty"`
 	Authenticated         bool     `json:"authenticated"`
+	Health                string   `json:"health,omitempty"`
+	HealthDetail          string   `json:"healthDetail,omitempty"`
+	FixCommand            string   `json:"fixCommand,omitempty"`
+	DiagnosticCommand     string   `json:"diagnosticCommand,omitempty"`
 	Source                string   `json:"source,omitempty"`
 	StorageBackend        string   `json:"storageBackend,omitempty"`
 	ProfileStorage        string   `json:"profileStorage,omitempty"`
@@ -109,6 +124,7 @@ func BuildAuthStatusSnapshot(cfg config.Config, lookupEnv func(string) string) A
 		}
 	}
 
+	classifyAuthHealth(&out, profile, lookupEnv)
 	return out
 }
 
@@ -125,6 +141,9 @@ func AuthStatusSummary(status AuthStatusSnapshot) string {
 	if status.SelectedProfile != "" {
 		parts = append(parts, "profile="+status.SelectedProfile)
 	}
+	if status.Health != "" {
+		parts = append(parts, "health="+status.Health)
+	}
 	if status.Source != "" {
 		parts = append(parts, "source="+status.Source)
 	}
@@ -139,4 +158,66 @@ func AuthStatusSummary(status AuthStatusSnapshot) string {
 		parts = append(parts, "developerId="+status.DeveloperID)
 	}
 	return strings.Join(parts, " ")
+}
+
+func classifyAuthHealth(out *AuthStatusSnapshot, profile config.Profile, lookupEnv func(string) string) {
+	if out == nil {
+		return
+	}
+	path := strings.TrimSpace(profile.ServiceAccountPath)
+	pathValid := false
+	if path != "" {
+		pathValid = CredentialLocallyValid(gpc.CredentialInput{ServiceAccountPath: path})
+	}
+	bypass := resolveCredentialsShouldBypassKeychain(lookupEnv)
+	probe := authStatusProbeKeychainAccess(lookupEnv)
+
+	setHealth := func(health AuthHealth, detail, fix string) {
+		out.Health = string(health)
+		out.HealthDetail = strings.TrimSpace(detail)
+		out.FixCommand = strings.TrimSpace(fix)
+		if out.HealthDetail != "" {
+			appendAuthStatusWarning(&out.Warnings, out.HealthDetail)
+		}
+	}
+
+	if probe.Blocked {
+		setHealth(
+			AuthHealthKeychainBlocked,
+			"system keychain access appears blocked for this profile",
+			"gpc auth init --service-account <path> --storage path",
+		)
+		out.DiagnosticCommand = "GPC_BYPASS_KEYCHAIN=1 gpc doctor --package-name <package>"
+		return
+	}
+
+	if path != "" && !pathValid && (strings.TrimSpace(profile.Storage) == config.StoragePath || bypass || !out.Authenticated || out.Source == string(authresolver.SourceConfig)) {
+		setHealth(
+			AuthHealthStalePath,
+			"profile service-account path is missing or invalid",
+			"gpc auth init --service-account <path> --storage path",
+		)
+		return
+	}
+
+	if strings.TrimSpace(profile.Storage) == "" && path != "" && !bypass && (probe.Available || out.Source == string(authresolver.SourceKeychain)) {
+		setHealth(
+			AuthHealthMixedSources,
+			"legacy profile can resolve from both keychain and config path sources",
+			"gpc auth init --service-account <path> --storage path",
+		)
+		return
+	}
+
+	if !out.Authenticated {
+		setHealth(
+			AuthHealthStalePath,
+			"no locally valid service-account credential is configured for the selected profile",
+			"gpc auth init --service-account <path> --storage path",
+		)
+		return
+	}
+
+	out.Health = string(AuthHealthReady)
+	out.HealthDetail = "credentials resolve cleanly"
 }
