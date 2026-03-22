@@ -248,6 +248,7 @@ gpc completion fish > ~/.config/fish/completions/gpc.fish
 | `notify` | Webhook, Slack, and Discord notification delivery |
 | `doctor` | Diagnostic pass for auth, access, and fixture health |
 | `games` | Play Games Services: achievements, events, leaderboards |
+| `migrate fastlane diff` | Preview Fastlane listing and changelog drift against live Play |
 | `migrate fastlane import` | Import Fastlane metadata into gpc workspace layout |
 | `integrity decode` | Decode Android Integrity API tokens |
 | `update` | Self-update to latest release |
@@ -327,6 +328,17 @@ EOF
 gpc deploy --package-name com.example.app --aab ./app.aab \
   --track production --status inProgress \
   --release-notes-file release-notes.txt --confirm
+```
+
+### Preview Fastlane metadata before migrating
+
+```bash
+gpc migrate fastlane diff \
+  --package-name com.example.app \
+  --from-dir ./fastlane \
+  --track production \
+  --version-code 123 \
+  --output table
 ```
 
 ### Manage subscriptions from YAML

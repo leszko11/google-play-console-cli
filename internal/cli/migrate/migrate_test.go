@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/leszko11/google-play-console-cli/internal/config"
+	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
 
 func runMigrate(t *testing.T, deps Deps, args ...string) (string, error) {
@@ -145,5 +148,230 @@ func TestFastlaneImportRequiresListingFiles(t *testing.T) {
 	)
 	if err == nil || !strings.Contains(err.Error(), "missing required file short_description.txt") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+type fakeDiffClient struct {
+	listings    []gpc.ListingInfo
+	images      map[string][]gpc.ImageInfo
+	tracks      []gpc.TrackInfo
+	deleteCalls int
+}
+
+func (f *fakeDiffClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, error) {
+	return gpc.EditInfo{ID: "edit-1"}, nil
+}
+
+func (f *fakeDiffClient) DeleteEdit(_ context.Context, _, _ string) error {
+	f.deleteCalls++
+	return nil
+}
+
+func (f *fakeDiffClient) ListListings(_ context.Context, _, _ string) ([]gpc.ListingInfo, error) {
+	return f.listings, nil
+}
+
+func (f *fakeDiffClient) ListImages(_ context.Context, _, _, language, imageType string) ([]gpc.ImageInfo, error) {
+	return f.images[language+"/"+imageType], nil
+}
+
+func (f *fakeDiffClient) ListTracks(_ context.Context, _, _ string) ([]gpc.TrackInfo, error) {
+	return f.tracks, nil
+}
+
+func defaultConfig() config.Config {
+	return config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {ServiceAccountPath: "/tmp/sa.json"},
+		},
+	}
+}
+
+func writeFastlaneFixture(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	source := filepath.Join(root, "fastlane", "metadata", "android")
+	writeFile(t, filepath.Join(source, "en-US", "title.txt"), "Title")
+	writeFile(t, filepath.Join(source, "en-US", "short_description.txt"), "Short")
+	writeFile(t, filepath.Join(source, "en-US", "full_description.txt"), "Full")
+	writeFile(t, filepath.Join(source, "en-US", "images", "phoneScreenshots", "1.png"), "local-image")
+	writeFile(t, filepath.Join(source, "en-US", "changelogs", "123.txt"), "Fresh notes")
+	return filepath.Join(root, "fastlane")
+}
+
+func runMigrateWithOutput(t *testing.T, deps Deps, args ...string) (string, error) {
+	t.Helper()
+	var out bytes.Buffer
+	deps.Stdout = &out
+	deps.Stderr = &bytes.Buffer{}
+	if deps.LookupEnv == nil {
+		deps.LookupEnv = func(key string) string {
+			if key == "GPC_BYPASS_KEYCHAIN" {
+				return "1"
+			}
+			return ""
+		}
+	}
+	cmd := NewCommand(deps)
+	err := cmd.ParseAndRun(context.Background(), args)
+	return out.String(), err
+}
+
+func TestFastlaneDiffJSON(t *testing.T) {
+	client := &fakeDiffClient{
+		listings: []gpc.ListingInfo{
+			{Language: "en-US", Title: "Old title", ShortDescription: "Short", FullDescription: "Full"},
+			{Language: "de-DE", Title: "Titel", ShortDescription: "Kurz", FullDescription: "Lang"},
+		},
+		images: map[string][]gpc.ImageInfo{
+			"en-US/phoneScreenshots": {{SHA256: "remote-image"}},
+		},
+		tracks: []gpc.TrackInfo{
+			{
+				Name: "production",
+				Releases: []gpc.TrackReleaseInfo{{
+					Name: "1.0.0",
+					ReleaseNotes: []gpc.LocalizedText{{
+						Language: "en-US",
+						Text:     "Old notes",
+					}},
+				}},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runMigrateWithOutput(t, deps,
+		"fastlane", "diff",
+		"--from-dir", writeFastlaneFixture(t),
+		"--package-name", "com.example.app",
+		"--track", "production",
+		"--version-code", "123",
+		"--output", "json",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{`"hasDiff":true`, `"field":"title"`, `"field":"phoneScreenshots"`, `"field":"releaseNotes"`, `"action":"remote_only_locale"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+	if client.deleteCalls != 1 {
+		t.Fatalf("expected cleanup delete call, got %d", client.deleteCalls)
+	}
+}
+
+func TestFastlaneDiffTableOutput(t *testing.T) {
+	client := &fakeDiffClient{
+		listings: []gpc.ListingInfo{
+			{Language: "en-US", Title: "Title", ShortDescription: "Short", FullDescription: "Full"},
+		},
+		images: map[string][]gpc.ImageInfo{
+			"en-US/phoneScreenshots": {{SHA256: "1f1d3f1d658dca9e96689387cc2d6eefa5b73b08b6adf74ddf2123321892d304"}},
+		},
+		tracks: []gpc.TrackInfo{
+			{
+				Name: "production",
+				Releases: []gpc.TrackReleaseInfo{{
+					Name: "1.0.0",
+					ReleaseNotes: []gpc.LocalizedText{{
+						Language: "en-US",
+						Text:     "Fresh notes",
+					}},
+				}},
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runMigrateWithOutput(t, deps,
+		"fastlane", "diff",
+		"--from-dir", writeFastlaneFixture(t),
+		"--package-name", "com.example.app",
+		"--track", "production",
+		"--version-code", "123",
+		"--output", "table",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "STATUS\tno-diff") {
+		t.Fatalf("expected no-diff table, got %s", out)
+	}
+	if !strings.Contains(out, "SCOPE\tTARGET\tFIELD\tACTION\tLIVE\tDESIRED") {
+		t.Fatalf("expected table header, got %s", out)
+	}
+}
+
+func TestFastlaneDiffMarkdownOutput(t *testing.T) {
+	client := &fakeDiffClient{
+		listings: []gpc.ListingInfo{
+			{Language: "en-US", Title: "Old title", ShortDescription: "Short", FullDescription: "Full"},
+		},
+		images: map[string][]gpc.ImageInfo{
+			"en-US/phoneScreenshots": {{SHA256: "remote-image"}},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runMigrateWithOutput(t, deps,
+		"fastlane", "diff",
+		"--from-dir", writeFastlaneFixture(t),
+		"--package-name", "com.example.app",
+		"--output", "markdown",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{
+		"| field | value |",
+		"| status | diff |",
+		"| scope | target | field | action | live | desired |",
+		"| listing | en-US | title | update | Old title | Title |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+}
+
+func TestFastlaneDiffYAMLOutput(t *testing.T) {
+	client := &fakeDiffClient{
+		listings: []gpc.ListingInfo{
+			{Language: "en-US", Title: "Old title", ShortDescription: "Short", FullDescription: "Full"},
+		},
+		images: map[string][]gpc.ImageInfo{
+			"en-US/phoneScreenshots": {{SHA256: "remote-image"}},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runMigrateWithOutput(t, deps,
+		"fastlane", "diff",
+		"--from-dir", writeFastlaneFixture(t),
+		"--package-name", "com.example.app",
+		"--output", "yaml",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{"packageName: com.example.app", "hasDiff: true", "field: title"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
 	}
 }
