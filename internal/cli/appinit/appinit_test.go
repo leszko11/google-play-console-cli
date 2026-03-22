@@ -22,7 +22,10 @@ type fakeClient struct {
 	listSubscriptionsErr    error
 	createSubscriptionErr   error
 	createOfferErr          map[string]error
+	verifyErr               error
 	createEditErr           error
+	validateEditErr         error
+	validateEditErrs        []error
 	listImagesErr           map[string]error
 
 	createEditCalls      int
@@ -46,6 +49,10 @@ type fakeClient struct {
 	appDetailsUpdate     gpc.AppDetailsUpdate
 }
 
+func (f *fakeClient) VerifyPackageAccess(_ context.Context, _ string) error {
+	return f.verifyErr
+}
+
 func (f *fakeClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, error) {
 	if f.createEditErr != nil {
 		return gpc.EditInfo{}, f.createEditErr
@@ -60,6 +67,14 @@ func (f *fakeClient) DeleteEdit(_ context.Context, _, _ string) error {
 }
 
 func (f *fakeClient) ValidateEdit(_ context.Context, _, _ string) error {
+	if len(f.validateEditErrs) > 0 {
+		err := f.validateEditErrs[0]
+		f.validateEditErrs = f.validateEditErrs[1:]
+		return err
+	}
+	if f.validateEditErr != nil {
+		return f.validateEditErr
+	}
 	f.validateEditCalls++
 	return nil
 }
@@ -437,7 +452,7 @@ func TestAppInitDryRun(t *testing.T) {
 	if !strings.Contains(out, `"status":"dry-run"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
-	if client.updateDetailsCalls != 1 || client.createEditCalls != 2 || client.deleteEditCalls != 2 {
+	if client.updateDetailsCalls != 1 || client.createEditCalls != 3 || client.deleteEditCalls != 3 {
 		t.Fatalf("unexpected dry-run edit flow: %+v", client)
 	}
 	if client.updateListingCalls != 1 || client.uploadImageCalls != 1 || client.createSubCalls != 0 || client.createOfferCalls != 0 {
@@ -501,6 +516,33 @@ func TestAppInitCommitSyncsProductsAndSubscriptions(t *testing.T) {
 	}
 	if client.batchUpdateSubCalls != 1 || len(client.updatedSubscriptions) != 1 {
 		t.Fatalf("expected subscription sync write, got %+v", client)
+	}
+}
+
+func TestAppInitFailsFastInDraftBootstrapState(t *testing.T) {
+	root := t.TempDir()
+	writeListingFixture(t, root)
+	writeMonetizationManifest(t, root)
+	manifestPath := writeAppInitManifest(t, root)
+	client := &fakeClient{
+		validateEditErrs: []error{
+			fmt.Errorf("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runCommand(t, deps, "--package-name", "com.example.app", "--manifest", manifestPath, "--dry-run")
+	if err == nil || !strings.Contains(err.Error(), "draft bootstrap state") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, `"packageReadiness":"draft_bootstrap_required"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if client.updateDetailsCalls != 0 {
+		t.Fatalf("app details should not run in draft bootstrap state: %+v", client)
 	}
 }
 

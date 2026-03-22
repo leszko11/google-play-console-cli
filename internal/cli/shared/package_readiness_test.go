@@ -54,6 +54,18 @@ func TestDetectPackageReadiness_DraftBootstrapRequired(t *testing.T) {
 	}
 }
 
+func TestDetectPackageReadiness_DeletedEditMapsToDraftBootstrapRequired(t *testing.T) {
+	res, err := DetectPackageReadiness(context.Background(), &fakePackageReadinessClient{
+		validateErr: errors.New("androidpublisher api error (400): This Edit has been deleted."),
+	}, "com.example.app")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Status != PackageReadinessDraftBootstrapRequired {
+		t.Fatalf("unexpected readiness: %+v", res)
+	}
+}
+
 func TestDetectPackageReadiness_Ready(t *testing.T) {
 	res, err := DetectPackageReadiness(context.Background(), &fakePackageReadinessClient{}, "com.example.app")
 	if err != nil {

@@ -400,7 +400,7 @@ func runDeveloperIDChecks(ctx context.Context, client Client, cfg config.Config,
 		return
 	}
 
-	users, err := client.ListUsers(ctx, developerID, 1, "", false)
+	users, err := client.ListUsers(ctx, developerID, -1, "", false)
 	if err != nil {
 		res.addWarn("developer_id", fmt.Sprintf("configured developer id %s could not be verified: %v", developerID, err))
 		res.addNextStep("Update the selected profile with the correct developer ID via `gpc auth init --developer-id <id>`.")

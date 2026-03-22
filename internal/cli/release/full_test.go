@@ -232,6 +232,9 @@ func TestReleaseFullStopsAfterBootstrapWhenPlayStillReportsDraftState(t *testing
 			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
 			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
 			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
 		},
 	}
 	deps := baseReleaseDeps(t, client)
@@ -252,6 +255,46 @@ func TestReleaseFullStopsAfterBootstrapWhenPlayStillReportsDraftState(t *testing
 	}
 	if client.commitCalls != 1 {
 		t.Fatalf("expected only bootstrap commit, got %d commits", client.commitCalls)
+	}
+}
+
+func TestReleaseFullReusesExistingBootstrapDraftRelease(t *testing.T) {
+	client := &fakeReleaseClient{
+		validateEditErrs: []error{
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+			errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app."),
+		},
+		getTrackInfo: gpc.TrackInfo{
+			Name: "internal",
+			Releases: []gpc.TrackReleaseInfo{
+				{Status: "draft", VersionCodes: []int64{2026032202}},
+			},
+		},
+	}
+	deps := baseReleaseDeps(t, client)
+	artifact := writeFakeAAB(t, filepath.Join(t.TempDir(), "app.aab"), true)
+	mapping := writeReleaseAsset(t, "mapping.txt")
+	manifest := writeReleaseManifest(t, artifact, mapping)
+
+	out, err := runFullCommand(t, deps, "full", "--package-name", "com.example.app", "--manifest", manifest, "--confirm")
+	if err == nil || !strings.Contains(err.Error(), "bootstrap release committed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, `"status":"bootstrap_committed"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if !strings.Contains(out, `Existing internal draft release already uses versionCode(s) 2026032202.`) {
+		t.Fatalf("expected reuse hint in output: %s", out)
+	}
+	if client.commitCalls != 0 {
+		t.Fatalf("expected no new bootstrap commit, got %d", client.commitCalls)
 	}
 }
 

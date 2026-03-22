@@ -32,6 +32,7 @@ type Client interface {
 	monetization.Client
 	productscmd.SyncClient
 	subscriptionscmd.SyncClient
+	VerifyPackageAccess(ctx context.Context, packageName string) error
 	CreateEdit(ctx context.Context, packageName string) (gpc.EditInfo, error)
 	DeleteEdit(ctx context.Context, packageName, editID string) error
 	ValidateEdit(ctx context.Context, packageName, editID string) error
@@ -100,10 +101,12 @@ type monetizationSection struct {
 
 type result struct {
 	PackageName       string       `json:"packageName"`
+	PackageReadiness  string       `json:"packageReadiness,omitempty"`
 	Manifest          string       `json:"manifest"`
 	Status            string       `json:"status"`
 	PlannedSections   []string     `json:"plannedSections,omitempty"`
 	CompletedSections []string     `json:"completedSections,omitempty"`
+	NextSteps         []string     `json:"nextSteps,omitempty"`
 	Steps             []stepResult `json:"steps"`
 }
 
@@ -262,6 +265,23 @@ func runAppInit(parentCtx, requestCtx context.Context, client Client, out io.Wri
 		result.Steps = append(result.Steps, stepResult{Name: step, Status: "error", Error: err.Error()})
 		_ = shared.WriteJSON(out, result)
 		return err
+	}
+
+	readiness, err := shared.DetectPackageReadiness(requestCtx, client, opts.PackageName)
+	if err != nil {
+		return fail("package_readiness", err)
+	}
+	result.PackageReadiness = string(readiness.Status)
+	switch readiness.Status {
+	case shared.PackageReadinessUninitialized:
+		result.NextSteps = append(result.NextSteps, readiness.NextStep)
+		return fail("package_readiness", fmt.Errorf("package is not initialized in Google Play yet"))
+	case shared.PackageReadinessDraftBootstrapRequired:
+		result.NextSteps = append(result.NextSteps, "Run `gpc release init --package-name "+opts.PackageName+" --dir ./play` to generate the bootstrap workspace.")
+		result.NextSteps = append(result.NextSteps, "Commit the bootstrap draft release with `gpc release full --manifest ./play/release.yaml --confirm`, wait for Play processing, then rerun `gpc appinit`.")
+		return fail("package_readiness", fmt.Errorf("package is still in Play's draft bootstrap state"))
+	default:
+		result.Steps = append(result.Steps, stepResult{Name: "package_readiness", Status: "ok"})
 	}
 
 	if manifest.AppDetails != nil {

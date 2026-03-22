@@ -86,5 +86,7 @@ func IsDraftAppError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(strings.ToLower(err.Error()), "only releases with status draft may be created on draft app")
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "only releases with status draft may be created on draft app") ||
+		strings.Contains(lower, "this edit has been deleted")
 }
