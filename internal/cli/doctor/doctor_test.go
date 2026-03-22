@@ -294,7 +294,7 @@ func TestRunIncludesBootstrapSummaryFromProjectState(t *testing.T) {
 	if len(res.BootstrapVersionCodes) != 1 || res.BootstrapVersionCodes[0] != 123 {
 		t.Fatalf("unexpected version codes: %+v", res.BootstrapVersionCodes)
 	}
-	if res.BootstrapStatePath == "" || !strings.Contains(res.BootstrapStatePath, "play/bootstrap-state.json") {
+	if res.BootstrapStatePath == "" || !strings.Contains(filepath.ToSlash(res.BootstrapStatePath), "play/bootstrap-state.json") {
 		t.Fatalf("unexpected bootstrap state path: %q", res.BootstrapStatePath)
 	}
 	if res.RecommendedNextCommand == "" || !strings.Contains(res.RecommendedNextCommand, "release full") {

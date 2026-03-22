@@ -247,7 +247,7 @@ func TestReleaseInitWritesProjectDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .gpc.yaml: %v", err)
 	}
-	got := string(raw)
+	got := filepath.ToSlash(string(raw))
 	for _, want := range []string{"screenshots-dir: play/screenshots", "products-dir: play/products", "subscriptions-dir: play/subscriptions", "android-project-dir: android", "build-task: :app:bundleRelease"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in project config: %s", want, got)
