@@ -35,11 +35,12 @@ type Deps struct {
 }
 
 type syncOptions struct {
-	PackageName string
-	Dir         string
-	Confirm     bool
-	DryRun      bool
-	Output      string
+	PackageName       string
+	Dir               string
+	Confirm           bool
+	DryRun            bool
+	Output            string
+	AutoFixDraftTrack bool
 }
 
 type syncResult struct {
@@ -55,6 +56,7 @@ type syncResult struct {
 	CleanupPerformed        bool     `json:"cleanupPerformed"`
 	ChangesNotSentForReview bool     `json:"changesNotSentForReview,omitempty"`
 	CommitRetried           bool     `json:"commitRetried,omitempty"`
+	DraftTrackAutoFixed     bool     `json:"draftTrackAutoFixed,omitempty"`
 }
 
 type localeScreenshots struct {
@@ -133,6 +135,7 @@ func newSyncCommand(deps Deps) *ffcli.Command {
 	fs.BoolVar(&opts.Confirm, "confirm", false, "Confirm committing the edit (required unless --dry-run)")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Create and validate the edit, then delete it instead of mutating Play")
 	fs.StringVar(&opts.Output, "output", "", "Output format: json")
+	fs.BoolVar(&opts.AutoFixDraftTrack, "auto-fix-draft-track", false, "If a draft-app commit fails because the internal track has a completed release, rewrite that internal release to draft and retry")
 
 	return &ffcli.Command{
 		Name:      "sync",
@@ -255,12 +258,15 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 		return fail(fmt.Errorf("failed to validate edit: %w", err))
 	}
 
-	commit, err := shared.CommitEditWithReviewFallback(requestCtx, client, opts.PackageName, edit.ID, false)
+	commit, err := shared.CommitEditWithOptions(requestCtx, client, opts.PackageName, edit.ID, shared.EditCommitOptions{
+		AutoFixDraftTrack: opts.AutoFixDraftTrack,
+	})
 	if err != nil {
 		return fail(fmt.Errorf("failed to commit edit: %w", err))
 	}
 	result.ChangesNotSentForReview = commit.ChangesNotSentForReview
 	result.CommitRetried = commit.RetriedWithChangesNotSentForReview
+	result.DraftTrackAutoFixed = commit.DraftTrackAutoFixed
 	result.Committed = true
 	result.Status = "committed"
 	return shared.WriteJSON(out, result)

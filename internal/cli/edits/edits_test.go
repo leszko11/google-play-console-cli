@@ -27,6 +27,8 @@ type fakeClient struct {
 	commit             gpc.EditInfo
 	commitErr          error
 	commitFn           func(packageName, editID string, changesNotSentForReview bool) (gpc.EditInfo, error)
+	getTrackFn         func(packageName, editID, trackName string) (gpc.TrackInfo, error)
+	updateTrackFn      func(packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error)
 	deleteErr          error
 	deleteFn           func(packageName, editID string) error
 	appDetails         gpc.AppDetailsInfo
@@ -97,6 +99,18 @@ func (f fakeClient) DeleteEdit(_ context.Context, packageName, editID string) er
 		return f.deleteFn(packageName, editID)
 	}
 	return f.deleteErr
+}
+func (f fakeClient) GetTrack(_ context.Context, packageName, editID, trackName string) (gpc.TrackInfo, error) {
+	if f.getTrackFn != nil {
+		return f.getTrackFn(packageName, editID, trackName)
+	}
+	return gpc.TrackInfo{}, nil
+}
+func (f fakeClient) UpdateTrack(_ context.Context, packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error) {
+	if f.updateTrackFn != nil {
+		return f.updateTrackFn(packageName, editID, trackName, update)
+	}
+	return gpc.TrackInfo{}, nil
 }
 func (f fakeClient) GetAppDetails(_ context.Context, _, _ string) (gpc.AppDetailsInfo, error) {
 	return f.appDetails, f.appDetailsErr
@@ -361,6 +375,71 @@ func TestEditsCommit_PassesChangesNotSentForReview(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in output: %s", want, out)
 		}
+	}
+}
+
+func TestEditsCommit_AutoFixesDraftTrack(t *testing.T) {
+	var commitCalls []bool
+	var updated gpc.TrackUpdate
+	fixed := false
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fakeClient{
+				commitFn: func(packageName, editID string, changesNotSentForReview bool) (gpc.EditInfo, error) {
+					if packageName != "com.example.app" || editID != "edit-1" {
+						t.Fatalf("unexpected commit target %q %q", packageName, editID)
+					}
+					commitCalls = append(commitCalls, changesNotSentForReview)
+					if !fixed {
+						return gpc.EditInfo{}, errors.New("androidpublisher api error (400): Only releases with status draft may be created on draft app.")
+					}
+					return gpc.EditInfo{ID: "edit-1"}, nil
+				},
+				getTrackFn: func(packageName, editID, trackName string) (gpc.TrackInfo, error) {
+					if packageName != "com.example.app" || editID != "edit-1" || trackName != "internal" {
+						t.Fatalf("unexpected get track target %q %q %q", packageName, editID, trackName)
+					}
+					return gpc.TrackInfo{
+						Name: "internal",
+						Releases: []gpc.TrackReleaseInfo{{
+							Status:       "completed",
+							VersionCodes: []int64{123},
+						}},
+					}, nil
+				},
+				updateTrackFn: func(packageName, editID, trackName string, update gpc.TrackUpdate) (gpc.TrackInfo, error) {
+					if packageName != "com.example.app" || editID != "edit-1" || trackName != "internal" {
+						t.Fatalf("unexpected update track target %q %q %q", packageName, editID, trackName)
+					}
+					updated = update
+					fixed = true
+					return gpc.TrackInfo{Name: "internal"}, nil
+				},
+			}, nil
+		},
+	}
+
+	out, err := runEdits(
+		t,
+		deps,
+		"commit",
+		"--package-name", "com.example.app",
+		"--edit-id", "edit-1",
+		"--confirm",
+		"--auto-fix-draft-track",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	if len(commitCalls) != 2 || commitCalls[0] || commitCalls[1] {
+		t.Fatalf("unexpected commit calls: %+v", commitCalls)
+	}
+	if updated.Status != "draft" || len(updated.VersionCodes) != 1 || updated.VersionCodes[0] != 123 {
+		t.Fatalf("unexpected track update: %+v", updated)
+	}
+	if !strings.Contains(out, `"draftTrackAutoFixed":true`) {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
 
