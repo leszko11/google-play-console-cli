@@ -67,6 +67,65 @@ That's it. Five commands from zero to deployed.
 
 ---
 
+## Command Discovery
+
+Use `--help` at every level:
+
+```bash
+gpc --help
+gpc audit --help
+gpc auth --help
+gpc bootstrap --help
+gpc appinit --help
+gpc apps --help
+gpc app-recoveries --help
+gpc changelog --help
+gpc custom-apps --help
+gpc edits --help
+gpc tracks --help
+gpc apks --help
+gpc bundles --help
+gpc deobfuscation --help
+gpc deploy --help
+gpc diff --help
+gpc doctor --help
+gpc e2e --help
+gpc release --help
+gpc rollback --help
+gpc screenshots --help
+gpc setup --help
+gpc status --help
+gpc reviews --help
+gpc reports --help
+gpc orders --help
+gpc external-transactions --help
+gpc device-tier-configs --help
+gpc system-apks --help
+gpc generated-apks --help
+gpc games --help
+gpc subscriptions --help
+gpc monetization --help
+gpc migrate --help
+gpc notify --help
+gpc products --help
+gpc publish --help
+gpc iap --help
+gpc listing --help
+gpc purchases --help
+gpc users --help
+gpc validate --help
+gpc workflow --help
+gpc grants --help
+gpc health --help
+gpc internal-sharing --help
+gpc integrity --help
+gpc watch --help
+gpc update --help
+gpc completion --help
+```
+
+---
+
 ## Install
 
 ### Homebrew
