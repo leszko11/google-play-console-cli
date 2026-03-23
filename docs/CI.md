@@ -68,13 +68,27 @@ The sample workflow uses a Script step to install `gpc`, persist the service-acc
 
 ## Extending The Examples
 
-After the initial auth/package smoke step is green, the usual next commands are:
+After the initial auth/package smoke step is green, the canonical next commands are:
 
 ```bash
 gpc doctor --package-name "$GPC_TEST_PACKAGE"
-gpc release verify --package-name "$GPC_TEST_PACKAGE" --aab ./app.aab --notes-text "Bug fixes"
-gpc release full --package-name "$GPC_TEST_PACKAGE" --manifest ./release.yaml --dry-run
+gpc release init --package-name "$GPC_TEST_PACKAGE" --dir ./play
+gpc release verify --package-name "$GPC_TEST_PACKAGE" --track internal --aab ./app.aab --notes-file ./play/changelog/internal/en-US.txt
+gpc products sync --package-name "$GPC_TEST_PACKAGE" --dry-run
+gpc subscriptions sync --package-name "$GPC_TEST_PACKAGE" --dry-run
+gpc screenshots sync --package-name "$GPC_TEST_PACKAGE" --dry-run
+gpc release full --manifest ./play/release.yaml --dry-run
 gpc notify webhook --url "$DEPLOY_WEBHOOK_URL" --event release.completed --input ./release-summary.json
 ```
 
 Keep CI stages read-only until credentials, package access, and artifact wiring are stable.
+
+Use `gpc release init` once per repo to generate `.gpc.yaml`, `./play/release.yaml`, `./play/appinit.yaml`, and the exported store state. After that, repeat releases can stay on `gpc release full --manifest ./play/release.yaml`.
+
+If the package is still in Play's draft bootstrap state, edit-only validations can fail with `Only releases with status draft may be created on draft app`. In that case, `gpc release full` handles the internal draft bootstrap release before continuing.
+
+CI guidance by journey:
+
+- Greenfield public app: keep the first Console upload manual and use `./play/MANUAL_FIRST_UPLOAD.md` for the web-only steps.
+- Existing Play app: rely on `./play/bootstrap-state.json` plus `gpc doctor` to decide whether bootstrap is already seeded.
+- Repeat release / CI: if bootstrap draft already exists, rerun readiness first and rebuild only if another upload is actually needed.

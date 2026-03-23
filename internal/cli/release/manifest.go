@@ -28,6 +28,9 @@ type rawFullManifest struct {
 	MappingFile    string            `json:"mappingFile" yaml:"mappingFile"`
 	MappingType    string            `json:"mappingType" yaml:"mappingType"`
 	UpdatePriority int64             `json:"updatePriority" yaml:"updatePriority"`
+	NotesFile      string            `json:"notesFile" yaml:"notesFile"`
+	NotesText      string            `json:"notesText" yaml:"notesText"`
+	NotesLocale    string            `json:"notesLocale" yaml:"notesLocale"`
 	ReleaseNotes   map[string]string `json:"releaseNotes" yaml:"releaseNotes"`
 }
 
@@ -49,6 +52,10 @@ func loadFullManifest(path string) (fullManifest, error) {
 	if err := shared.LoadManifest(path, &raw); err != nil {
 		return fullManifest{}, err
 	}
+	baseDir := filepath.Dir(path)
+	raw.ArtifactPath = resolveManifestPath(baseDir, raw.ArtifactPath)
+	raw.MappingFile = resolveManifestPath(baseDir, raw.MappingFile)
+	raw.NotesFile = resolveManifestPath(baseDir, raw.NotesFile)
 	return normalizeFullManifest(raw)
 }
 
@@ -109,6 +116,25 @@ func normalizeFullManifest(raw rawFullManifest) (fullManifest, error) {
 		}
 	}
 
+	if strings.TrimSpace(raw.NotesFile) != "" || strings.TrimSpace(raw.NotesText) != "" {
+		notes, err := shared.ParseReleaseNotesInput(raw.NotesFile, raw.NotesText, raw.NotesLocale, nil)
+		if err != nil {
+			return fullManifest{}, err
+		}
+		return fullManifest{
+			ArtifactType:   artifactType,
+			ArtifactPath:   raw.ArtifactPath,
+			Track:          raw.Track,
+			Status:         raw.Status,
+			ReleaseName:    raw.ReleaseName,
+			UserFraction:   userFraction,
+			MappingFile:    raw.MappingFile,
+			MappingType:    raw.MappingType,
+			UpdatePriority: raw.UpdatePriority,
+			ReleaseNotes:   notes,
+		}, nil
+	}
+
 	notes := make([]gpc.LocalizedText, 0, len(raw.ReleaseNotes))
 	for locale, text := range raw.ReleaseNotes {
 		locale = strings.TrimSpace(locale)
@@ -135,6 +161,14 @@ func normalizeFullManifest(raw rawFullManifest) (fullManifest, error) {
 		UpdatePriority: raw.UpdatePriority,
 		ReleaseNotes:   notes,
 	}, nil
+}
+
+func resolveManifestPath(baseDir, value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || filepath.IsAbs(value) {
+		return value
+	}
+	return filepath.Join(baseDir, value)
 }
 
 func detectArtifactType(path string) (string, error) {

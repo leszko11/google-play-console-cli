@@ -18,6 +18,10 @@ import (
 
 type fakeClient struct {
 	verifyPackageAccessErr  error
+	getTrackInfo            gpc.TrackInfo
+	getTrackErr             error
+	usersList               gpc.UsersListInfo
+	usersListErr            error
 	subscriptionDiagnostic  gpc.SubscriptionDiagnosticInfo
 	subscriptionErr         error
 	oneTimeProductDiag      gpc.OneTimeProductDiagnosticInfo
@@ -42,6 +46,32 @@ type fakeClient struct {
 
 func (f *fakeClient) VerifyPackageAccess(_ context.Context, _ string) error {
 	return f.verifyPackageAccessErr
+}
+
+func (f *fakeClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, error) {
+	return gpc.EditInfo{ID: "edit-1"}, nil
+}
+
+func (f *fakeClient) DeleteEdit(_ context.Context, _, _ string) error {
+	return nil
+}
+
+func (f *fakeClient) ValidateEdit(_ context.Context, _, _ string) error {
+	return nil
+}
+
+func (f *fakeClient) GetTrack(_ context.Context, _, _, _ string) (gpc.TrackInfo, error) {
+	if f.getTrackErr != nil {
+		return gpc.TrackInfo{}, f.getTrackErr
+	}
+	if f.getTrackInfo.Name == "" {
+		return gpc.TrackInfo{Name: "internal"}, nil
+	}
+	return f.getTrackInfo, nil
+}
+
+func (f *fakeClient) ListUsers(_ context.Context, _ string, _ int64, _ string, _ bool) (gpc.UsersListInfo, error) {
+	return f.usersList, f.usersListErr
 }
 
 func (f *fakeClient) GetSubscriptionDiagnostic(_ context.Context, _, _ string) (gpc.SubscriptionDiagnosticInfo, error) {
@@ -125,8 +155,37 @@ func TestRunWithoutPackageNameAuthOnly(t *testing.T) {
 	if checkStatus(res, "auth") != "ok" {
 		t.Fatalf("expected auth check ok, got %+v", res.Checks)
 	}
+	if checkStatus(res, "developer_id") != "ok" {
+		t.Fatalf("expected developer_id check ok, got %+v", res.Checks)
+	}
 	if checkStatus(res, "package_access") != "skipped" {
 		t.Fatalf("expected package_access skipped, got %+v", res.Checks)
+	}
+}
+
+func TestRunWarnsWhenConfiguredDeveloperIDIsInvalid(t *testing.T) {
+	resetGlobalFlags(t, shared.GlobalFlags{})
+	cfg, lookupEnv := validConfig(t)
+
+	res, err := run(context.Background(), Deps{
+		LoadConfig: func() (config.Config, error) { return cfg, nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{usersListErr: fmt.Errorf("invalid developer id")}, nil
+		},
+		NewReportingClient: func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
+			return &fakeReportingClient{}, nil
+		},
+		LookupEnv: lookupEnv,
+	}, options{})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	if checkStatus(res, "developer_id") != "warn" {
+		t.Fatalf("expected developer_id warn, got %+v", res.Checks)
+	}
+	if !containsSubstring(res.NextSteps, "gpc auth init --developer-id <id>") {
+		t.Fatalf("expected developer id next step, got %+v", res.NextSteps)
 	}
 }
 
@@ -183,6 +242,63 @@ func TestRunPackageNotFoundAddsBootstrapHint(t *testing.T) {
 	}
 	if !containsSubstring(res.NextSteps, "Upload the first APK or AAB once in Play Console") {
 		t.Fatalf("expected bootstrap next step, got %+v", res.NextSteps)
+	}
+}
+
+func TestRunIncludesBootstrapSummaryFromProjectState(t *testing.T) {
+	resetGlobalFlags(t, shared.GlobalFlags{})
+	root := t.TempDir()
+	t.Chdir(root)
+	cfg, lookupEnv := validConfig(t)
+	if err := os.WriteFile(filepath.Join(root, ".gpc.yaml"), []byte("release-manifest: play/release.yaml\n"), 0o600); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "play"), 0o755); err != nil {
+		t.Fatalf("mkdir play: %v", err)
+	}
+	if err := shared.WriteBootstrapState(filepath.Join(root, "play", "bootstrap-state.json"), shared.BootstrapState{
+		PackageName:              "com.example.app",
+		PackageReadiness:         "draft_bootstrap_required",
+		BootstrapDraftExists:     true,
+		BootstrapVersionCodes:    []int64{123},
+		LastReadinessRecheck:     "draft_bootstrap_required",
+		LastBootstrapCommittedAt: "2026-03-22T12:00:00Z",
+	}); err != nil {
+		t.Fatalf("write bootstrap state: %v", err)
+	}
+
+	res, err := run(context.Background(), Deps{
+		LoadConfig: func() (config.Config, error) { return cfg, nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{
+				getTrackInfo: gpc.TrackInfo{
+					Name: "internal",
+					Releases: []gpc.TrackReleaseInfo{
+						{Status: "draft", VersionCodes: []int64{123}},
+					},
+				},
+			}, nil
+		},
+		NewReportingClient: func(context.Context, gpc.CredentialInput) (ReportingClient, error) {
+			return &fakeReportingClient{}, nil
+		},
+		LookupEnv: lookupEnv,
+	}, options{PackageName: "com.example.app"})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	if !res.BootstrapDraftExists {
+		t.Fatalf("expected bootstrap draft summary, got %+v", res)
+	}
+	if len(res.BootstrapVersionCodes) != 1 || res.BootstrapVersionCodes[0] != 123 {
+		t.Fatalf("unexpected version codes: %+v", res.BootstrapVersionCodes)
+	}
+	if res.BootstrapStatePath == "" || !strings.Contains(filepath.ToSlash(res.BootstrapStatePath), "play/bootstrap-state.json") {
+		t.Fatalf("unexpected bootstrap state path: %q", res.BootstrapStatePath)
+	}
+	if res.RecommendedNextCommand == "" || !strings.Contains(res.RecommendedNextCommand, "release full") {
+		t.Fatalf("unexpected recommended command: %q", res.RecommendedNextCommand)
 	}
 }
 

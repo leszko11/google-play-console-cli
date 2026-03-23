@@ -146,17 +146,6 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 	}
 
 	result.PlannedActions = buildPlannedActions(locales, result.DeletedLocales)
-	if opts.DryRun {
-		if err := client.ValidateEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
-			return fail(fmt.Errorf("failed to validate edit: %w", err))
-		}
-		if err := client.DeleteEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
-			return fail(fmt.Errorf("failed to delete dry-run edit: %w", err))
-		}
-		result.CleanupPerformed = true
-		result.Status = "dry-run"
-		return shared.WriteJSON(out, result)
-	}
 
 	for _, locale := range locales {
 		if _, err := client.UpdateListing(requestCtx, opts.PackageName, edit.ID, locale.Locale, locale.Listing); err != nil {
@@ -179,6 +168,18 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 		if err := client.DeleteListing(requestCtx, opts.PackageName, edit.ID, locale); err != nil {
 			return fail(fmt.Errorf("failed to delete locale %q: %w", locale, err))
 		}
+	}
+
+	if opts.DryRun {
+		if err := client.ValidateEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
+			return fail(fmt.Errorf("failed to validate edit: %w", err))
+		}
+		if err := client.DeleteEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
+			return fail(fmt.Errorf("failed to delete dry-run edit: %w", err))
+		}
+		result.CleanupPerformed = true
+		result.Status = "dry-run"
+		return shared.WriteJSON(out, result)
 	}
 
 	if err := client.ValidateEdit(requestCtx, opts.PackageName, edit.ID); err != nil {

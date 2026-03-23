@@ -256,6 +256,14 @@ func runSubscriptions(t *testing.T, deps Deps, args ...string) (string, error) {
 	var out bytes.Buffer
 	deps.Stdout = &out
 	deps.Stderr = &bytes.Buffer{}
+	if deps.LookupEnv == nil {
+		deps.LookupEnv = func(key string) string {
+			if key == "GPC_BYPASS_KEYCHAIN" {
+				return "1"
+			}
+			return ""
+		}
+	}
 	cmd := NewCommand(deps)
 	err := cmd.ParseAndRun(context.Background(), args)
 	return out.String(), err

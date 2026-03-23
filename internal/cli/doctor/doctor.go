@@ -3,7 +3,6 @@ package doctor
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -20,6 +19,11 @@ import (
 
 type Client interface {
 	VerifyPackageAccess(ctx context.Context, packageName string) error
+	CreateEdit(ctx context.Context, packageName string) (gpc.EditInfo, error)
+	DeleteEdit(ctx context.Context, packageName, editID string) error
+	ValidateEdit(ctx context.Context, packageName, editID string) error
+	GetTrack(ctx context.Context, packageName, editID, trackName string) (gpc.TrackInfo, error)
+	ListUsers(ctx context.Context, developerID string, pageSize int64, pageToken string, paginate bool) (gpc.UsersListInfo, error)
 	GetSubscriptionDiagnostic(ctx context.Context, packageName, productID string) (gpc.SubscriptionDiagnosticInfo, error)
 	GetOneTimeProductDiagnostic(ctx context.Context, packageName, productID string) (gpc.OneTimeProductDiagnosticInfo, error)
 	GetOrder(ctx context.Context, packageName, orderID string) (gpc.OrderInfo, error)
@@ -64,14 +68,21 @@ type doctorCheck struct {
 }
 
 type result struct {
-	Status         string        `json:"status"`
-	PackageName    string        `json:"packageName,omitempty"`
-	VersionCode    int64         `json:"versionCode,omitempty"`
-	ProjectConfig  *projectInfo  `json:"projectConfig,omitempty"`
-	Checks         []doctorCheck `json:"checks"`
-	Warnings       []string      `json:"warnings,omitempty"`
-	BlockingIssues []string      `json:"blockingIssues,omitempty"`
-	NextSteps      []string      `json:"nextSteps,omitempty"`
+	Status                 string        `json:"status"`
+	PackageName            string        `json:"packageName,omitempty"`
+	AuthHealth             string        `json:"authHealth,omitempty"`
+	PackageReadiness       string        `json:"packageReadiness,omitempty"`
+	BootstrapDraftExists   bool          `json:"bootstrapDraftExists,omitempty"`
+	BootstrapVersionCodes  []int64       `json:"bootstrapVersionCodes,omitempty"`
+	LastKnownReadiness     string        `json:"lastKnownReadiness,omitempty"`
+	RecommendedNextCommand string        `json:"recommendedNextCommand,omitempty"`
+	BootstrapStatePath     string        `json:"bootstrapStatePath,omitempty"`
+	VersionCode            int64         `json:"versionCode,omitempty"`
+	ProjectConfig          *projectInfo  `json:"projectConfig,omitempty"`
+	Checks                 []doctorCheck `json:"checks"`
+	Warnings               []string      `json:"warnings,omitempty"`
+	BlockingIssues         []string      `json:"blockingIssues,omitempty"`
+	NextSteps              []string      `json:"nextSteps,omitempty"`
 }
 
 type projectInfo struct {
@@ -194,12 +205,33 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 	}
 	projectCfg, projectErr := config.LoadProject()
 	if projectErr == nil && projectCfg.Path != "" {
-		defaultPaths := make([]string, 0, 4)
+		if strings.TrimSpace(projectCfg.Config.ReleaseManifest) != "" {
+			res.BootstrapStatePath = shared.BootstrapStatePathFromReleaseManifest(projectCfg.Config.ReleaseManifest)
+		}
+		defaultPaths := make([]string, 0, 8)
 		if projectCfg.Config.ListingDir != "" {
 			defaultPaths = append(defaultPaths, "listing-dir="+projectCfg.Config.ListingDir)
 		}
+		if projectCfg.Config.ScreenshotsDir != "" {
+			defaultPaths = append(defaultPaths, "screenshots-dir="+projectCfg.Config.ScreenshotsDir)
+		}
+		if projectCfg.Config.ProductsDir != "" {
+			defaultPaths = append(defaultPaths, "products-dir="+projectCfg.Config.ProductsDir)
+		}
+		if projectCfg.Config.SubscriptionsDir != "" {
+			defaultPaths = append(defaultPaths, "subscriptions-dir="+projectCfg.Config.SubscriptionsDir)
+		}
 		if projectCfg.Config.ChangelogDir != "" {
 			defaultPaths = append(defaultPaths, "changelog-dir="+projectCfg.Config.ChangelogDir)
+		}
+		if projectCfg.Config.AndroidProjectDir != "" {
+			defaultPaths = append(defaultPaths, "android-project-dir="+projectCfg.Config.AndroidProjectDir)
+		}
+		if projectCfg.Config.ArtifactPath != "" {
+			defaultPaths = append(defaultPaths, "artifact-path="+projectCfg.Config.ArtifactPath)
+		}
+		if projectCfg.Config.NotesFile != "" {
+			defaultPaths = append(defaultPaths, "notes-file="+projectCfg.Config.NotesFile)
 		}
 		if projectCfg.Config.AppInitManifest != "" {
 			defaultPaths = append(defaultPaths, "appinit-manifest="+projectCfg.Config.AppInitManifest)
@@ -217,8 +249,16 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 			DefaultPaths:  defaultPaths,
 		}
 	}
+	stateInfo, err := shared.ReadBootstrapState(res.BootstrapStatePath)
+	if err != nil {
+		return result{}, err
+	}
+	if strings.TrimSpace(stateInfo.State.LastReadinessRecheck) != "" {
+		res.LastKnownReadiness = stateInfo.State.LastReadinessRecheck
+	}
 
 	authStatus := shared.BuildAuthStatusSnapshot(cfg, deps.LookupEnv)
+	res.AuthHealth = authStatus.Health
 	authDetail := shared.AuthStatusSummary(authStatus)
 	if authDetail == "" {
 		authDetail = "authentication status unavailable"
@@ -254,6 +294,8 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 		return res, nil
 	}
 
+	runDeveloperIDChecks(requestCtx, client, cfg, &res)
+
 	if res.PackageName == "" {
 		res.addSkipped("package_access", "skipped (--package-name not provided)")
 		res.addSkipped("reporting", "skipped (--package-name not provided)")
@@ -269,17 +311,47 @@ func run(ctx context.Context, deps Deps, opts options) (result, error) {
 		return res, nil
 	}
 
-	packageAccessErr := client.VerifyPackageAccess(requestCtx, res.PackageName)
+	readiness, readinessErr := shared.DetectPackageReadiness(requestCtx, client, res.PackageName)
 	switch {
-	case packageAccessErr == nil:
-		res.addOK("package_access", "package access verified")
-	case errors.Is(packageAccessErr, gpc.ErrPackageNotFound):
-		res.addBlocking("package_access", packageAccessErr.Error())
+	case readinessErr != nil:
+		res.addBlocking("package_access", readinessErr.Error())
+	case readiness.Status == shared.PackageReadinessUninitialized:
+		res.PackageReadiness = string(readiness.Status)
+		res.addBlocking("package_access", readiness.Detail)
 		res.addWarning("package is not initialized in Google Play yet")
-		res.addNextStep("Upload the first APK or AAB once in Play Console, then rerun gpc doctor.")
+		res.addNextStep(readiness.NextStep)
+	case readiness.Status == shared.PackageReadinessDraftBootstrapRequired:
+		res.PackageReadiness = string(readiness.Status)
+		res.addOK("package_access", "package access verified")
+		res.addWarn("package_readiness", readiness.Detail)
+		if readiness.Warning != "" {
+			res.addWarning(readiness.Warning)
+		}
+		res.addNextStep(readiness.NextStep)
 	default:
-		res.addBlocking("package_access", packageAccessErr.Error())
+		res.PackageReadiness = string(readiness.Status)
+		res.addOK("package_access", "package access verified")
+		res.addOK("package_readiness", readiness.Detail)
 	}
+	if res.LastKnownReadiness == "" {
+		res.LastKnownReadiness = res.PackageReadiness
+	}
+
+	if res.PackageName != "" && readinessErr == nil && readiness.Status != shared.PackageReadinessUninitialized {
+		bootstrapDraft, err := shared.DetectBootstrapDraftState(requestCtx, client, res.PackageName)
+		if err == nil {
+			res.BootstrapDraftExists = bootstrapDraft.Exists
+			res.BootstrapVersionCodes = append([]int64(nil), bootstrapDraft.VersionCodes...)
+		}
+	}
+	if !res.BootstrapDraftExists && len(stateInfo.State.BootstrapVersionCodes) > 0 {
+		res.BootstrapVersionCodes = append([]int64(nil), stateInfo.State.BootstrapVersionCodes...)
+	}
+	releaseManifest := ""
+	if projectCfg.Path != "" {
+		releaseManifest = projectCfg.Config.ReleaseManifest
+	}
+	res.RecommendedNextCommand = shared.RecommendedReleaseCommand(res.PackageName, res.PackageReadiness, "./play", releaseManifest)
 
 	reportingClient, err := deps.NewReportingClient(requestCtx, resolved.Input)
 	if err != nil {
@@ -354,6 +426,23 @@ func loadFixtures(path string) (fixturesFile, error) {
 	fixtures.GoogleGroup = strings.TrimSpace(fixtures.GoogleGroup)
 	fixtures.ExternalTransactionID = strings.TrimSpace(fixtures.ExternalTransactionID)
 	return fixtures, nil
+}
+
+func runDeveloperIDChecks(ctx context.Context, client Client, cfg config.Config, res *result) {
+	developerID, err := shared.ResolveDeveloperID("", cfg)
+	if err != nil {
+		res.addSkipped("developer_id", "skipped (developerId not configured for selected profile)")
+		return
+	}
+
+	users, err := client.ListUsers(ctx, developerID, -1, "", false)
+	if err != nil {
+		res.addWarn("developer_id", fmt.Sprintf("configured developer id %s could not be verified: %v", developerID, err))
+		res.addNextStep("Update the selected profile with the correct developer ID via `gpc auth init --developer-id <id>`.")
+		return
+	}
+
+	res.addOK("developer_id", fmt.Sprintf("developer id verified (%s, visibleUsers=%d)", developerID, len(users.Users)))
 }
 
 func runSubscriptionChecks(ctx context.Context, client Client, packageName string, fixtures fixturesFile, res *result) {

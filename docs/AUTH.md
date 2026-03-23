@@ -77,6 +77,7 @@ When strict mode is enabled and multiple credential sources are present, command
 - `GPC_BYPASS_KEYCHAIN=1` disables keychain reads/writes for the current process.
 - For `path` profiles, bypass is effectively a no-op because those profiles do not use keychain during normal resolution.
 - On unsupported systems or unavailable keychain backend, explicit `keychain` profiles can fall back to their saved `serviceAccountPath` metadata and report warnings.
+- If a local command appears to stall during auth resolution on macOS, rerun once with `GPC_BYPASS_KEYCHAIN=1` to confirm whether the system keychain is the blocking dependency.
 
 Truthy values for keychain bypass:
 
@@ -118,6 +119,34 @@ Truthy values for keychain bypass:
 - `lastValidatedAt`
 - `developerId`
 - `warnings`
+
+### Developer ID Health
+
+If a profile stores `developerId`, `gpc doctor` now validates that value against the live Play `users.list` surface.
+
+Use:
+
+```bash
+gpc doctor
+gpc doctor --package-name com.example.app
+```
+
+If the configured developer ID is stale or invalid, `doctor` reports a `developer_id` warning and points you back to `gpc auth init --developer-id <id>`.
+
+When you pass `--package-name`, `doctor` also reports package readiness:
+
+- `uninitialized`: the app is not initialized in Play yet
+- `draft_bootstrap_required`: the package exists, but Play still requires the first internal draft bootstrap release
+- `ready`: package access and metadata edits are available
+
+That readiness state is the same one used by `gpc release init`, `gpc release verify`, and `gpc release full`.
+
+When a project has `release-manifest` configured, `doctor` also reports bootstrap rerun context from `./play/bootstrap-state.json`:
+
+- whether an internal draft bootstrap release is already present
+- the version code(s) already associated with that bootstrap draft
+- the last known readiness result
+- the recommended next command for the current state
 
 ### Logout
 

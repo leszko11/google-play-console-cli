@@ -64,6 +64,8 @@ type localeScreenshots struct {
 	Images map[string][]string
 }
 
+type LocaleScreenshots = localeScreenshots
+
 var screenshotDirAliases = map[string]string{
 	"phone":                  "phoneScreenshots",
 	"phonescreenshots":       "phoneScreenshots",
@@ -102,6 +104,10 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newSyncCommand(deps),
 		},
 	}
+}
+
+func ScanScreenshotsDir(root string) ([]LocaleScreenshots, error) {
+	return scanScreenshotsDir(root)
 }
 
 func withDefaults(deps Deps) Deps {
@@ -180,6 +186,10 @@ func validateSyncOptions(opts syncOptions) (syncOptions, error) {
 		return syncOptions{}, err
 	}
 	opts.PackageName = pkg
+	opts.Dir, err = shared.ResolveProjectPath(opts.Dir, func(cfg config.ProjectConfig) string { return cfg.ScreenshotsDir })
+	if err != nil {
+		return syncOptions{}, err
+	}
 	opts.Dir = strings.TrimSpace(opts.Dir)
 	if opts.Dir == "" {
 		return syncOptions{}, shared.UsageErrorf("--dir is required")
@@ -220,7 +230,7 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 
 	if opts.DryRun {
 		if err := client.ValidateEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
-			return fail(fmt.Errorf("failed to validate edit: %w", err))
+			return fail(explainDraftAppValidationError(fmt.Errorf("failed to validate edit: %w", err)))
 		}
 		if err := client.DeleteEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
 			return fail(fmt.Errorf("failed to delete dry-run edit: %w", err))
@@ -255,7 +265,7 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 	}
 
 	if err := client.ValidateEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
-		return fail(fmt.Errorf("failed to validate edit: %w", err))
+		return fail(explainDraftAppValidationError(fmt.Errorf("failed to validate edit: %w", err)))
 	}
 
 	commit, err := shared.CommitEditWithOptions(requestCtx, client, opts.PackageName, edit.ID, shared.EditCommitOptions{
@@ -270,6 +280,13 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 	result.Committed = true
 	result.Status = "committed"
 	return shared.WriteJSON(out, result)
+}
+
+func explainDraftAppValidationError(err error) error {
+	if !shared.IsDraftAppError(err) {
+		return err
+	}
+	return fmt.Errorf("%w\nhint: this package is still in Play's draft bootstrap state. Run `gpc release init --package-name <package> --dir ./play` to generate the bootstrap workflow, commit the draft bootstrap release with `gpc release full --manifest ./play/release.yaml --confirm`, wait for Play processing, then rerun screenshots sync.", err)
 }
 
 func scanScreenshotsDir(root string) ([]localeScreenshots, error) {

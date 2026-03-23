@@ -22,6 +22,7 @@ var resolveOutputDetectTTY = detectStdoutTTY
 var resolvePackageLookupEnv = os.Getenv
 var resolveProfileLookupEnv = os.Getenv
 var resolveCredentialsShouldBypassKeychain = authresolver.ShouldBypassKeychain
+var resolveCredentialsProbeKeychainAccess = authresolver.ProbeKeychainAccess
 var resolveCredentialsLoadProfileCredential = authresolver.LoadProfileCredential
 var resolveCredentialsIsCredentialNotFound = authresolver.IsCredentialNotFound
 var resolveCredentialsIsKeyringUnavailable = authresolver.IsKeyringUnavailable
@@ -182,15 +183,25 @@ func ResolveCredentials(cfg config.Config, lookupEnv func(string) string) (Resol
 		if resolveCredentialsShouldBypassKeychain(lookupEnv) {
 			warnings = append(warnings, "keychain bypassed via GPC_BYPASS_KEYCHAIN")
 		} else {
-			payload, err := resolveCredentialsLoadProfileCredential(profileName)
-			if err == nil {
-				keychainJSON = payload
-			} else if resolveCredentialsIsCredentialNotFound(err) {
-				// Profile may still have config path fallback.
-			} else if resolveCredentialsIsKeyringUnavailable(err) {
+			probe := resolveCredentialsProbeKeychainAccess(lookupEnv)
+			switch {
+			case probe.Blocked:
+				warnings = append(warnings, "system keychain access appears blocked; using config/environment/flags")
+			case probe.Err != nil:
+				warnings = append(warnings, fmt.Sprintf("keychain error: %v", probe.Err))
+			case !probe.Available:
 				warnings = append(warnings, "system keychain unavailable; using config/environment/flags")
-			} else {
-				return ResolvedCredentials{}, err
+			default:
+				payload, err := resolveCredentialsLoadProfileCredential(profileName)
+				if err == nil {
+					keychainJSON = payload
+				} else if resolveCredentialsIsCredentialNotFound(err) {
+					// Profile may still have config path fallback.
+				} else if resolveCredentialsIsKeyringUnavailable(err) {
+					warnings = append(warnings, "system keychain unavailable; using config/environment/flags")
+				} else {
+					return ResolvedCredentials{}, err
+				}
 			}
 		}
 	}
@@ -322,6 +333,44 @@ func resolveExplicitProfileCredentials(profileName, storage, flagPath, envPath, 
 				ServiceAccountPath: cfgPath,
 				ProfileStorage:     storage,
 				Warnings:           []string{"keychain bypassed via GPC_BYPASS_KEYCHAIN"},
+			}, nil
+		}
+
+		probe := resolveCredentialsProbeKeychainAccess(lookupEnv)
+		if probe.Blocked {
+			if cfgPath == "" {
+				return ResolvedCredentials{}, authresolver.ErrNoCredentialSources
+			}
+			return ResolvedCredentials{
+				Input:              gpc.CredentialInput{ServiceAccountPath: cfgPath},
+				Source:             authresolver.SourceConfig,
+				ServiceAccountPath: cfgPath,
+				ProfileStorage:     storage,
+				Warnings:           []string{"system keychain access appears blocked; using profile service-account path"},
+			}, nil
+		}
+		if probe.Err != nil {
+			if cfgPath == "" {
+				return ResolvedCredentials{}, probe.Err
+			}
+			return ResolvedCredentials{
+				Input:              gpc.CredentialInput{ServiceAccountPath: cfgPath},
+				Source:             authresolver.SourceConfig,
+				ServiceAccountPath: cfgPath,
+				ProfileStorage:     storage,
+				Warnings:           []string{fmt.Sprintf("keychain error: %v", probe.Err)},
+			}, nil
+		}
+		if !probe.Available {
+			if cfgPath == "" {
+				return ResolvedCredentials{}, authresolver.ErrNoCredentialSources
+			}
+			return ResolvedCredentials{
+				Input:              gpc.CredentialInput{ServiceAccountPath: cfgPath},
+				Source:             authresolver.SourceConfig,
+				ServiceAccountPath: cfgPath,
+				ProfileStorage:     storage,
+				Warnings:           []string{"system keychain unavailable; using profile service-account path"},
 			}, nil
 		}
 

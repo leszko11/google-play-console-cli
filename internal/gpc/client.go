@@ -94,7 +94,7 @@ func mapAPIErrorWithService(serviceName string, statusCode int, msg string, boot
 		return errors.New(prefix)
 	case 404:
 		if bootstrapHint && isPackageBootstrapNotReady(msg) {
-			return fmt.Errorf("%w: %s\nhint: this package is not initialized in Google Play yet. Upload the first APK or AAB once in Play Console, then retry. Also verify the service account has access to this app.", ErrPackageNotFound, msg)
+			return fmt.Errorf("%w: %s\nhint: this package is not initialized in Google Play yet. Upload the first APK or AAB once in Play Console, then retry. Also verify the service account has access to this app. For a guided local workspace, run `gpc release init --package-name <package>`.", ErrPackageNotFound, msg)
 		}
 		return fmt.Errorf("%w: %s", ErrPackageNotFound, msg)
 	case 429:

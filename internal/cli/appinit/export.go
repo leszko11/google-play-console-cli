@@ -151,7 +151,7 @@ func NewBootstrapCommand(deps Deps) *ffcli.Command {
 			exportOpts := exportOptions{
 				PackageName:        strings.TrimSpace(opts.PackageName),
 				Dir:                strings.TrimSpace(opts.Dir),
-				Include:            "app-details,listing,changelog",
+				Include:            "app-details,listing,changelog,products,subscriptions",
 				Tracks:             strings.TrimSpace(opts.Tracks),
 				Layout:             "gpc",
 				SkipImages:         opts.SkipImages,
@@ -316,7 +316,7 @@ func runExport(parentCtx, requestCtx context.Context, client Client, out io.Writ
 		return err
 	}
 	if opts.WriteProjectConfig {
-		if err := writeProjectConfig(filepath.Join(opts.Dir, ".gpc.yaml"), opts.PackageName, paths); err != nil {
+		if err := writeProjectConfig(filepath.Join(opts.Dir, ".gpc.yaml"), opts.PackageName, details); err != nil {
 			return err
 		}
 		result.Files["projectConfig"] = filepath.Join(opts.Dir, ".gpc.yaml")
@@ -387,6 +387,9 @@ func exportListings(ctx context.Context, client Client, packageName, editID stri
 		for _, imageType := range exportImageTypes {
 			images, err := client.ListImages(ctx, packageName, editID, item.Language, imageType)
 			if err != nil {
+				if isUnsupportedImageTypeError(err) {
+					continue
+				}
 				return fmt.Errorf("failed to list images for %s/%s: %w", item.Language, imageType, err)
 			}
 			for index, image := range images {
@@ -397,6 +400,16 @@ func exportListings(ctx context.Context, client Client, packageName, editID stri
 		}
 	}
 	return nil
+}
+
+func isUnsupportedImageTypeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(msg, "invalid value at 'image_type'") ||
+		strings.Contains(msg, "invalid value at \"image_type\"") ||
+		strings.Contains(msg, "unsupported image type")
 }
 
 func exportChangelogs(ctx context.Context, client Client, packageName, editID string, paths exportPaths, layout string, tracks map[string]struct{}) (int, error) {
@@ -501,6 +514,20 @@ func writeExportAppInitManifest(path, layout string, paths exportPaths, details 
 		}
 		manifest.Listing = &listingSection{Dir: dir}
 	}
+	if _, ok := sections["products"]; ok {
+		dir := "./products"
+		if layout == "gpp" {
+			dir = "./play/products"
+		}
+		manifest.Products = &syncSection{Dir: dir}
+	}
+	if _, ok := sections["subscriptions"]; ok {
+		dir := "./subscriptions"
+		if layout == "gpp" {
+			dir = "./play/subscriptions"
+		}
+		manifest.Subscriptions = &syncSection{Dir: dir}
+	}
 	raw, err := yaml.Marshal(manifest)
 	if err != nil {
 		return fmt.Errorf("marshal appinit manifest: %w", err)
@@ -508,12 +535,15 @@ func writeExportAppInitManifest(path, layout string, paths exportPaths, details 
 	return writeBytes(path, raw)
 }
 
-func writeProjectConfig(path, packageName string, paths exportPaths) error {
+func writeProjectConfig(path, packageName string, details gpc.AppDetailsInfo) error {
 	cfg := map[string]any{
 		"package-name":     packageName,
 		"listing-dir":      "./listing",
 		"changelog-dir":    "./changelog",
 		"appinit-manifest": "./appinit.yaml",
+	}
+	if strings.TrimSpace(details.DefaultLanguage) != "" {
+		cfg["default-locale"] = details.DefaultLanguage
 	}
 	raw, err := yaml.Marshal(cfg)
 	if err != nil {

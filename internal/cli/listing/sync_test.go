@@ -113,8 +113,8 @@ func TestListingSyncDryRun(t *testing.T) {
 	if !strings.Contains(out, `"status":"dry-run"`) {
 		t.Fatalf("unexpected output: %s", out)
 	}
-	if client.updateCalls != 0 || client.uploadCalls != 0 {
-		t.Fatalf("dry-run should not mutate: updates=%d uploads=%d", client.updateCalls, client.uploadCalls)
+	if client.updateCalls != 1 || client.uploadCalls != 1 {
+		t.Fatalf("dry-run should stage listing changes in the temporary edit: updates=%d uploads=%d", client.updateCalls, client.uploadCalls)
 	}
 	if client.deleteCalls != 1 {
 		t.Fatalf("expected dry-run cleanup delete, got %d", client.deleteCalls)

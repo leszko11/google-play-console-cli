@@ -47,23 +47,25 @@ brew install leszko11/tap/gpc
 # Authenticate
 gpc auth init --service-account /path/to/service-account.json
 
-# Verify access
-gpc doctor --package-name com.example.app
-
-# Save a package for later commands
-gpc apps add-package --package-name com.example.app
-
-# Deploy a bundle to internal testing
-gpc deploy \
+# Generate a release workspace from the current Play state
+gpc release init \
   --package-name com.example.app \
-  --aab ./app.aab \
+  --dir ./play
+
+# Check the release inputs before committing
+gpc release verify \
+  --package-name com.example.app \
   --track internal \
-  --status completed \
-  --release-notes-text "Bug fixes and stability improvements." \
+  --aab ./app.aab \
+  --notes-file ./play/changelog/internal/en-US.txt
+
+# Run the full non-production release flow
+gpc release full \
+  --manifest ./play/release.yaml \
   --confirm
 ```
 
-That's it. Five commands from zero to deployed.
+For public apps that are not initialized in Play yet, `gpc release init` generates the local workspace and a `play/MANUAL_FIRST_UPLOAD.md` bridge for the first Console upload.
 
 ---
 
@@ -180,6 +182,63 @@ gpc completion fish > ~/.config/fish/completions/gpc.fish
 
 ---
 
+## Command Discovery
+
+```bash
+gpc --help
+gpc audit --help
+gpc auth --help
+gpc bootstrap --help
+gpc appinit --help
+gpc apps --help
+gpc app-recoveries --help
+gpc changelog --help
+gpc custom-apps --help
+gpc edits --help
+gpc tracks --help
+gpc apks --help
+gpc bundles --help
+gpc deobfuscation --help
+gpc deploy --help
+gpc diff --help
+gpc doctor --help
+gpc e2e --help
+gpc release --help
+gpc rollback --help
+gpc screenshots --help
+gpc setup --help
+gpc status --help
+gpc reviews --help
+gpc reports --help
+gpc orders --help
+gpc external-transactions --help
+gpc device-tier-configs --help
+gpc system-apks --help
+gpc generated-apks --help
+gpc games --help
+gpc subscriptions --help
+gpc monetization --help
+gpc migrate --help
+gpc notify --help
+gpc products --help
+gpc publish --help
+gpc iap --help
+gpc listing --help
+gpc purchases --help
+gpc users --help
+gpc validate --help
+gpc workflow --help
+gpc grants --help
+gpc health --help
+gpc internal-sharing --help
+gpc integrity --help
+gpc watch --help
+gpc update --help
+gpc completion --help
+```
+
+---
+
 ## What Can It Do
 
 `gpc` covers the full surface of Google Play Console operations across **6 Google API families**.
@@ -242,7 +301,7 @@ gpc completion fish > ~/.config/fish/completions/gpc.fish
 
 | Command | Description |
 |---------|-------------|
-| `bootstrap` / `appinit` | Export Play state to local workspace |
+| `bootstrap` / `appinit` | Export and re-apply app details, listings, screenshots, products, and subscriptions |
 | `setup --auto` | One-shot GCP + auth + workspace provisioning |
 | `workflow run` | Declarative multi-step automation from `.gpc/workflow.yml` |
 | `notify` | Webhook, Slack, and Discord notification delivery |
@@ -288,6 +347,35 @@ gpc deploy \
   --confirm
 ```
 
+### Connect an existing Play app
+
+```bash
+gpc release init \
+  --package-name com.example.app \
+  --dir ./play
+
+gpc doctor --package-name com.example.app
+```
+
+`release init` exports the current Play state into `./play`, writes `.gpc.yaml`, and generates `.gpc/workflow.yml`.
+
+It also writes `./play/bootstrap-state.json`, which records the last known package readiness and whether an internal draft bootstrap release already exists.
+
+### First public app upload bridge
+
+```bash
+gpc release init \
+  --package-name com.example.app \
+  --dir ./play
+```
+
+If the package is not initialized yet, `gpc` does not pretend it can complete that step. It writes `./play/MANUAL_FIRST_UPLOAD.md` with:
+
+- what `gpc` can already prepare locally
+- the exact Play Console steps that must still be done on the web
+- the CLI limitations for public apps
+- the rerun command after that first upload
+
 ### Staged rollout with vitals gating
 
 ```bash
@@ -299,6 +387,26 @@ gpc release full \
   --auto-halt-on-regression \
   --confirm
 ```
+
+### Repeat internal or alpha releases
+
+```bash
+gpc release init --package-name com.example.app --dir ./play
+gpc release full --manifest ./play/release.yaml --dry-run
+gpc release full --manifest ./play/release.yaml --confirm
+```
+
+`release full` applies app details, listing metadata, screenshots, products, subscriptions, uploads the artifact, and runs post-release checks. If Play still treats the package as a draft app, `release full` seeds the bootstrap release first and then continues.
+
+If `./play/bootstrap-state.json` or the internal track already shows a draft bootstrap release, reruns reuse that state and recheck readiness before attempting another upload.
+
+### Web vs CLI
+
+| Surface | Tasks |
+| --- | --- |
+| Web only | Create or initialize a public Play app entry, upload the first public-app artifact, wait for Play processing to clear draft bootstrap |
+| CLI only | Export Play state, sync local listing/screenshots/products/subscriptions, verify release inputs, run non-production release orchestration |
+| Either | Review release metadata, inspect track state, rerun readiness checks after Play finishes processing |
 
 ### Sync store listings from local files
 
@@ -378,12 +486,12 @@ vars:
 steps:
   - id: deploy-internal
     run: >
-      gpc deploy --package-name ${packageName} --aab ./app.aab
+      deploy --package-name ${packageName} --aab ./app.aab
       --track internal --status completed --confirm
   - id: notify-team
     needs: [deploy-internal]
     run: >
-      gpc notify slack --url ${slackWebhook}
+      notify slack --url ${slackWebhook}
       --event release.completed
       --message "Internal build deployed"
 ```

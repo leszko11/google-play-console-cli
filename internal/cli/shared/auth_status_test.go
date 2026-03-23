@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 )
 
@@ -55,13 +56,18 @@ func TestBuildAuthStatusSnapshot_PathProfileUsesPathBackend(t *testing.T) {
 func TestBuildAuthStatusSnapshot_KeychainProfileBypassUsesPathBackend(t *testing.T) {
 	prevFlags := boundGlobalFlags
 	prevBypass := resolveCredentialsShouldBypassKeychain
+	prevProbe := authStatusProbeKeychainAccess
 	defer func() {
 		boundGlobalFlags = prevFlags
 		resolveCredentialsShouldBypassKeychain = prevBypass
+		authStatusProbeKeychainAccess = prevProbe
 	}()
 
 	boundGlobalFlags = &GlobalFlags{}
 	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return true }
+	authStatusProbeKeychainAccess = func(func(string) string) authresolver.KeychainProbeResult {
+		return authresolver.KeychainProbeResult{}
+	}
 
 	serviceAccountPath := writeStatusFixtureServiceAccount(t)
 	cfg := config.Config{
@@ -86,6 +92,120 @@ func TestBuildAuthStatusSnapshot_KeychainProfileBypassUsesPathBackend(t *testing
 	}
 	if !slices.Contains(status.Warnings, "keychain bypassed via GPC_BYPASS_KEYCHAIN") {
 		t.Fatalf("expected bypass warning, got %v", status.Warnings)
+	}
+	if status.Health != string(AuthHealthReady) {
+		t.Fatalf("expected ready auth health, got %q", status.Health)
+	}
+}
+
+func TestBuildAuthStatusSnapshot_LegacyMixedSources(t *testing.T) {
+	prevFlags := boundGlobalFlags
+	prevBypass := resolveCredentialsShouldBypassKeychain
+	prevProbe := authStatusProbeKeychainAccess
+	prevKeychainAvailable := authStatusKeychainAvailable
+	prevLoad := resolveCredentialsLoadProfileCredential
+	prevNotFound := resolveCredentialsIsCredentialNotFound
+	prevUnavailable := resolveCredentialsIsKeyringUnavailable
+	defer func() {
+		boundGlobalFlags = prevFlags
+		resolveCredentialsShouldBypassKeychain = prevBypass
+		authStatusProbeKeychainAccess = prevProbe
+		authStatusKeychainAvailable = prevKeychainAvailable
+		resolveCredentialsLoadProfileCredential = prevLoad
+		resolveCredentialsIsCredentialNotFound = prevNotFound
+		resolveCredentialsIsKeyringUnavailable = prevUnavailable
+	}()
+
+	boundGlobalFlags = &GlobalFlags{}
+	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return false }
+	authStatusProbeKeychainAccess = func(func(string) string) authresolver.KeychainProbeResult {
+		return authresolver.KeychainProbeResult{Available: true}
+	}
+	authStatusKeychainAvailable = func(func(string) string) (bool, error) { return true, nil }
+	resolveCredentialsLoadProfileCredential = func(string) ([]byte, error) {
+		return []byte(`{"type":"service_account","project_id":"example"}`), nil
+	}
+	resolveCredentialsIsCredentialNotFound = func(error) bool { return false }
+	resolveCredentialsIsKeyringUnavailable = func(error) bool { return false }
+
+	serviceAccountPath := writeStatusFixtureServiceAccount(t)
+	cfg := config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {ServiceAccountPath: serviceAccountPath},
+		},
+	}
+
+	status := BuildAuthStatusSnapshot(cfg, func(string) string { return "" })
+	if status.Health != string(AuthHealthMixedSources) {
+		t.Fatalf("expected mixed_sources health, got %q", status.Health)
+	}
+	if status.FixCommand == "" {
+		t.Fatal("expected fix command")
+	}
+}
+
+func TestBuildAuthStatusSnapshot_StalePath(t *testing.T) {
+	prevFlags := boundGlobalFlags
+	prevBypass := resolveCredentialsShouldBypassKeychain
+	prevProbe := authStatusProbeKeychainAccess
+	defer func() {
+		boundGlobalFlags = prevFlags
+		resolveCredentialsShouldBypassKeychain = prevBypass
+		authStatusProbeKeychainAccess = prevProbe
+	}()
+
+	boundGlobalFlags = &GlobalFlags{}
+	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return true }
+	authStatusProbeKeychainAccess = func(func(string) string) authresolver.KeychainProbeResult {
+		return authresolver.KeychainProbeResult{}
+	}
+
+	cfg := config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {
+				Storage:            config.StoragePath,
+				ServiceAccountPath: filepath.Join(t.TempDir(), "missing.json"),
+			},
+		},
+	}
+
+	status := BuildAuthStatusSnapshot(cfg, func(string) string { return "" })
+	if status.Health != string(AuthHealthStalePath) {
+		t.Fatalf("expected stale_path health, got %q", status.Health)
+	}
+}
+
+func TestBuildAuthStatusSnapshot_KeychainBlocked(t *testing.T) {
+	prevFlags := boundGlobalFlags
+	prevBypass := resolveCredentialsShouldBypassKeychain
+	prevProbe := authStatusProbeKeychainAccess
+	defer func() {
+		boundGlobalFlags = prevFlags
+		resolveCredentialsShouldBypassKeychain = prevBypass
+		authStatusProbeKeychainAccess = prevProbe
+	}()
+
+	boundGlobalFlags = &GlobalFlags{}
+	resolveCredentialsShouldBypassKeychain = func(func(string) string) bool { return false }
+	authStatusProbeKeychainAccess = func(func(string) string) authresolver.KeychainProbeResult {
+		return authresolver.KeychainProbeResult{Blocked: true}
+	}
+
+	cfg := config.Config{
+		ActiveProfile: "default",
+		Profiles: map[string]config.Profile{
+			"default": {Storage: config.StorageKeychain},
+		},
+	}
+
+	status := BuildAuthStatusSnapshot(cfg, func(string) string { return "" })
+	if status.Health != string(AuthHealthKeychainBlocked) {
+		t.Fatalf("expected keychain_blocked health, got %q", status.Health)
+	}
+	if status.DiagnosticCommand == "" {
+		t.Fatal("expected diagnostic command")
 	}
 }
 

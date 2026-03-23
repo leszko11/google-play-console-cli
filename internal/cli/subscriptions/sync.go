@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
+	"github.com/leszko11/google-play-console-cli/internal/config"
+	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
 	"google.golang.org/api/androidpublisher/v3"
 )
@@ -22,6 +24,15 @@ type syncOptions struct {
 	Confirm       bool
 	DryRun        bool
 	DeleteMissing bool
+}
+
+type SyncOptions = syncOptions
+
+type SyncClient interface {
+	ListSubscriptions(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionsListInfo, error)
+	GetLatestRegionsVersion(ctx context.Context, packageName string) (string, error)
+	BatchUpdateSubscriptions(ctx context.Context, packageName string, requests []*androidpublisher.UpdateSubscriptionRequest) (gpc.SubscriptionsListInfo, error)
+	DeleteSubscription(ctx context.Context, packageName, productID string) error
 }
 
 type syncResult struct {
@@ -55,6 +66,11 @@ func newSyncCommand(deps Deps) *ffcli.Command {
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, _ []string) error {
+			var err error
+			opts.Dir, err = shared.ResolveProjectPath(opts.Dir, func(cfg config.ProjectConfig) string { return cfg.SubscriptionsDir })
+			if err != nil {
+				return err
+			}
 			opts.Dir = strings.TrimSpace(opts.Dir)
 			if opts.Dir == "" {
 				return fmt.Errorf("--dir is required")
@@ -116,7 +132,7 @@ func readSyncSubscriptionFile(path string) (syncSubscriptionFile, error) {
 	return syncSubscriptionFile{Subscription: &subscription}, nil
 }
 
-func runSync(requestCtx context.Context, client Client, out io.Writer, opts syncOptions, subscriptions []syncSubscriptionFile) error {
+func runSync(requestCtx context.Context, client SyncClient, out io.Writer, opts syncOptions, subscriptions []syncSubscriptionFile) error {
 	result := syncResult{
 		PackageName: opts.PackageName,
 		Dir:         opts.Dir,
@@ -193,6 +209,14 @@ func runSync(requestCtx context.Context, client Client, out io.Writer, opts sync
 	}
 	result.Status = "committed"
 	return shared.WriteJSON(out, result)
+}
+
+func RunSync(requestCtx context.Context, client SyncClient, out io.Writer, opts SyncOptions) error {
+	subscriptions, err := readSyncSubscriptionsDir(opts.Dir)
+	if err != nil {
+		return err
+	}
+	return runSync(requestCtx, client, out, opts, subscriptions)
 }
 
 func subscriptionSyncUpdateMask(subscription *androidpublisher.Subscription) string {

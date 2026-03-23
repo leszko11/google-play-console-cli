@@ -142,9 +142,8 @@ func explainDraftAppCommitError(err error) error {
 	if err == nil {
 		return nil
 	}
-
 	if isDraftAppTrackConflict(err) {
-		return fmt.Errorf("%w\nhint: this draft app still has a track release with status \"completed\". Update the internal track release to \"draft\" in Play Console, then retry. Automatic track fixes are not applied by gpc.", err)
+		return fmt.Errorf("%w\nhint: this draft app still has a track release with status \"completed\". Update the internal track release to \"draft\" in Play Console, or run `gpc release init --package-name <package> --dir ./play` to generate the bootstrap release workflow. Automatic track fixes are only applied when you explicitly enable `--auto-fix-draft-track` on supported commands.", err)
 	}
 	return err
 }

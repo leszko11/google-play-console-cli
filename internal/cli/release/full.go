@@ -6,6 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	"github.com/peterbourgon/ff/v3/ffcli"
+	"gopkg.in/yaml.v3"
 )
 
 type fullStep struct {
@@ -22,16 +25,24 @@ type fullStep struct {
 }
 
 type fullResult struct {
-	PackageName          string                `json:"packageName"`
-	Manifest             string                `json:"manifest"`
-	Track                string                `json:"track"`
-	Status               string                `json:"status"`
-	UploadedArtifactType string                `json:"uploadedArtifactType,omitempty"`
-	VersionCode          int64                 `json:"versionCode,omitempty"`
-	Committed            bool                  `json:"committed"`
-	CleanupPerformed     bool                  `json:"cleanupPerformed"`
-	VitalsGate           *fullVitalsGateResult `json:"vitalsGate,omitempty"`
-	Steps                []fullStep            `json:"steps"`
+	PackageName            string                `json:"packageName"`
+	PackageReadiness       string                `json:"packageReadiness,omitempty"`
+	BootstrapDraftExists   bool                  `json:"bootstrapDraftExists,omitempty"`
+	BootstrapVersionCodes  []int64               `json:"bootstrapVersionCodes,omitempty"`
+	LastKnownReadiness     string                `json:"lastKnownReadiness,omitempty"`
+	RecommendedNextCommand string                `json:"recommendedNextCommand,omitempty"`
+	BootstrapStatePath     string                `json:"bootstrapStatePath,omitempty"`
+	Manifest               string                `json:"manifest"`
+	Track                  string                `json:"track"`
+	Status                 string                `json:"status"`
+	UploadedArtifactType   string                `json:"uploadedArtifactType,omitempty"`
+	VersionCode            int64                 `json:"versionCode,omitempty"`
+	Committed              bool                  `json:"committed"`
+	CleanupPerformed       bool                  `json:"cleanupPerformed"`
+	VitalsGate             *fullVitalsGateResult `json:"vitalsGate,omitempty"`
+	Warnings               []string              `json:"warnings,omitempty"`
+	NextSteps              []string              `json:"nextSteps,omitempty"`
+	Steps                  []fullStep            `json:"steps"`
 }
 
 type fullOptions struct {
@@ -45,6 +56,10 @@ type fullOptions struct {
 	VitalsWait           time.Duration
 	AutoHaltOnRegression bool
 }
+
+const (
+	fullStatusBootstrapCommitted = "bootstrap_committed"
+)
 
 func newFullCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("full", flag.ContinueOnError)
@@ -142,24 +157,277 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 		Manifest:    opts.ManifestPath,
 		Track:       manifest.Track,
 		Status:      "failed",
-		Steps:       make([]fullStep, 0, 8),
+		Steps:       make([]fullStep, 0, 16),
+	}
+	result.BootstrapStatePath = shared.BootstrapStatePathFromReleaseManifest(opts.ManifestPath)
+	result.RecommendedNextCommand = shared.RecommendedReleaseCommand(opts.PackageName, result.PackageReadiness, filepath.Dir(opts.ManifestPath), opts.ManifestPath)
+	stateInfo, err := shared.ReadBootstrapState(result.BootstrapStatePath)
+	if err != nil {
+		return err
+	}
+	bootstrapState := stateInfo.State
+	if strings.TrimSpace(bootstrapState.LastReadinessRecheck) != "" {
+		result.LastKnownReadiness = bootstrapState.LastReadinessRecheck
+	}
+	defer func() {
+		bootstrapState.PackageName = result.PackageName
+		if strings.TrimSpace(result.PackageReadiness) != "" {
+			bootstrapState.PackageReadiness = result.PackageReadiness
+			bootstrapState.LastReadinessRecheck = result.PackageReadiness
+		}
+		bootstrapState.BootstrapDraftExists = result.BootstrapDraftExists
+		if len(result.BootstrapVersionCodes) > 0 {
+			bootstrapState.BootstrapVersionCodes = append([]int64(nil), result.BootstrapVersionCodes...)
+		}
+		_ = shared.WriteBootstrapState(result.BootstrapStatePath, bootstrapState)
+	}()
+
+	verify, _ := runVerify(parentCtx, deps, verifyOptions{
+		PackageName: opts.PackageName,
+		Track:       manifest.Track,
+		ProjectDir:  "",
+		BuildTask:   "",
+		AABPath:     manifest.ArtifactPath,
+		ProbeTrack:  true,
+		NotesMode:   "none",
+		NotesFile:   "",
+	})
+	result.PackageReadiness = verify.PackageReadiness
+	if result.LastKnownReadiness == "" {
+		result.LastKnownReadiness = result.PackageReadiness
+	}
+	result.RecommendedNextCommand = shared.RecommendedReleaseCommand(opts.PackageName, result.PackageReadiness, filepath.Dir(opts.ManifestPath), opts.ManifestPath)
+	if verify.Status != "ok" && verify.PackageReadiness != string(shared.PackageReadinessDraftBootstrapRequired) {
+		result.Steps = append(result.Steps, fullStep{Name: "preflight_verify", Status: "error", Error: "release verification failed"})
+		result.NextSteps = append(result.NextSteps, "Run `gpc release verify --package-name "+opts.PackageName+" --track "+manifest.Track+" --aab "+manifest.ArtifactPath+"` or `gpc doctor --package-name "+opts.PackageName+"` for details.")
+		_ = shared.WriteJSON(out, result)
+		return fmt.Errorf("release verification failed")
+	}
+	result.Steps = append(result.Steps, fullStep{Name: "preflight_verify", Status: "ok"})
+
+	if opts.DryRun {
+		result.Status = "dry-run"
+		for _, step := range plannedFullSteps(result.PackageReadiness) {
+			result.Steps = append(result.Steps, fullStep{Name: step, Status: "planned"})
+		}
+		return shared.WriteJSON(out, result)
 	}
 
+	if result.PackageReadiness == string(shared.PackageReadinessUninitialized) {
+		result.Status = "manual_required"
+		result.NextSteps = append(result.NextSteps, "Run `gpc release init --package-name "+opts.PackageName+" --dir ./play` to generate the first-upload bridge.")
+		result.Steps = append(result.Steps, fullStep{Name: "package_readiness", Status: "error", Error: "package is not initialized in Google Play yet"})
+		_ = shared.WriteJSON(out, result)
+		return fmt.Errorf("package is not initialized in Google Play yet")
+	}
+
+	if result.PackageReadiness == string(shared.PackageReadinessDraftBootstrapRequired) {
+		existingDraft, err := shared.DetectBootstrapDraftState(requestCtx, client, opts.PackageName)
+		if err != nil {
+			result.Steps = append(result.Steps, fullStep{Name: "bootstrap_existing_draft", Status: "error", Error: err.Error()})
+			_ = shared.WriteJSON(out, result)
+			return err
+		}
+		result.BootstrapDraftExists = existingDraft.Exists
+		result.BootstrapVersionCodes = append([]int64(nil), existingDraft.VersionCodes...)
+		if !result.BootstrapDraftExists && len(bootstrapState.BootstrapVersionCodes) > 0 {
+			result.BootstrapVersionCodes = append([]int64(nil), bootstrapState.BootstrapVersionCodes...)
+		}
+		if existingDraft.Exists {
+			result.Steps = append(result.Steps, fullStep{Name: "bootstrap_existing_draft", Status: "ok"})
+			writeFullProgress(deps.Stderr, "bootstrap_release", "reusing existing internal draft bootstrap release")
+			if len(existingDraft.VersionCodes) > 0 {
+				result.NextSteps = append(result.NextSteps, "Existing internal draft release already uses versionCode(s) "+shared.JoinVersionCodes(existingDraft.VersionCodes)+".")
+			}
+		} else {
+			writeFullProgress(deps.Stderr, "bootstrap_release", "uploading internal draft bootstrap release")
+			bootstrapManifest := manifest
+			bootstrapManifest.Track = "internal"
+			bootstrapManifest.Status = "draft"
+			if err := runManifestDeploy(parentCtx, requestCtx, client, deps, opts, bootstrapManifest, &result, "bootstrap_"); err != nil {
+				_ = shared.WriteJSON(out, result)
+				return err
+			}
+			result.Steps = append(result.Steps, fullStep{Name: "bootstrap_release", Status: "ok"})
+			result.BootstrapDraftExists = true
+			if result.VersionCode > 0 {
+				result.BootstrapVersionCodes = []int64{result.VersionCode}
+				bootstrapState.LastBootstrapCommittedAt = deps.Now().UTC().Format(time.RFC3339)
+			}
+		}
+		writeFullProgress(deps.Stderr, "post_bootstrap_recheck", "waiting for Play to leave draft bootstrap state")
+		bootstrapReadiness, err := waitForReadyAfterBootstrap(requestCtx, deps, client, opts.PackageName)
+		if err != nil {
+			result.Steps = append(result.Steps, fullStep{Name: "post_bootstrap_recheck", Status: "error", Error: err.Error()})
+			_ = shared.WriteJSON(out, result)
+			return err
+		}
+		result.PackageReadiness = string(bootstrapReadiness.Status)
+		result.LastKnownReadiness = result.PackageReadiness
+		result.RecommendedNextCommand = shared.RecommendedReleaseCommand(opts.PackageName, result.PackageReadiness, filepath.Dir(opts.ManifestPath), opts.ManifestPath)
+		if bootstrapReadiness.Status != shared.PackageReadinessReady {
+			result.Status = fullStatusBootstrapCommitted
+			result.Steps = append(result.Steps, fullStep{Name: "post_bootstrap_recheck", Status: "warning", Error: bootstrapReadiness.Detail})
+			if bootstrapReadiness.Warning != "" {
+				result.Warnings = append(result.Warnings, bootstrapReadiness.Warning)
+			}
+			result.NextSteps = append(result.NextSteps, "The draft bootstrap release was committed. Wait for Play to finish processing it, then rerun `gpc release full --manifest "+opts.ManifestPath+" --confirm`.")
+			_ = shared.WriteJSON(out, result)
+			return fmt.Errorf("bootstrap release committed, but package is still in Play's draft bootstrap state")
+		}
+		result.Steps = append(result.Steps, fullStep{Name: "post_bootstrap_recheck", Status: "ok"})
+	}
+
+	writeFullProgress(deps.Stderr, "content_sync", "applying app details, listing, screenshots, products, and subscriptions")
+	if err := runContentSync(parentCtx, deps, opts.PackageName, opts.ManifestPath, &result); err != nil {
+		_ = shared.WriteJSON(out, result)
+		return err
+	}
+
+	writeFullProgress(deps.Stderr, "final_deploy", "uploading the requested track release")
+	if err := runManifestDeploy(parentCtx, requestCtx, client, deps, opts, manifest, &result, "deploy_"); err != nil {
+		_ = shared.WriteJSON(out, result)
+		return err
+	}
+
+	writeFullProgress(deps.Stderr, "post_release_checks", "running post-release verification")
+	if err := runPostReleaseChecks(requestCtx, client, deps, opts.PackageName, manifest.Track, &result); err != nil {
+		result.Warnings = append(result.Warnings, err.Error())
+	}
+	if len(opts.VitalsGate) > 0 && opts.VitalsWait > 0 {
+		reportingClient, _, reportingCancel, err := buildReportingClient(parentCtx, deps)
+		if err != nil {
+			result.Status = "failed"
+			result.Steps = append(result.Steps, fullStep{Name: "create_reporting_client", Status: "error", Error: err.Error()})
+			_ = shared.WriteJSON(out, result)
+			return err
+		}
+		defer reportingCancel()
+		if err := monitorVitalsGate(parentCtx, deps, client, reportingClient, &result, opts, manifest, result.VersionCode); err != nil {
+			_ = shared.WriteJSON(out, result)
+			return err
+		}
+	}
+	return shared.WriteJSON(out, result)
+}
+
+func plannedFullSteps(readiness string) []string {
+	steps := []string{"preflight_verify"}
+	if readiness == string(shared.PackageReadinessDraftBootstrapRequired) {
+		steps = append(steps, "bootstrap_existing_draft", "bootstrap_release", "post_bootstrap_recheck")
+	}
+	return append(steps, "sync_app_details_listing", "sync_screenshots", "sync_products", "sync_subscriptions", "deploy_release", "post_release_checks")
+}
+
+func waitForReadyAfterBootstrap(ctx context.Context, deps Deps, client Client, packageName string) (shared.PackageReadinessResult, error) {
+	const attempts = 12
+	startedAt := deps.Now()
+	for attempt := 0; attempt < attempts; attempt++ {
+		readiness, err := shared.DetectPackageReadiness(ctx, client, packageName)
+		if err != nil {
+			return shared.PackageReadinessResult{}, err
+		}
+		if readiness.Status == shared.PackageReadinessReady {
+			return readiness, nil
+		}
+		if attempt == attempts-1 {
+			return readiness, nil
+		}
+		elapsed := deps.Now().Sub(startedAt).Round(time.Second)
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		writeFullProgress(deps.Stderr, "post_bootstrap_recheck", fmt.Sprintf("still waiting after %s (attempt %d/%d)", elapsed, attempt+1, attempts))
+		if err := deps.Sleep(ctx, 5*time.Second); err != nil {
+			return shared.PackageReadinessResult{}, err
+		}
+	}
+	return shared.PackageReadinessResult{}, nil
+}
+
+func runContentSync(ctx context.Context, deps Deps, packageName, manifestPath string, result *fullResult) error {
+	appInitManifest, err := shared.ResolveProjectPath("", func(cfg config.ProjectConfig) string { return cfg.AppInitManifest })
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(appInitManifest) != "" {
+		listingManifest, err := writeFilteredAppInitManifest(appInitManifest, map[string]bool{"appDetails": true, "listing": true})
+		if err != nil {
+			return err
+		}
+		if listingManifest != "" {
+			defer os.Remove(listingManifest)
+			if err := deps.RunAppInit(ctx, []string{"--package-name", packageName, "--manifest", listingManifest, "--confirm"}); err != nil {
+				result.Steps = append(result.Steps, fullStep{Name: "sync_app_details_listing", Status: "error", Error: err.Error()})
+				return err
+			}
+			result.Steps = append(result.Steps, fullStep{Name: "sync_app_details_listing", Status: "ok"})
+		} else {
+			result.Steps = append(result.Steps, fullStep{Name: "sync_app_details_listing", Status: "skipped"})
+		}
+	} else {
+		result.Steps = append(result.Steps, fullStep{Name: "sync_app_details_listing", Status: "skipped"})
+	}
+
+	screenshotsDir, err := shared.ResolveProjectPath("", func(cfg config.ProjectConfig) string { return cfg.ScreenshotsDir })
+	if err != nil {
+		return err
+	}
+	if dirHasFiles(screenshotsDir) {
+		if err := deps.RunScreenshotsSync(ctx, []string{"--package-name", packageName, "--dir", screenshotsDir, "--confirm"}); err != nil {
+			result.Steps = append(result.Steps, fullStep{Name: "sync_screenshots", Status: "error", Error: err.Error()})
+			return err
+		}
+		result.Steps = append(result.Steps, fullStep{Name: "sync_screenshots", Status: "ok"})
+	} else {
+		result.Steps = append(result.Steps, fullStep{Name: "sync_screenshots", Status: "skipped"})
+	}
+
+	productsDir, err := shared.ResolveProjectPath("", func(cfg config.ProjectConfig) string { return cfg.ProductsDir })
+	if err != nil {
+		return err
+	}
+	if dirHasFiles(productsDir) {
+		if err := deps.RunProductsSync(ctx, []string{"--package-name", packageName, "--dir", productsDir, "--confirm"}); err != nil {
+			result.Steps = append(result.Steps, fullStep{Name: "sync_products", Status: "error", Error: err.Error()})
+			return err
+		}
+		result.Steps = append(result.Steps, fullStep{Name: "sync_products", Status: "ok"})
+	} else {
+		result.Steps = append(result.Steps, fullStep{Name: "sync_products", Status: "skipped"})
+	}
+
+	subscriptionsDir, err := shared.ResolveProjectPath("", func(cfg config.ProjectConfig) string { return cfg.SubscriptionsDir })
+	if err != nil {
+		return err
+	}
+	if dirHasFiles(subscriptionsDir) {
+		if err := deps.RunSubscriptionsSync(ctx, []string{"--package-name", packageName, "--dir", subscriptionsDir, "--confirm"}); err != nil {
+			result.Steps = append(result.Steps, fullStep{Name: "sync_subscriptions", Status: "error", Error: err.Error()})
+			return err
+		}
+		result.Steps = append(result.Steps, fullStep{Name: "sync_subscriptions", Status: "ok"})
+	} else {
+		result.Steps = append(result.Steps, fullStep{Name: "sync_subscriptions", Status: "skipped"})
+	}
+
+	_ = manifestPath
+	return nil
+}
+
+func runManifestDeploy(parentCtx, requestCtx context.Context, client Client, deps Deps, opts fullOptions, manifest fullManifest, result *fullResult, prefix string) error {
 	var currentEditID string
 	fail := func(step string, err error) error {
-		result.Steps = append(result.Steps, fullStep{Name: step, Status: "error", Error: err.Error()})
+		result.Steps = append(result.Steps, fullStep{Name: prefix + step, Status: "error", Error: err.Error()})
 		if currentEditID != "" {
 			cleanupCtx, cleanupCancel := shared.ContextWithTimeout(parentCtx, shared.ActiveGlobalFlags().Timeout)
 			cleanupErr := client.DeleteEdit(cleanupCtx, opts.PackageName, currentEditID)
 			cleanupCancel()
 			if cleanupErr == nil {
 				result.CleanupPerformed = true
-				result.Steps = append(result.Steps, fullStep{Name: "cleanup_delete_edit", Status: "ok"})
-			} else {
-				result.Steps = append(result.Steps, fullStep{Name: "cleanup_delete_edit", Status: "error", Error: cleanupErr.Error()})
+				result.Steps = append(result.Steps, fullStep{Name: prefix + "cleanup_delete_edit", Status: "ok"})
 			}
 		}
-		_ = shared.WriteJSON(out, result)
 		return err
 	}
 
@@ -168,28 +436,28 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 		return fail("create_edit", fmt.Errorf("failed to create edit: %w", err))
 	}
 	currentEditID = edit.ID
-	result.Steps = append(result.Steps, fullStep{Name: "create_edit", Status: "ok"})
+	result.Steps = append(result.Steps, fullStep{Name: prefix + "create_edit", Status: "ok"})
 
+	writeFullProgress(deps.Stderr, prefix+"upload_artifact", "uploading artifact")
 	uploadCtx, uploadCancel := shared.ContextWithUploadTimeout(parentCtx, shared.ActiveGlobalFlags().UploadTimeout)
 	versionCode, err := uploadManifestArtifact(uploadCtx, client, opts.PackageName, currentEditID, manifest)
 	uploadCancel()
 	if err != nil {
-		return fail("upload_artifact", err)
+		return fail("upload_artifact", normalizeUploadError(err))
 	}
 	result.VersionCode = versionCode
 	result.UploadedArtifactType = manifest.ArtifactType
-	result.Steps = append(result.Steps, fullStep{Name: "upload_artifact", Status: "ok"})
+	result.Steps = append(result.Steps, fullStep{Name: prefix + "upload_artifact", Status: "ok"})
 
 	if manifest.MappingFile != "" {
+		writeFullProgress(deps.Stderr, prefix+"upload_mapping", "uploading mapping file")
 		mapCtx, mapCancel := shared.ContextWithUploadTimeout(parentCtx, shared.ActiveGlobalFlags().UploadTimeout)
 		_, err := client.UploadDeobfuscationFile(mapCtx, opts.PackageName, currentEditID, versionCode, manifest.MappingType, manifest.MappingFile)
 		mapCancel()
 		if err != nil {
 			return fail("upload_mapping", fmt.Errorf("failed to upload mapping file: %w", err))
 		}
-		result.Steps = append(result.Steps, fullStep{Name: "upload_mapping", Status: "ok"})
-	} else {
-		result.Steps = append(result.Steps, fullStep{Name: "upload_mapping", Status: "skipped"})
+		result.Steps = append(result.Steps, fullStep{Name: prefix + "upload_mapping", Status: "ok"})
 	}
 
 	_, err = client.UpdateTrack(requestCtx, opts.PackageName, currentEditID, manifest.Track, gpc.TrackUpdate{
@@ -203,14 +471,15 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 	if err != nil {
 		return fail("update_track", fmt.Errorf("failed to update track: %w", err))
 	}
-	result.Steps = append(result.Steps, fullStep{Name: "update_track", Status: "ok"})
+	result.Steps = append(result.Steps, fullStep{Name: prefix + "update_track", Status: "ok"})
 
+	writeFullProgress(deps.Stderr, prefix+"validate_edit", "validating Play edit")
 	if err := client.ValidateEdit(requestCtx, opts.PackageName, currentEditID); err != nil {
 		return fail("validate_edit", fmt.Errorf("failed to validate edit: %w", err))
 	}
-	result.Steps = append(result.Steps, fullStep{Name: "validate_edit", Status: "ok"})
+	result.Steps = append(result.Steps, fullStep{Name: prefix + "validate_edit", Status: "ok"})
 
-	if len(opts.VitalsGate) > 0 {
+	if prefix == "deploy_" && len(opts.VitalsGate) > 0 {
 		reportingClient, reportingCtx, reportingCancel, err := buildReportingClient(parentCtx, deps)
 		if err != nil {
 			return fail("create_reporting_client", err)
@@ -231,42 +500,132 @@ func runFull(parentCtx, requestCtx context.Context, client Client, deps Deps, ou
 			result.VitalsGate.Status = "blocked"
 			return fail("vitals_gate_precommit", fmt.Errorf("vitals gate failed"))
 		}
-		result.Steps = append(result.Steps, fullStep{Name: "vitals_gate_precommit", Status: "ok"})
+		result.Steps = append(result.Steps, fullStep{Name: prefix + "vitals_gate_precommit", Status: "ok"})
 	}
 
-	if opts.DryRun {
-		if err := client.DeleteEdit(requestCtx, opts.PackageName, currentEditID); err != nil {
-			return fail("delete_edit_dry_run", fmt.Errorf("failed to delete dry-run edit: %w", err))
-		}
-		result.CleanupPerformed = true
-		result.Status = "dry-run"
-		result.Steps = append(result.Steps, fullStep{Name: "delete_edit_dry_run", Status: "ok"})
-		return shared.WriteJSON(out, result)
-	}
-
-	if _, err := client.CommitEdit(requestCtx, opts.PackageName, currentEditID, false); err != nil {
+	commit, err := shared.CommitEditWithReviewFallback(requestCtx, client, opts.PackageName, currentEditID, false)
+	if err != nil {
 		return fail("commit_edit", fmt.Errorf("failed to commit edit: %w", err))
 	}
-	currentEditID = ""
 	result.Committed = true
+	if commit.ChangesNotSentForReview {
+		result.Warnings = append(result.Warnings, "commit used changesNotSentForReview fallback")
+	}
 	result.Status = "committed"
-	result.Steps = append(result.Steps, fullStep{Name: "commit_edit", Status: "ok"})
+	result.Steps = append(result.Steps, fullStep{Name: prefix + "commit_edit", Status: "ok"})
+	return nil
+}
 
-	if len(opts.VitalsGate) > 0 && opts.VitalsWait > 0 {
-		reportingClient, _, reportingCancel, err := buildReportingClient(parentCtx, deps)
-		if err != nil {
-			result.Status = "failed"
-			result.Steps = append(result.Steps, fullStep{Name: "create_reporting_client", Status: "error", Error: err.Error()})
-			_ = shared.WriteJSON(out, result)
-			return err
-		}
+func writeFullProgress(stderr io.Writer, step, detail string) {
+	if stderr == nil {
+		return
+	}
+	step = strings.TrimSpace(step)
+	detail = strings.TrimSpace(detail)
+	if step == "" && detail == "" {
+		return
+	}
+	if detail == "" {
+		_, _ = fmt.Fprintf(stderr, "[release full] %s\n", step)
+		return
+	}
+	_, _ = fmt.Fprintf(stderr, "[release full] %s: %s\n", step, detail)
+}
+
+func normalizeUploadError(err error) error {
+	if err == nil {
+		return nil
+	}
+	lower := strings.ToLower(err.Error())
+	if strings.Contains(lower, "version code") && strings.Contains(lower, "has already been used") {
+		return fmt.Errorf("artifact version code already exists in Play: rerun readiness first and rebuild only if a new upload is actually required (%w)", err)
+	}
+	if strings.Contains(lower, "http2: client connection lost") ||
+		strings.Contains(lower, "broken pipe") ||
+		strings.Contains(lower, "connection reset by peer") {
+		return fmt.Errorf("retryable upload failure: artifact upload lost its network connection; rerun the same `gpc release full` command (%w)", err)
+	}
+	return err
+}
+
+func runPostReleaseChecks(ctx context.Context, client Client, deps Deps, packageName, track string, result *fullResult) error {
+	edit, err := client.CreateEdit(ctx, packageName)
+	if err != nil {
+		result.Steps = append(result.Steps, fullStep{Name: "post_release_checks", Status: "error", Error: err.Error()})
+		return err
+	}
+	defer client.DeleteEdit(ctx, packageName, edit.ID)
+	if _, err := client.GetTrack(ctx, packageName, edit.ID, track); err != nil {
+		result.Steps = append(result.Steps, fullStep{Name: "post_release_track", Status: "error", Error: err.Error()})
+		return err
+	}
+	result.Steps = append(result.Steps, fullStep{Name: "post_release_track", Status: "ok"})
+	if _, err := client.ListOneTimeProducts(ctx, packageName, 1, "", false); err == nil {
+		result.Steps = append(result.Steps, fullStep{Name: "post_release_products", Status: "ok"})
+	} else {
+		result.Warnings = append(result.Warnings, err.Error())
+	}
+	if _, err := client.ListSubscriptions(ctx, packageName, 1, "", false); err == nil {
+		result.Steps = append(result.Steps, fullStep{Name: "post_release_subscriptions", Status: "ok"})
+	} else {
+		result.Warnings = append(result.Warnings, err.Error())
+	}
+	reportingClient, reportingCtx, reportingCancel, err := buildReportingClient(ctx, deps)
+	if err == nil {
 		defer reportingCancel()
-		if err := monitorVitalsGate(parentCtx, deps, client, reportingClient, &result, opts, manifest, versionCode); err != nil {
-			_ = shared.WriteJSON(out, result)
-			return err
+		if _, err := reportingClient.SearchApps(reportingCtx, 10, "", false); err == nil {
+			result.Steps = append(result.Steps, fullStep{Name: "post_release_reporting", Status: "ok"})
+		} else {
+			result.Warnings = append(result.Warnings, err.Error())
 		}
 	}
-	return shared.WriteJSON(out, result)
+	return nil
+}
+
+func writeFilteredAppInitManifest(path string, include map[string]bool) (string, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	var payload map[string]any
+	if err := yaml.Unmarshal(raw, &payload); err != nil {
+		return "", err
+	}
+	filtered := map[string]any{}
+	for key, value := range payload {
+		if include[key] {
+			filtered[key] = value
+		}
+	}
+	if len(filtered) == 0 {
+		return "", nil
+	}
+	tmp, err := os.CreateTemp("", "gpc-release-appinit-*.yaml")
+	if err != nil {
+		return "", err
+	}
+	defer tmp.Close()
+	encoded, err := yaml.Marshal(filtered)
+	if err != nil {
+		return "", err
+	}
+	if _, err := tmp.Write(encoded); err != nil {
+		return "", err
+	}
+	return tmp.Name(), nil
+}
+
+func dirHasFiles(path string) bool {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return false
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.IsDir() {
+		return false
+	}
+	entries, err := os.ReadDir(path)
+	return err == nil && len(entries) > 0
 }
 
 func uploadManifestArtifact(ctx context.Context, client Client, packageName, editID string, manifest fullManifest) (int64, error) {

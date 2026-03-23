@@ -3,7 +3,6 @@ package release
 import (
 	"archive/zip"
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -14,7 +13,6 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/listing"
 	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
-	"github.com/leszko11/google-play-console-cli/internal/gpc"
 	notesgen "github.com/leszko11/google-play-console-cli/internal/release/notes"
 	"github.com/leszko11/google-play-console-cli/internal/validate"
 	"github.com/peterbourgon/ff/v3/ffcli"
@@ -33,17 +31,18 @@ type verifyCheck struct {
 }
 
 type verifyResult struct {
-	PackageName    string        `json:"packageName"`
-	Track          string        `json:"track"`
-	ProjectDir     string        `json:"projectDir"`
-	BuildTask      string        `json:"buildTask"`
-	ArtifactPath   string        `json:"artifactPath,omitempty"`
-	ListingDir     string        `json:"listingDir,omitempty"`
-	NotesMode      string        `json:"notesMode"`
-	Status         string        `json:"status"`
-	Checks         []verifyCheck `json:"checks"`
-	BlockingIssues []string      `json:"blockingIssues,omitempty"`
-	Warnings       []string      `json:"warnings,omitempty"`
+	PackageName      string        `json:"packageName"`
+	PackageReadiness string        `json:"packageReadiness,omitempty"`
+	Track            string        `json:"track"`
+	ProjectDir       string        `json:"projectDir"`
+	BuildTask        string        `json:"buildTask"`
+	ArtifactPath     string        `json:"artifactPath,omitempty"`
+	ListingDir       string        `json:"listingDir,omitempty"`
+	NotesMode        string        `json:"notesMode"`
+	Status           string        `json:"status"`
+	Checks           []verifyCheck `json:"checks"`
+	BlockingIssues   []string      `json:"blockingIssues,omitempty"`
+	Warnings         []string      `json:"warnings,omitempty"`
 }
 
 type verifyOptions struct {
@@ -82,8 +81,8 @@ func newVerifyCommand(deps Deps) *ffcli.Command {
 
 	fs.StringVar(&packageName, "package-name", defaultStagingPackage, "Target package name")
 	fs.StringVar(&track, "track", defaultTrack, "Target track name")
-	fs.StringVar(&projectDir, "project-dir", ".", "Android project directory")
-	fs.StringVar(&buildTask, "build-task", defaultBuildTask, "Gradle build task for release bundle")
+	fs.StringVar(&projectDir, "project-dir", "", "Android project directory")
+	fs.StringVar(&buildTask, "build-task", "", "Gradle build task for release bundle")
 	fs.StringVar(&aabPath, "aab", "", "Path to prebuilt .aab for artifact validation")
 	fs.BoolVar(&probeTrack, "probe-track", false, "Create temporary edit and probe target track")
 	fs.StringVar(&notesMode, "notes-mode", notesgen.ModeGit, "Release notes mode: git, file, none")
@@ -138,15 +137,43 @@ func runVerify(ctx context.Context, deps Deps, opts verifyOptions) (verifyResult
 	if result.Track == "" {
 		result.Track = defaultTrack
 	}
-	if result.ProjectDir == "" {
-		result.ProjectDir = "."
-	}
-	if result.BuildTask == "" {
-		result.BuildTask = defaultBuildTask
-	}
 	if result.NotesMode == "" {
 		result.NotesMode = notesgen.ModeGit
 	}
+
+	resolvedProjectDir, err := shared.ResolveProjectPath(opts.ProjectDir, func(cfg config.ProjectConfig) string { return cfg.AndroidProjectDir })
+	if err != nil {
+		result.addBlocking("project_dir", err.Error())
+		return finalizeVerifyResult(result), nil
+	}
+	if strings.TrimSpace(resolvedProjectDir) != "" {
+		result.ProjectDir = resolvedProjectDir
+	} else if result.ProjectDir == "" {
+		result.ProjectDir = "."
+	}
+	resolvedBuildTask, err := shared.ResolveProjectValue(opts.BuildTask, func(cfg config.ProjectConfig) string { return cfg.BuildTask })
+	if err != nil {
+		result.addBlocking("gradle_task", err.Error())
+		return finalizeVerifyResult(result), nil
+	}
+	if strings.TrimSpace(resolvedBuildTask) != "" {
+		result.BuildTask = resolvedBuildTask
+	} else if result.BuildTask == "" {
+		result.BuildTask = defaultBuildTask
+	}
+	resolvedArtifactPath, err := shared.ResolveProjectPath(opts.AABPath, func(cfg config.ProjectConfig) string { return cfg.ArtifactPath })
+	if err != nil {
+		result.addBlocking("bundle_artifact", err.Error())
+		return finalizeVerifyResult(result), nil
+	}
+	opts.AABPath = resolvedArtifactPath
+	resolvedNotesFile, err := shared.ResolveProjectPath(opts.NotesFile, func(cfg config.ProjectConfig) string { return cfg.NotesFile })
+	if err != nil {
+		result.addBlocking("notes_source", err.Error())
+		return finalizeVerifyResult(result), nil
+	}
+	opts.NotesFile = resolvedNotesFile
+	prebuiltArtifact := strings.TrimSpace(opts.AABPath) != ""
 
 	if info, err := os.Stat(result.ProjectDir); err != nil || !info.IsDir() {
 		issue := fmt.Sprintf("project directory is not accessible: %s", result.ProjectDir)
@@ -170,16 +197,28 @@ func runVerify(ctx context.Context, deps Deps, opts verifyOptions) (verifyResult
 
 	gradlewPath := filepath.Join(result.ProjectDir, "gradlew")
 	if info, err := os.Stat(gradlewPath); err != nil || info.IsDir() {
-		result.addBlocking("gradle_wrapper", fmt.Sprintf("gradle wrapper not found at %s", gradlewPath))
+		if prebuiltArtifact {
+			result.addWarn("gradle_wrapper", "skipped (prebuilt artifact provided)")
+		} else {
+			result.addBlocking("gradle_wrapper", fmt.Sprintf("gradle wrapper not found at %s", gradlewPath))
+		}
 	} else {
 		result.addOK("gradle_wrapper", gradlewPath)
 	}
 
 	taskListOut, taskErr := deps.RunCommand(ctx, result.ProjectDir, "./gradlew", ":app:tasks", "--all")
 	if taskErr != nil {
-		result.addBlocking("gradle_task", fmt.Sprintf("failed to inspect Gradle tasks: %v", taskErr))
+		if prebuiltArtifact {
+			result.addWarn("gradle_task", "skipped (prebuilt artifact provided)")
+		} else {
+			result.addBlocking("gradle_task", fmt.Sprintf("failed to inspect Gradle tasks: %v", taskErr))
+		}
 	} else if !strings.Contains(strings.ToLower(taskListOut), strings.ToLower(taskToken(result.BuildTask))) {
-		result.addBlocking("gradle_task", fmt.Sprintf("build task %q not found", result.BuildTask))
+		if prebuiltArtifact {
+			result.addWarn("gradle_task", "skipped (prebuilt artifact provided)")
+		} else {
+			result.addBlocking("gradle_task", fmt.Sprintf("build task %q not found", result.BuildTask))
+		}
 	} else {
 		result.addOK("gradle_task", fmt.Sprintf("task %q is available", result.BuildTask))
 	}
@@ -223,17 +262,33 @@ func runVerify(ctx context.Context, deps Deps, opts verifyOptions) (verifyResult
 	defer cancel()
 	result.addOK("service_account", "service account resolved")
 
-	accessErr := client.VerifyPackageAccess(requestCtx, result.PackageName)
-	if accessErr != nil {
-		result.addBlocking("package_access", accessErr.Error())
-		if errors.Is(accessErr, gpc.ErrPackageNotFound) {
-			result.Warnings = append(result.Warnings, "Package is not initialized in Play Console. Upload one artifact manually once, then rerun.")
-		}
+	readiness, readinessErr := shared.DetectPackageReadiness(requestCtx, client, result.PackageName)
+	if readinessErr != nil {
+		result.addBlocking("package_access", readinessErr.Error())
 	} else {
-		result.addOK("package_access", "package access verified")
+		result.PackageReadiness = string(readiness.Status)
+		switch readiness.Status {
+		case shared.PackageReadinessUninitialized:
+			result.addBlocking("package_access", readiness.Detail)
+			if readiness.NextStep != "" {
+				result.Warnings = append(result.Warnings, readiness.NextStep)
+			}
+		case shared.PackageReadinessDraftBootstrapRequired:
+			result.addOK("package_access", "package access verified")
+			result.addWarn("package_readiness", readiness.Detail)
+			if readiness.Warning != "" {
+				result.Warnings = append(result.Warnings, readiness.Warning)
+			}
+			if readiness.NextStep != "" {
+				result.Warnings = append(result.Warnings, readiness.NextStep)
+			}
+		default:
+			result.addOK("package_access", "package access verified")
+			result.addOK("package_readiness", readiness.Detail)
+		}
 	}
 
-	if opts.ProbeTrack && accessErr == nil {
+	if opts.ProbeTrack && readinessErr == nil && readiness.Status != shared.PackageReadinessUninitialized {
 		edit, err := client.CreateEdit(requestCtx, result.PackageName)
 		if err != nil {
 			result.Warnings = append(result.Warnings, fmt.Sprintf("track probe skipped: failed to create edit: %v", err))

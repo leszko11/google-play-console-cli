@@ -20,6 +20,17 @@ func ResolveProjectPath(localValue string, selectPath func(config.ProjectConfig)
 	return "", nil
 }
 
+func ResolveProjectValue(localValue string, selectValue func(config.ProjectConfig) string) (string, error) {
+	if value := strings.TrimSpace(localValue); value != "" {
+		return value, nil
+	}
+	project, err := config.LoadProject()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(selectValue(project.Config)), nil
+}
+
 func ResolveDefaultTrack(localValue string) (string, error) {
 	if value := strings.TrimSpace(localValue); value != "" {
 		return value, nil
