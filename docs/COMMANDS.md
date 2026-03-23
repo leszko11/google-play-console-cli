@@ -201,6 +201,7 @@ make generate-command-docs
 - `gpc monetization sync`
 - `gpc migrate`
 - `gpc migrate fastlane`
+- `gpc migrate fastlane diff`
 - `gpc migrate fastlane import`
 - `gpc notify`
 - `gpc notify webhook`
@@ -764,12 +765,13 @@ USAGE
   sync
 
 FLAGS
-  -confirm=false           Confirm committing the edit (required unless --dry-run)
-  -dir string              Changelog directory
-  -dry-run=false           Create and validate the edit, then delete it instead of updating Play
-  -fallback-locale string  Locale file to reuse when a locale-specific file is missing
-  -package-name string     Package name
-  -track string            Track name
+  -auto-fix-draft-track=false  If a draft-app commit fails because the internal track has a completed release, rewrite that internal release to draft and retry
+  -confirm=false               Confirm committing the edit (required unless --dry-run)
+  -dir string                  Changelog directory
+  -dry-run=false               Create and validate the edit, then delete it instead of updating Play
+  -fallback-locale string      Locale file to reuse when a locale-specific file is missing
+  -package-name string         Package name
+  -track string                Track name
 ```
 
 ## `gpc custom-apps --help`
@@ -873,6 +875,7 @@ USAGE
   commit
 
 FLAGS
+  -auto-fix-draft-track=false         If a draft-app commit fails because the internal track has a completed release, rewrite that internal release to draft and retry
   -changes-not-sent-for-review=false  Indicate that the changes in this edit will not be reviewed until they are explicitly sent for review from the Google Play Console UI
   -confirm=false                      Confirm committing the edit (required unless --dry-run)
   -dry-run=false                      Validate the edit without committing it
@@ -1907,11 +1910,12 @@ USAGE
   sync
 
 FLAGS
-  -confirm=false        Confirm committing the edit (required unless --dry-run)
-  -dir string           Screenshot directory root
-  -dry-run=false        Create and validate the edit, then delete it instead of mutating Play
-  -output string        Output format: json
-  -package-name string  Package name
+  -auto-fix-draft-track=false  If a draft-app commit fails because the internal track has a completed release, rewrite that internal release to draft and retry
+  -confirm=false               Confirm committing the edit (required unless --dry-run)
+  -dir string                  Screenshot directory root
+  -dry-run=false               Create and validate the edit, then delete it instead of mutating Play
+  -output string               Output format: json
+  -package-name string         Package name
 ```
 
 ## `gpc setup --help`
@@ -3294,7 +3298,25 @@ USAGE
   fastlane
 
 SUBCOMMANDS
+  diff    Compare Fastlane metadata against live Play listing and changelog state
   import  Import Fastlane metadata into the local gpc listing/changelog layout
+```
+
+## `gpc migrate fastlane diff --help`
+
+```text
+DESCRIPTION
+  Compare Fastlane metadata against live Play listing and changelog state
+
+USAGE
+  diff
+
+FLAGS
+  -from-dir fastlane    Fastlane metadata root (fastlane, `fastlane/metadata`, or `fastlane/metadata/android`)
+  -output string        Output format: json, table, markdown, yaml
+  -package-name string  Package name
+  -track production     Track name for live release note comparison
+  -version-code 0       Preferred Fastlane changelog version code (falls back to default.txt)
 ```
 
 ## `gpc migrate fastlane import --help`
@@ -4006,11 +4028,12 @@ USAGE
   sync
 
 FLAGS
-  -confirm=false         Confirm committing the edit (required unless --dry-run)
-  -delete-missing=false  Delete remote locales that do not exist locally
-  -dir string            Listings directory root
-  -dry-run=false         Create and validate the edit, then delete it instead of mutating Play
-  -package-name string   Package name
+  -auto-fix-draft-track=false  If a draft-app commit fails because the internal track has a completed release, rewrite that internal release to draft and retry
+  -confirm=false               Confirm committing the edit (required unless --dry-run)
+  -delete-missing=false        Delete remote locales that do not exist locally
+  -dir string                  Listings directory root
+  -dry-run=false               Create and validate the edit, then delete it instead of mutating Play
+  -package-name string         Package name
 ```
 
 ## `gpc purchases --help`

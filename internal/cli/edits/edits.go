@@ -202,12 +202,13 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 	fs := flag.NewFlagSet("commit", flag.ContinueOnError)
 	fs.SetOutput(deps.Stderr)
 	var packageName, editID string
-	var confirm, dryRun, changesNotSentForReview bool
+	var confirm, dryRun, changesNotSentForReview, autoFixDraftTrack bool
 	fs.StringVar(&packageName, "package-name", "", "Package name")
 	fs.StringVar(&editID, "edit-id", "", "Edit ID")
 	fs.BoolVar(&confirm, "confirm", false, "Confirm committing the edit (required unless --dry-run)")
 	fs.BoolVar(&dryRun, "dry-run", false, "Validate the edit without committing it")
 	fs.BoolVar(&changesNotSentForReview, "changes-not-sent-for-review", false, "Indicate that the changes in this edit will not be reviewed until they are explicitly sent for review from the Google Play Console UI")
+	fs.BoolVar(&autoFixDraftTrack, "auto-fix-draft-track", false, "If a draft-app commit fails because the internal track has a completed release, rewrite that internal release to draft and retry")
 
 	return &ffcli.Command{
 		Name:      "commit",
@@ -238,7 +239,10 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 					"validated":   true,
 				})
 			}
-			commit, err := shared.CommitEditWithReviewFallback(requestCtx, client, pkg, editID, changesNotSentForReview)
+			commit, err := shared.CommitEditWithOptions(requestCtx, client, pkg, editID, shared.EditCommitOptions{
+				ChangesNotSentForReview: changesNotSentForReview,
+				AutoFixDraftTrack:       autoFixDraftTrack,
+			})
 			if err != nil {
 				return fmt.Errorf("failed to commit edit: %w", err)
 			}
@@ -248,6 +252,7 @@ func newCommitCommand(deps Deps) *ffcli.Command {
 				"status":                  "committed",
 				"changesNotSentForReview": commit.ChangesNotSentForReview,
 				"commitRetried":           commit.RetriedWithChangesNotSentForReview,
+				"draftTrackAutoFixed":     commit.DraftTrackAutoFixed,
 			})
 		},
 	}

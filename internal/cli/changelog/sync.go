@@ -26,21 +26,23 @@ type Client interface {
 }
 
 type syncOptions struct {
-	PackageName    string
-	Track          string
-	Dir            string
-	FallbackLocale string
-	Confirm        bool
-	DryRun         bool
+	PackageName       string
+	Track             string
+	Dir               string
+	FallbackLocale    string
+	Confirm           bool
+	DryRun            bool
+	AutoFixDraftTrack bool
 }
 
 type syncResult struct {
-	PackageName string              `json:"packageName"`
-	Track       string              `json:"track"`
-	Status      string              `json:"status"`
-	ReleaseName string              `json:"releaseName,omitempty"`
-	Notes       []gpc.LocalizedText `json:"notes,omitempty"`
-	Committed   bool                `json:"committed"`
+	PackageName         string              `json:"packageName"`
+	Track               string              `json:"track"`
+	Status              string              `json:"status"`
+	ReleaseName         string              `json:"releaseName,omitempty"`
+	Notes               []gpc.LocalizedText `json:"notes,omitempty"`
+	Committed           bool                `json:"committed"`
+	DraftTrackAutoFixed bool                `json:"draftTrackAutoFixed,omitempty"`
 }
 
 func newSyncCommand(deps Deps) *ffcli.Command {
@@ -54,6 +56,7 @@ func newSyncCommand(deps Deps) *ffcli.Command {
 	fs.StringVar(&opts.FallbackLocale, "fallback-locale", "", "Locale file to reuse when a locale-specific file is missing")
 	fs.BoolVar(&opts.Confirm, "confirm", false, "Confirm committing the edit (required unless --dry-run)")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Create and validate the edit, then delete it instead of updating Play")
+	fs.BoolVar(&opts.AutoFixDraftTrack, "auto-fix-draft-track", false, "If a draft-app commit fails because the internal track has a completed release, rewrite that internal release to draft and retry")
 
 	return &ffcli.Command{
 		Name:      "sync",
@@ -220,11 +223,16 @@ func runSync(parentCtx, requestCtx context.Context, client Client, out io.Writer
 	if err := client.ValidateEdit(requestCtx, opts.PackageName, edit.ID); err != nil {
 		return fail(fmt.Errorf("failed to validate edit: %w", err))
 	}
-	if _, err := client.CommitEdit(requestCtx, opts.PackageName, edit.ID, false); err != nil {
+	commit, err := shared.CommitEditWithOptions(requestCtx, client, opts.PackageName, edit.ID, shared.EditCommitOptions{
+		AutoFixDraftTrack: opts.AutoFixDraftTrack,
+	})
+	if err != nil {
 		return fail(fmt.Errorf("failed to commit edit: %w", err))
 	}
+	_ = commit
 	result.Status = "committed"
 	result.Committed = true
+	result.DraftTrackAutoFixed = commit.DraftTrackAutoFixed
 	return shared.WriteJSON(out, result)
 }
 

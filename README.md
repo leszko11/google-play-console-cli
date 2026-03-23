@@ -69,6 +69,65 @@ For public apps that are not initialized in Play yet, `gpc release init` generat
 
 ---
 
+## Command Discovery
+
+Use `--help` at every level:
+
+```bash
+gpc --help
+gpc audit --help
+gpc auth --help
+gpc bootstrap --help
+gpc appinit --help
+gpc apps --help
+gpc app-recoveries --help
+gpc changelog --help
+gpc custom-apps --help
+gpc edits --help
+gpc tracks --help
+gpc apks --help
+gpc bundles --help
+gpc deobfuscation --help
+gpc deploy --help
+gpc diff --help
+gpc doctor --help
+gpc e2e --help
+gpc release --help
+gpc rollback --help
+gpc screenshots --help
+gpc setup --help
+gpc status --help
+gpc reviews --help
+gpc reports --help
+gpc orders --help
+gpc external-transactions --help
+gpc device-tier-configs --help
+gpc system-apks --help
+gpc generated-apks --help
+gpc games --help
+gpc subscriptions --help
+gpc monetization --help
+gpc migrate --help
+gpc notify --help
+gpc products --help
+gpc publish --help
+gpc iap --help
+gpc listing --help
+gpc purchases --help
+gpc users --help
+gpc validate --help
+gpc workflow --help
+gpc grants --help
+gpc health --help
+gpc internal-sharing --help
+gpc integrity --help
+gpc watch --help
+gpc update --help
+gpc completion --help
+```
+
+---
+
 ## Install
 
 ### Homebrew
@@ -248,6 +307,7 @@ gpc completion --help
 | `notify` | Webhook, Slack, and Discord notification delivery |
 | `doctor` | Diagnostic pass for auth, access, and fixture health |
 | `games` | Play Games Services: achievements, events, leaderboards |
+| `migrate fastlane diff` | Preview Fastlane listing and changelog drift against live Play |
 | `migrate fastlane import` | Import Fastlane metadata into gpc workspace layout |
 | `integrity decode` | Decode Android Integrity API tokens |
 | `update` | Self-update to latest release |
@@ -376,6 +436,17 @@ EOF
 gpc deploy --package-name com.example.app --aab ./app.aab \
   --track production --status inProgress \
   --release-notes-file release-notes.txt --confirm
+```
+
+### Preview Fastlane metadata before migrating
+
+```bash
+gpc migrate fastlane diff \
+  --package-name com.example.app \
+  --from-dir ./fastlane \
+  --track production \
+  --version-code 123 \
+  --output table
 ```
 
 ### Manage subscriptions from YAML
