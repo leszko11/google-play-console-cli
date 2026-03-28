@@ -109,6 +109,8 @@ make generate-command-docs
 - `gpc release alpha`
 - `gpc release full`
 - `gpc release promote`
+- `gpc release rollback`
+- `gpc release rollback plan`
 - `gpc rollback`
 - `gpc screenshots`
 - `gpc screenshots sync`
@@ -1747,11 +1749,12 @@ USAGE
   release
 
 SUBCOMMANDS
-  init     Initialize a local Android release workspace from package state
-  verify   Run non-mutating release readiness checks
-  alpha    Build staging AAB and deploy to alpha track in one flow
-  full     Deploy a release from a YAML or JSON manifest
-  promote  Promote the latest releasable release from one track to another
+  init      Initialize a local Android release workspace from package state
+  verify    Run non-mutating release readiness checks
+  alpha     Build staging AAB and deploy to alpha track in one flow
+  full      Deploy a release from a YAML or JSON manifest
+  promote   Promote the latest releasable release from one track to another
+  rollback  Read-only rollback planning for staged releases
 ```
 
 ## `gpc release init --help`
@@ -1869,6 +1872,35 @@ FLAGS
   -release-name string  Optional target release name override
   -status string        Optional target release status override
   -to-track string      Target track name
+```
+
+## `gpc release rollback --help`
+
+```text
+DESCRIPTION
+  Read-only rollback planning for staged releases
+
+USAGE
+  rollback
+
+SUBCOMMANDS
+  plan  Inspect track state and suggest the next rollback action
+```
+
+## `gpc release rollback plan --help`
+
+```text
+DESCRIPTION
+  Inspect track state and suggest the next rollback action
+
+USAGE
+  plan
+
+FLAGS
+  -output string        Output format: json or table
+  -package-name string  Target package name
+  -track string         Track name (e.g. production)
+  -vitals-gate string   Comma-separated vitals thresholds (for example: crashRate<2.0,anrRate<0.5)
 ```
 
 ## `gpc rollback --help`

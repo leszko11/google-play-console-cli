@@ -80,6 +80,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newAlphaCommand(deps),
 			newFullCommand(deps),
 			newPromoteCommand(deps),
+			newRollbackCommand(deps),
 		},
 	}
 }
