@@ -86,7 +86,18 @@ Keep CI stages read-only until credentials, package access, and artifact wiring 
 
 Use `gpc release init` once per repo to generate `.gpc.yaml`, `./play/release.yaml`, `./play/appinit.yaml`, and the exported store state. After that, repeat releases can stay on `gpc release full --manifest ./play/release.yaml`.
 
+Use `gpc release init --template staged-rollout` when the repo should default to a production rollout scaffold with `status: inProgress` and a starter `userFraction`.
+
 Use `gpc release rehearse --manifest ./play/release.yaml` as the canonical read-only preflight before any `release full` dry-run or confirm step. It keeps the whole readiness report in one command instead of stitching together `doctor`, `release verify`, and ad hoc track inspection.
+
+To turn Play Developer Reporting vitals into a blocking CI gate, add:
+
+```bash
+gpc reports vitals alert \
+  --package-name "$GPC_TEST_PACKAGE" \
+  --vitals-gate "crashRate<2.0,anrRate<0.5" \
+  --fail-on warning
+```
 
 If the package is still in Play's draft bootstrap state, edit-only validations can fail with `Only releases with status draft may be created on draft app`. In that case, `gpc release full` handles the internal draft bootstrap release before continuing.
 

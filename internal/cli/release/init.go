@@ -21,6 +21,7 @@ import (
 type initOptions struct {
 	PackageName        string
 	Dir                string
+	Template           string
 	Guided             bool
 	Track              string
 	DefaultLocale      string
@@ -76,8 +77,9 @@ func newInitCommand(deps Deps) *ffcli.Command {
 	var opts initOptions
 	fs.StringVar(&opts.PackageName, "package-name", "", "Target package name")
 	fs.StringVar(&opts.Dir, "dir", "./play", "Workspace directory to generate")
+	fs.StringVar(&opts.Template, "template", "internal", "Workspace template: internal or staged-rollout")
 	fs.BoolVar(&opts.Guided, "guided", false, "Prompt for missing values when running in a TTY")
-	fs.StringVar(&opts.Track, "track", "internal", "Default non-production release track")
+	fs.StringVar(&opts.Track, "track", "", "Release track override")
 	fs.StringVar(&opts.DefaultLocale, "default-locale", "", "Default store locale")
 	fs.StringVar(&opts.AndroidProjectDir, "android-project-dir", "", "Android project directory")
 	fs.StringVar(&opts.BuildTask, "build-task", "", "Gradle build task used for release verification")
@@ -277,6 +279,7 @@ func runInit(ctx context.Context, deps Deps, opts initOptions) (initResult, erro
 func validateInitOptions(deps Deps, opts initOptions) (initOptions, error) {
 	opts.PackageName = strings.TrimSpace(opts.PackageName)
 	opts.Dir = strings.TrimSpace(opts.Dir)
+	opts.Template = strings.TrimSpace(opts.Template)
 	opts.Track = strings.TrimSpace(opts.Track)
 	opts.DefaultLocale = strings.TrimSpace(opts.DefaultLocale)
 	opts.AndroidProjectDir = strings.TrimSpace(opts.AndroidProjectDir)
@@ -306,8 +309,20 @@ func validateInitOptions(deps Deps, opts initOptions) (initOptions, error) {
 	if opts.Dir == "" {
 		opts.Dir = "./play"
 	}
+	if opts.Template == "" {
+		opts.Template = "internal"
+	}
+	switch opts.Template {
+	case "internal", "staged-rollout":
+	default:
+		return initOptions{}, shared.UsageErrorf("--template must be one of internal, staged-rollout")
+	}
 	if opts.Track == "" {
-		opts.Track = "internal"
+		if opts.Template == "staged-rollout" {
+			opts.Track = "production"
+		} else {
+			opts.Track = "internal"
+		}
 	}
 	if opts.DefaultLocale == "" {
 		locale, err := shared.ResolveDefaultLocale("")
@@ -381,13 +396,19 @@ func ensureReleaseManifest(opts initOptions) error {
 	if _, err := os.Stat(manifestPath); err == nil {
 		return nil
 	}
-	raw, err := yaml.Marshal(map[string]any{
+	manifest := map[string]any{
 		"artifact":    relativeFrom(filepath.Dir(manifestPath), opts.ArtifactPath),
 		"track":       opts.Track,
-		"status":      "completed",
 		"notesFile":   relativeFrom(filepath.Dir(manifestPath), opts.NotesFile),
 		"notesLocale": opts.DefaultLocale,
-	})
+	}
+	if opts.Template == "staged-rollout" {
+		manifest["status"] = "inProgress"
+		manifest["userFraction"] = 0.1
+	} else {
+		manifest["status"] = "completed"
+	}
+	raw, err := yaml.Marshal(manifest)
 	if err != nil {
 		return err
 	}

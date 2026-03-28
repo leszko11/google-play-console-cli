@@ -144,6 +144,7 @@ make generate-command-docs
 - `gpc reports vitals`
 - `gpc reports vitals get`
 - `gpc reports vitals query`
+- `gpc reports vitals alert`
 - `gpc orders`
 - `gpc orders get`
 - `gpc orders batch-get`
@@ -1821,7 +1822,8 @@ FLAGS
   -notes-file string           Release notes file path
   -package-name string         Target package name
   -strict-export=false         Fail when exported release content is not ready to release
-  -track internal              Default non-production release track
+  -template internal           Workspace template: internal or staged-rollout
+  -track string                Release track override
   -write-project-config=true   Write .gpc.yaml in the repo root
 ```
 
@@ -2401,6 +2403,7 @@ USAGE
 SUBCOMMANDS
   get    Get vitals metric set freshness metadata
   query  Query vitals metric set rows
+  alert  Evaluate vitals thresholds and optionally deliver breach alerts
 ```
 
 ## `gpc reports vitals get --help`
@@ -2430,6 +2433,23 @@ FLAGS
   -input string         Path to vitals query JSON payload (use - for stdin)
   -metric-set string    Vitals metric set
   -package-name string  Package name
+```
+
+## `gpc reports vitals alert --help`
+
+```text
+DESCRIPTION
+  Evaluate vitals thresholds and optionally deliver breach alerts
+
+USAGE
+  alert
+
+FLAGS
+  -fail-on warning       Exit non-zero on warning, critical, or none
+  -package-name string   Package name
+  -slack-webhook string  Slack webhook URL for breach notifications
+  -vitals-gate string    Vitals threshold gate, for example: crashRate<2.0,anrRate<0.5
+  -webhook string        Generic webhook URL for breach notifications
 ```
 
 ## `gpc orders --help`
