@@ -26,6 +26,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		ShortHelp: "Store listing workflows",
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
+			newAuditCommand(deps),
 			newSyncCommand(deps),
 		},
 	}

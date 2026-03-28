@@ -62,6 +62,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		ShortHelp: "Manage monetization subscriptions",
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
+			newAuditCommand(deps),
 			newListCommand(deps),
 			newGetCommand(deps),
 			newSyncCommand(deps),
@@ -648,6 +649,9 @@ func newBasePlansMigratePricesCommand(deps Deps) *ffcli.Command {
 		ShortHelp: "Migrate legacy cohorts to current prices for one base plan",
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
+		Subcommands: []*ffcli.Command{
+			newBasePlansMigratePricesPreviewCommand(deps),
+		},
 		Exec: func(ctx context.Context, _ []string) error {
 			client, pkg, requestCtx, cancel, err := buildClient(ctx, deps, packageName)
 			if err != nil {

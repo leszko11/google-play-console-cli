@@ -173,6 +173,7 @@ make generate-command-docs
 - `gpc games leaderboards list`
 - `gpc games leaderboards get`
 - `gpc subscriptions`
+- `gpc subscriptions audit`
 - `gpc subscriptions list`
 - `gpc subscriptions get`
 - `gpc subscriptions sync`
@@ -188,6 +189,7 @@ make generate-command-docs
 - `gpc subscriptions base-plans batch-update-states`
 - `gpc subscriptions base-plans delete`
 - `gpc subscriptions base-plans migrate-prices`
+- `gpc subscriptions base-plans migrate-prices preview`
 - `gpc subscriptions base-plans batch-migrate-prices`
 - `gpc subscriptions offers`
 - `gpc subscriptions offers list`
@@ -250,6 +252,7 @@ make generate-command-docs
 - `gpc iap delete`
 - `gpc init`
 - `gpc listing`
+- `gpc listing audit`
 - `gpc listing sync`
 - `gpc purchases`
 - `gpc purchases products`
@@ -2858,6 +2861,7 @@ USAGE
   subscriptions
 
 SUBCOMMANDS
+  audit         Audit subscription sync files before mutation
   list          List subscriptions
   get           Get a subscription by product ID
   sync          Sync subscriptions from exported JSON files
@@ -2869,6 +2873,21 @@ SUBCOMMANDS
   archive       Archive a subscription
   base-plans    Manage subscription base plans
   offers        Manage subscription offers under base plans
+```
+
+## `gpc subscriptions audit --help`
+
+```text
+DESCRIPTION
+  Audit subscription sync files before mutation
+
+USAGE
+  audit
+
+FLAGS
+  -dir string     Directory containing exported subscription JSON files
+  -output string  Output format: json, table, markdown, yaml
+  -strict=false   Fail on warnings and errors
 ```
 
 ## `gpc subscriptions list --help`
@@ -3096,9 +3115,28 @@ DESCRIPTION
 USAGE
   migrate-prices
 
+SUBCOMMANDS
+  preview  Preview normalized base plan price migration payload without mutating Play
+
 FLAGS
   -base-plan-id string  Base plan ID
   -confirm=false        Confirm migrating base plan prices (required)
+  -input string         Path to base plan migrate-prices JSON payload (use - for stdin)
+  -package-name string  Package name
+  -product-id string    Subscription product ID
+```
+
+## `gpc subscriptions base-plans migrate-prices preview --help`
+
+```text
+DESCRIPTION
+  Preview normalized base plan price migration payload without mutating Play
+
+USAGE
+  preview
+
+FLAGS
+  -base-plan-id string  Base plan ID
   -input string         Path to base plan migrate-prices JSON payload (use - for stdin)
   -package-name string  Package name
   -product-id string    Subscription product ID
@@ -4135,7 +4173,25 @@ USAGE
   listing
 
 SUBCOMMANDS
-  sync  Sync store listing metadata and images from a directory
+  audit  Audit listing files and screenshot coverage before sync
+  sync   Sync store listing metadata and images from a directory
+```
+
+## `gpc listing audit --help`
+
+```text
+DESCRIPTION
+  Audit listing files and screenshot coverage before sync
+
+USAGE
+  audit
+
+FLAGS
+  -default-locale string   Default locale to require in the listing set
+  -dir string              Directory containing listing locale folders
+  -output string           Output format: json, table, markdown, yaml
+  -screenshots-dir string  Directory containing screenshot locale folders
+  -strict=false            Fail on warnings and errors
 ```
 
 ## `gpc listing sync --help`
