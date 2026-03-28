@@ -79,6 +79,7 @@ gpc audit --help
 gpc auth --help
 gpc bootstrap --help
 gpc appinit --help
+gpc init --help
 gpc apps --help
 gpc app-recoveries --help
 gpc changelog --help
@@ -190,6 +191,7 @@ gpc audit --help
 gpc auth --help
 gpc bootstrap --help
 gpc appinit --help
+gpc init --help
 gpc apps --help
 gpc app-recoveries --help
 gpc changelog --help
@@ -302,6 +304,7 @@ gpc completion --help
 | Command | Description |
 |---------|-------------|
 | `bootstrap` / `appinit` | Export and re-apply app details, listings, screenshots, products, and subscriptions |
+| `init` | Local-first scaffold for `.gpc.yaml`, `play/`, and workflow files |
 | `setup --auto` | One-shot GCP + auth + workspace provisioning |
 | `workflow run` | Declarative multi-step automation from `.gpc/workflow.yml` |
 | `notify` | Webhook, Slack, and Discord notification delivery |
@@ -331,6 +334,18 @@ See [docs/COMMANDS.md](docs/COMMANDS.md) for the complete auto-generated referen
 ---
 
 ## Common Workflows
+
+### Scaffold a repo before connecting Play
+
+```bash
+gpc init \
+  --package-name com.example.app \
+  --dir ./play
+```
+
+`gpc init` is local-only. It creates the standard `play/` workspace, `.gpc.yaml`, `play/release.yaml`, `play/appinit.yaml`, and `.gpc/workflow.yml` without requiring auth or calling Play APIs.
+
+Use `gpc init` when you want to adopt the repo layout first. Use `gpc bootstrap` or `gpc release init` only when you want to read live Play state.
 
 ### CI/CD: Deploy on merge
 

@@ -15,7 +15,7 @@ func TestRegisterAddsCoreCommands(t *testing.T) {
 		got[c.Name] = true
 	}
 
-	for _, name := range []string{"auth", "bootstrap", "appinit", "apps", "app-recoveries", "changelog", "custom-apps", "edits", "tracks", "apks", "bundles", "deobfuscation", "deploy", "diff", "doctor", "e2e", "release", "rollback", "status", "reviews", "orders", "external-transactions", "device-tier-configs", "system-apks", "generated-apks", "games", "subscriptions", "monetization", "migrate", "notify", "products", "publish", "iap", "listing", "purchases", "users", "validate", "grants", "internal-sharing", "integrity", "update", "completion"} {
+	for _, name := range []string{"auth", "bootstrap", "appinit", "apps", "app-recoveries", "changelog", "custom-apps", "edits", "tracks", "apks", "bundles", "deobfuscation", "deploy", "diff", "doctor", "e2e", "release", "rollback", "status", "reviews", "orders", "external-transactions", "device-tier-configs", "system-apks", "generated-apks", "games", "subscriptions", "monetization", "migrate", "notify", "products", "publish", "iap", "init", "listing", "purchases", "users", "validate", "grants", "internal-sharing", "integrity", "update", "completion"} {
 		if !got[name] {
 			t.Fatalf("expected subcommand %q, got %#v", name, got)
 		}
