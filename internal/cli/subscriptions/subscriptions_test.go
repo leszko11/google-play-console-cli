@@ -800,6 +800,64 @@ func TestSubscriptionsBasePlansMigratePrices_ReturnsStatusMigrated(t *testing.T)
 	}
 }
 
+func TestSubscriptionsBasePlansMigratePricesPreview_ResolvesRegionsVersionWithoutMutation(t *testing.T) {
+	payloadPath := writeBasePlanMigratePayload(t)
+	fc := &fakeClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return fc, nil
+		},
+	}
+
+	out, err := runSubscriptions(
+		t,
+		deps,
+		"base-plans", "migrate-prices", "preview",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--base-plan-id", "monthly",
+		"--input", payloadPath,
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+	for _, want := range []string{`"status":"preview"`, `"regionsVersion":"2026/01"`, `"regionalPriceMigrationCount":1`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+	if fc.basePlanMigrateInput != nil {
+		t.Fatalf("preview should not trigger a migrate call, got %+v", fc.basePlanMigrateInput)
+	}
+}
+
+func TestSubscriptionsBasePlansMigratePricesPreview_RequiresMigrations(t *testing.T) {
+	payloadPath := filepath.Join(t.TempDir(), "empty-migrate.json")
+	if err := os.WriteFile(payloadPath, []byte(`{"regionalPriceMigrations":[]}`), 0o600); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) {
+			return &fakeClient{}, nil
+		},
+	}
+
+	_, err := runSubscriptions(
+		t,
+		deps,
+		"base-plans", "migrate-prices", "preview",
+		"--package-name", "com.example.app",
+		"--product-id", "premium_monthly",
+		"--base-plan-id", "monthly",
+		"--input", payloadPath,
+	)
+	if err == nil || !strings.Contains(err.Error(), "must include at least one regional price migration") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestSubscriptionsBasePlansBatchMigratePrices_RequiresConfirm(t *testing.T) {
 	payloadPath := writeBasePlanBatchMigratePayload(t)
 	deps := Deps{
