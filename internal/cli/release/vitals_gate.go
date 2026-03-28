@@ -19,6 +19,11 @@ const (
 
 var errVitalsValueUnavailable = errors.New("vitals value unavailable")
 
+type VitalsGateCondition = vitalsGateCondition
+type VitalsGateCheck = fullVitalsGateCheck
+
+var ErrVitalsValueUnavailable = errVitalsValueUnavailable
+
 type vitalsGateCondition struct {
 	Metric      string                       `json:"metric"`
 	MetricSet   gpc.ReportingVitalsMetricSet `json:"-"`
@@ -187,4 +192,12 @@ func compareVitalsGate(actual float64, operator string, threshold float64) bool 
 	default:
 		return false
 	}
+}
+
+func ParseVitalsGate(raw string) ([]VitalsGateCondition, error) {
+	return parseVitalsGate(raw)
+}
+
+func EvaluateVitalsGate(ctx context.Context, client ReportingClient, packageName string, now time.Time, conditions []VitalsGateCondition) ([]VitalsGateCheck, error) {
+	return evaluateVitalsGate(ctx, client, packageName, now, conditions)
 }

@@ -255,6 +255,63 @@ func TestReleaseInitWritesProjectDefaults(t *testing.T) {
 	}
 }
 
+func TestReleaseInitDefaultTemplateRemainsInternal(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	deps := baseReleaseDeps(t, &fakeReleaseClient{})
+	seedInitAuth(t, &deps, root)
+	deps.RunBootstrap = func(_ context.Context, _ []string) error {
+		return os.WriteFile(filepath.Join(root, "play", "appinit.yaml"), []byte("appDetails:\n  defaultLanguage: en-US\n"), 0o600)
+	}
+
+	if _, err := runInitCommand(t, deps, "--package-name", "com.example.app", "--dir", "./play"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "play", "release.yaml"))
+	if err != nil {
+		t.Fatalf("read release manifest: %v", err)
+	}
+	got := string(raw)
+	for _, want := range []string{"track: internal", "status: completed"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in manifest: %s", want, got)
+		}
+	}
+}
+
+func TestReleaseInitStagedRolloutTemplateWritesProductionManifest(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	deps := baseReleaseDeps(t, &fakeReleaseClient{})
+	seedInitAuth(t, &deps, root)
+	deps.RunBootstrap = func(_ context.Context, _ []string) error {
+		return os.WriteFile(filepath.Join(root, "play", "appinit.yaml"), []byte("appDetails:\n  defaultLanguage: en-US\n"), 0o600)
+	}
+
+	if _, err := runInitCommand(t, deps, "--package-name", "com.example.app", "--dir", "./play", "--template", "staged-rollout"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	manifestRaw, err := os.ReadFile(filepath.Join(root, "play", "release.yaml"))
+	if err != nil {
+		t.Fatalf("read release manifest: %v", err)
+	}
+	manifest := string(manifestRaw)
+	for _, want := range []string{"track: production", "status: inProgress", "userFraction: 0.1"} {
+		if !strings.Contains(manifest, want) {
+			t.Fatalf("missing %q in manifest: %s", want, manifest)
+		}
+	}
+	workflowRaw, err := os.ReadFile(filepath.Join(root, ".gpc", "workflow.yml"))
+	if err != nil {
+		t.Fatalf("read workflow: %v", err)
+	}
+	if !strings.Contains(string(workflowRaw), "release full --package-name ${packageName}") {
+		t.Fatalf("unexpected workflow: %s", string(workflowRaw))
+	}
+}
+
 func TestReleaseInitAuthRequired(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)

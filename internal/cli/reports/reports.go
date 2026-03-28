@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -35,7 +36,9 @@ type Deps struct {
 	LoadConfig         func() (config.Config, error)
 	NewClient          func(context.Context, gpc.CredentialInput) (Client, error)
 	NewFinancialClient func(context.Context, gpc.CredentialInput) (FinancialClient, error)
+	HTTPClient         httpDoer
 	LookupEnv          func(string) string
+	Now                func() time.Time
 	Stdin              io.Reader
 	Stdout             io.Writer
 	Stderr             io.Writer
@@ -100,8 +103,14 @@ func withDefaults(deps Deps) Deps {
 			return NewFinancialClient(ctx, creds)
 		}
 	}
+	if deps.HTTPClient == nil {
+		deps.HTTPClient = http.DefaultClient
+	}
 	if deps.LookupEnv == nil {
 		deps.LookupEnv = os.Getenv
+	}
+	if deps.Now == nil {
+		deps.Now = time.Now
 	}
 	if deps.Stdin == nil {
 		deps.Stdin = os.Stdin
@@ -123,6 +132,7 @@ func newVitalsCommand(deps Deps) *ffcli.Command {
 		Subcommands: []*ffcli.Command{
 			newVitalsGetCommand(deps),
 			newVitalsQueryCommand(deps),
+			newVitalsAlertCommand(deps),
 		},
 	}
 }

@@ -3,11 +3,14 @@ package reports
 import (
 	"bytes"
 	"context"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
+	playdeveloperreporting "google.golang.org/api/playdeveloperreporting/v1beta1"
 )
 
 type fakeClient struct {
@@ -33,6 +36,17 @@ type fakeClient struct {
 	capturedPaginate    bool
 	capturedInterval    gpc.ReportingInterval
 	capturedSampleLimit int64
+}
+
+type fakeHTTPClient struct {
+	requests []capturedRequest
+	status   int
+	err      error
+}
+
+type capturedRequest struct {
+	URL  string
+	Body string
 }
 
 func (f *fakeClient) SearchApps(_ context.Context, pageSize int64, pageToken string, paginate bool) (gpc.ReportingAppsListInfo, error) {
@@ -84,6 +98,26 @@ func (f *fakeClient) QueryVitalsMetricSet(_ context.Context, packageName string,
 	f.capturedMetricSet = metricSet
 	f.capturedQuery = request
 	return f.queryResult, f.queryErr
+}
+
+func (f *fakeHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	body, _ := io.ReadAll(req.Body)
+	f.requests = append(f.requests, capturedRequest{
+		URL:  req.URL.String(),
+		Body: string(body),
+	})
+	if f.err != nil {
+		return nil, f.err
+	}
+	status := f.status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	return &http.Response{
+		StatusCode: status,
+		Body:       io.NopCloser(strings.NewReader("ok")),
+		Header:     make(http.Header),
+	}, nil
 }
 
 func runReports(t *testing.T, deps Deps, args ...string) (string, error) {
@@ -443,5 +477,138 @@ func TestReportsSummary_WarnsWhenPackageNotVisible(t *testing.T) {
 	}
 	if !strings.Contains(out, `"status":"warn"`) || !strings.Contains(out, `"visible":false`) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestReportsVitalsAlertWarnsAndDeliversNotifications(t *testing.T) {
+	fc := &fakeClient{
+		queryResult: gpc.ReportingVitalsQueryResult{
+			Rows: []*gpc.ReportingMetricsRow{
+				metricsRow("crashRate", "2.4"),
+			},
+		},
+	}
+	httpClient := &fakeHTTPClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+		HTTPClient: httpClient,
+	}
+
+	out, err := runReports(t, deps, "vitals", "alert", "--package-name", "com.example.app", "--vitals-gate", "crashRate<2.0", "--slack-webhook", "https://hooks.slack.test/1", "--webhook", "https://example.com/alert")
+	if err == nil || !strings.Contains(err.Error(), "vitals alert status warning breached fail-on=warning") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{`"status":"warning"`, `"breachCount":1`, `"provider":"slack"`, `"provider":"webhook"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got %s", want, out)
+		}
+	}
+	if len(httpClient.requests) != 2 {
+		t.Fatalf("expected 2 alert requests, got %d", len(httpClient.requests))
+	}
+	if !strings.Contains(httpClient.requests[0].Body, "GPC vitals alert WARNING for com.example.app") {
+		t.Fatalf("unexpected slack payload: %s", httpClient.requests[0].Body)
+	}
+	if !strings.Contains(httpClient.requests[1].Body, `"packageName":"com.example.app"`) {
+		t.Fatalf("unexpected webhook payload: %s", httpClient.requests[1].Body)
+	}
+}
+
+func TestReportsVitalsAlertCriticalOnlyFailsOnCritical(t *testing.T) {
+	fc := &fakeClient{
+		queryResult: gpc.ReportingVitalsQueryResult{
+			Rows: []*gpc.ReportingMetricsRow{
+				metricsRow("crashRate", "2.4"),
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+	}
+
+	out, err := runReports(t, deps, "vitals", "alert", "--package-name", "com.example.app", "--vitals-gate", "crashRate<2.0", "--fail-on", "critical")
+	if err != nil {
+		t.Fatalf("expected warning status to pass with --fail-on critical, got %v", err)
+	}
+	if !strings.Contains(out, `"status":"warning"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestReportsVitalsAlertCriticalStatusFromMultipleBreaches(t *testing.T) {
+	fc := &fakeClient{
+		queryResult: gpc.ReportingVitalsQueryResult{
+			Rows: []*gpc.ReportingMetricsRow{
+				metricsRow("crashRate", "2.4"),
+				metricsRow("anrRate", "0.8"),
+			},
+		},
+	}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+	}
+
+	out, err := runReports(t, deps, "vitals", "alert", "--package-name", "com.example.app", "--vitals-gate", "crashRate<2.0,anrRate<0.5", "--fail-on", "critical")
+	if err == nil || !strings.Contains(err.Error(), "vitals alert status critical breached fail-on=critical") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, `"status":"critical"`) || !strings.Contains(out, `"breachCount":2`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestReportsVitalsAlertSkipsNotificationsWhenHealthy(t *testing.T) {
+	fc := &fakeClient{
+		queryResult: gpc.ReportingVitalsQueryResult{
+			Rows: []*gpc.ReportingMetricsRow{
+				metricsRow("crashRate", "1.4"),
+			},
+		},
+	}
+	httpClient := &fakeHTTPClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return fc, nil },
+		HTTPClient: httpClient,
+	}
+
+	out, err := runReports(t, deps, "vitals", "alert", "--package-name", "com.example.app", "--vitals-gate", "crashRate<2.0", "--webhook", "https://example.com/alert")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, `"status":"ok"`) {
+		t.Fatalf("unexpected output: %s", out)
+	}
+	if len(httpClient.requests) != 0 {
+		t.Fatalf("expected no notifications for healthy result, got %d", len(httpClient.requests))
+	}
+}
+
+func TestReportsVitalsAlertRejectsUnsupportedMetric(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		NewClient:  func(context.Context, gpc.CredentialInput) (Client, error) { return &fakeClient{}, nil },
+	}
+
+	_, err := runReports(t, deps, "vitals", "alert", "--package-name", "com.example.app", "--vitals-gate", "slowStartRate<2.0")
+	if err == nil || !strings.Contains(err.Error(), `unsupported vitals gate metric "slowStartRate"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func metricsRow(metric, value string) *gpc.ReportingMetricsRow {
+	return &gpc.ReportingMetricsRow{
+		AggregationPeriod: "FULL_RANGE",
+		Metrics: []*playdeveloperreporting.GooglePlayDeveloperReportingV1beta1MetricValue{
+			{
+				Metric: metric,
+				DecimalValue: &playdeveloperreporting.GoogleTypeDecimal{
+					Value: value,
+				},
+			},
+		},
 	}
 }
