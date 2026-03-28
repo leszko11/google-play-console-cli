@@ -47,6 +47,7 @@
 - `bundles`: Manage Android App Bundles in an edit
 - `deobfuscation`: Manage deobfuscation files in an edit
 - `deploy`: Upload artifact and publish to a track in one flow
+- `drift`: Aggregate read-only workspace drift against live Play state
 - `diff`: Compare live Play state against local listing or track drafts
 - `doctor`: Run read-only diagnostics for auth, package access, and e2e fixtures
 - `e2e`: E2E fixture and smoke-testing helpers
@@ -70,6 +71,7 @@
 - `products`: Manage monetization one-time products
 - `publish`: Common publish flows with track presets
 - `iap`: Manage legacy in-app products
+- `init`: Create a local gpc workspace scaffold without calling Play APIs
 - `listing`: Store listing workflows
 - `purchases`: Manage one-time and subscription purchases
 - `users`: Manage Play Console account users

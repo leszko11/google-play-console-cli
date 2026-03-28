@@ -3,6 +3,8 @@ package status
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,6 +13,8 @@ import (
 )
 
 type fakeClient struct {
+	verifyPackageErr error
+
 	createEdit    gpc.EditInfo
 	createEditErr error
 
@@ -22,6 +26,13 @@ type fakeClient struct {
 
 	reviews    gpc.ReviewsListInfo
 	reviewsErr error
+
+	subscriptions    gpc.SubscriptionsListInfo
+	subscriptionsErr error
+}
+
+func (f *fakeClient) VerifyPackageAccess(_ context.Context, _ string) error {
+	return f.verifyPackageErr
 }
 
 func (f *fakeClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, error) {
@@ -32,6 +43,10 @@ func (f *fakeClient) CreateEdit(_ context.Context, _ string) (gpc.EditInfo, erro
 		return gpc.EditInfo{ID: "edit-1"}, nil
 	}
 	return f.createEdit, nil
+}
+
+func (f *fakeClient) ValidateEdit(_ context.Context, _, _ string) error {
+	return nil
 }
 
 func (f *fakeClient) DeleteEdit(_ context.Context, _, _ string) error {
@@ -76,6 +91,18 @@ func (f *fakeClient) ListReviews(_ context.Context, _ string, _, _ int64, _, _ s
 		}, nil
 	}
 	return f.reviews, nil
+}
+
+func (f *fakeClient) ListSubscriptions(_ context.Context, _ string, _ int64, _ string, _ bool) (gpc.SubscriptionsListInfo, error) {
+	if f.subscriptionsErr != nil {
+		return gpc.SubscriptionsListInfo{}, f.subscriptionsErr
+	}
+	if len(f.subscriptions.Subscriptions) == 0 {
+		return gpc.SubscriptionsListInfo{
+			Subscriptions: []gpc.SubscriptionInfo{{ProductID: "monthly"}, {ProductID: "yearly"}},
+		}, nil
+	}
+	return f.subscriptions, nil
 }
 
 func defaultConfig() config.Config {
@@ -264,5 +291,70 @@ func TestStatusYAMLOutput(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in output: %s", want, out)
 		}
+	}
+}
+
+func TestStatusIncludeSectionsAddsDashboardData(t *testing.T) {
+	root := t.TempDir()
+	listingDir := filepath.Join(root, "play", "listing", "en-US")
+	screenshotsDir := filepath.Join(root, "play", "screenshots", "en-US")
+	subscriptionsDir := filepath.Join(root, "play", "subscriptions")
+	changelogDir := filepath.Join(root, "play", "changelog")
+	for _, dir := range []string{listingDir, screenshotsDir, subscriptionsDir, changelogDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+	for name, contents := range map[string]string{
+		filepath.Join(listingDir, "title.txt"):             "Example title",
+		filepath.Join(listingDir, "short-description.txt"): "Example short description",
+		filepath.Join(listingDir, "full-description.txt"):  "Example full description for Android listing.",
+		filepath.Join(subscriptionsDir, "monthly.json"):    `{"subscription":{"productId":"monthly","basePlans":[{"basePlanId":"monthly"}],"listings":{"en-US":{"title":"Monthly","benefits":["One"]}}}}`,
+	} {
+		if err := os.WriteFile(name, []byte(contents), 0o600); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	client := &fakeClient{}
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) { return defaultConfig(), nil },
+		LoadProject: func() (config.ProjectConfigInfo, error) {
+			return config.ProjectConfigInfo{Config: config.ProjectConfig{
+				DefaultLocale:    "en-US",
+				ListingDir:       filepath.Join(root, "play", "listing"),
+				ScreenshotsDir:   filepath.Join(root, "play", "screenshots"),
+				SubscriptionsDir: subscriptionsDir,
+				ChangelogDir:     changelogDir,
+			}}, nil
+		},
+		NewClient: func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runCommand(t, deps, "--package-name", "com.example.app", "--include", "tracks,reviews,auth,readiness,listing,subscriptions", "--output", "json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{`"auth":{`, `"readiness":{`, `"listing":{`, `"subscriptions":{`, `"remoteCount":2`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in output: %s", want, out)
+		}
+	}
+}
+
+func TestStatusIncludeAbsentPreservesDefaultShape(t *testing.T) {
+	client := &fakeClient{}
+	deps := Deps{
+		LoadConfig:  func() (config.Config, error) { return defaultConfig(), nil },
+		LoadProject: func() (config.ProjectConfigInfo, error) { return config.ProjectConfigInfo{}, nil },
+		NewClient:   func(context.Context, gpc.CredentialInput) (Client, error) { return client, nil },
+	}
+
+	out, err := runCommand(t, deps, "--package-name", "com.example.app", "--output", "json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(out, `"auth":`) || strings.Contains(out, `"listing":`) || strings.Contains(out, `"subscriptions":`) {
+		t.Fatalf("expected default shape without new sections, got %s", out)
 	}
 }

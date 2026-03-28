@@ -37,6 +37,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
 			NewInitCommand(deps),
+			NewExplainCommand(deps),
 			NewStatusCommand(deps),
 			NewProfilesCommand(deps),
 			NewSwitchCommand(deps),

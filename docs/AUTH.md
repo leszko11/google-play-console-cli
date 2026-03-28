@@ -58,6 +58,25 @@ Legacy profiles without `storage` keep the previous behavior:
 - `managedCredentialPath`: managed `~/.gpc/credentials/...` path when relevant
 - `warnings`: fallback/bypass/unavailable notes
 
+Use `gpc auth explain` when you need the full resolution chain instead of the summarized health view. It is especially useful in CI and shared shells where config, env, and bypass flags can mix:
+
+```bash
+gpc auth explain --output table
+gpc auth explain --output json
+```
+
+`gpc auth explain` includes:
+
+- selected and active profile
+- config path in use
+- env override presence
+- keychain availability and bypass state
+- persisted profile storage mode
+- final credential source selection
+- mixed-source risk
+- strict-auth failure risk
+- a CI-safe recommended invocation
+
 `authenticated=true` is only returned when credentials are locally valid:
 
 - keychain source: JSON exists and parses

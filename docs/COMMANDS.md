@@ -22,6 +22,7 @@ make generate-command-docs
 - `gpc audit show`
 - `gpc auth`
 - `gpc auth init`
+- `gpc auth explain`
 - `gpc auth status`
 - `gpc auth profiles`
 - `gpc auth profiles list`
@@ -430,6 +431,7 @@ USAGE
 
 SUBCOMMANDS
   init      Initialize authentication profile
+  explain   Explain how credentials are resolved for the current profile
   status    Show authentication status
   profiles  Manage authentication profiles
   switch    Switch active authentication profile
@@ -452,6 +454,19 @@ FLAGS
   -prompt-developer-id=false  Prompt for developer ID when missing (interactive terminals only)
   -service-account string     Path to service account JSON
   -storage auto               Credential storage backend: auto, keychain, path
+```
+
+## `gpc auth explain --help`
+
+```text
+DESCRIPTION
+  Explain how credentials are resolved for the current profile
+
+USAGE
+  explain
+
+FLAGS
+  -output string  Output format: json, table
 ```
 
 ## `gpc auth status --help`
@@ -2049,6 +2064,7 @@ USAGE
   status
 
 FLAGS
+  -include string       Comma-separated sections: tracks,reviews,auth,readiness,listing,subscriptions
   -output string        Output format: json, table, markdown, yaml, minimal
   -package-name string  Package name
 ```
