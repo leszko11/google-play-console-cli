@@ -243,6 +243,7 @@ make generate-command-docs
 - `gpc iap batch-update`
 - `gpc iap batch-delete`
 - `gpc iap delete`
+- `gpc init`
 - `gpc listing`
 - `gpc listing sync`
 - `gpc purchases`
@@ -338,6 +339,7 @@ SUBCOMMANDS
   products               Manage monetization one-time products
   publish                Common publish flows with track presets
   iap                    Manage legacy in-app products
+  init                   Create a local gpc workspace scaffold without calling Play APIs
   listing                Store listing workflows
   purchases              Manage one-time and subscription purchases
   users                  Manage Play Console account users
@@ -4003,6 +4005,29 @@ FLAGS
   -confirm=false        Confirm deleting the in-app product (required)
   -package-name string  Package name
   -sku string           In-app product SKU
+```
+
+## `gpc init --help`
+
+```text
+DESCRIPTION
+  Create a local gpc workspace scaffold without calling Play APIs
+
+USAGE
+  init
+
+FLAGS
+  -android-project-dir ./android  Android project directory
+  -artifact-path string           Release artifact path
+  -build-task :app:bundleRelease  Gradle build task used for release verification
+  -default-locale en-US           Default store locale
+  -dir ./play                     Workspace directory to create
+  -notes-file string              Release notes file path
+  -output string                  Output format: json, table
+  -package-name string            Package name to persist into the local scaffold
+  -track internal                 Default non-production release track
+  -write-project-config=true      Write .gpc.yaml with project-local defaults
+  -write-workflow=true            Write .gpc/workflow.yml scaffold
 ```
 
 ## `gpc listing --help`

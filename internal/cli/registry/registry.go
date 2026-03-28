@@ -24,6 +24,7 @@ import (
 	"github.com/leszko11/google-play-console-cli/internal/cli/grants"
 	"github.com/leszko11/google-play-console-cli/internal/cli/health"
 	"github.com/leszko11/google-play-console-cli/internal/cli/iap"
+	"github.com/leszko11/google-play-console-cli/internal/cli/initcmd"
 	"github.com/leszko11/google-play-console-cli/internal/cli/integrity"
 	"github.com/leszko11/google-play-console-cli/internal/cli/internalsharing"
 	"github.com/leszko11/google-play-console-cli/internal/cli/listing"
@@ -99,6 +100,7 @@ func Register(root *ffcli.Command, deps Deps) {
 		products.NewCommand(products.Deps{}),
 		publish.NewCommand(publish.Deps{}),
 		iap.NewCommand(iap.Deps{}),
+		initcmd.NewCommand(initcmd.Deps{}),
 		listing.NewCommand(listing.Deps{}),
 		purchases.NewCommand(purchases.Deps{}),
 		users.NewCommand(users.Deps{}),
