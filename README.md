@@ -90,6 +90,7 @@ gpc bundles --help
 gpc deobfuscation --help
 gpc deploy --help
 gpc diff --help
+gpc drift --help
 gpc doctor --help
 gpc e2e --help
 gpc release --help
@@ -201,6 +202,7 @@ gpc bundles --help
 gpc deobfuscation --help
 gpc deploy --help
 gpc diff --help
+gpc drift --help
 gpc doctor --help
 gpc e2e --help
 gpc release --help
@@ -265,6 +267,7 @@ gpc completion --help
 | `edits listings` | CRUD for localized store listings |
 | `edits images` | Upload, list, delete store images |
 | `diff listing` | Preview listing drift before syncing |
+| `drift report` | Roll up live-vs-local drift across listings, screenshots, changelogs, products, subscriptions, and optional track intent |
 
 ### Monetization
 
@@ -358,6 +361,18 @@ gpc doctor --package-name com.example.app
 ```
 
 `release init` exports the current Play state into `./play`, writes `.gpc.yaml`, and generates `.gpc/workflow.yml`.
+
+### Audit workspace drift before sync or release
+
+```bash
+gpc drift report \
+  --package-name com.example.app \
+  --dir ./play \
+  --track internal \
+  --output table
+```
+
+Use `drift report` for the operator-level rollup. Use `diff listing`, `diff track`, or the surface-specific sync commands when you need the exact low-level change set for one area.
 
 It also writes `./play/bootstrap-state.json`, which records the last known package readiness and whether an internal draft bootstrap release already exists.
 

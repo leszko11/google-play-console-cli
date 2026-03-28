@@ -96,6 +96,8 @@ make generate-command-docs
 - `gpc deobfuscation`
 - `gpc deobfuscation upload`
 - `gpc deploy`
+- `gpc drift`
+- `gpc drift report`
 - `gpc diff`
 - `gpc diff listing`
 - `gpc diff track`
@@ -315,6 +317,7 @@ SUBCOMMANDS
   bundles                Manage Android App Bundles in an edit
   deobfuscation          Manage deobfuscation files in an edit
   deploy                 Upload artifact and publish to a track in one flow
+  drift                  Aggregate read-only workspace drift against live Play state
   diff                   Compare live Play state against local listing or track drafts
   doctor                 Run read-only diagnostics for auth, package access, and e2e fixtures
   e2e                    E2E fixture and smoke-testing helpers
@@ -1624,6 +1627,44 @@ FLAGS
   -track string                Track name (e.g. internal, production)
   -update-priority 0           In-app update priority (0-5)
   -user-fraction -1            Rollout user fraction (0-1)
+```
+
+## `gpc drift --help`
+
+```text
+DESCRIPTION
+  Aggregate read-only workspace drift against live Play state
+
+USAGE
+  drift
+
+SUBCOMMANDS
+  report  Roll up read-only drift across store content surfaces
+```
+
+## `gpc drift report --help`
+
+```text
+DESCRIPTION
+  Roll up read-only drift across store content surfaces
+
+USAGE
+  report
+
+FLAGS
+  -dir string                  Workspace root containing listing/, screenshots/, changelog/, products/, and subscriptions/
+  -include value               Surface(s) to include: listing, screenshots, changelog, products, subscriptions, track
+  -output string               Output format: json, table, markdown, yaml
+  -package-name string         Package name
+  -release-name string         Desired track release name
+  -release-notes-file string   Desired release notes file
+  -release-notes-locale en-US  Desired release notes locale
+  -release-notes-text string   Desired inline release notes text
+  -status string               Desired track release status (draft, inProgress, halted, completed)
+  -track string                Track name for changelog and optional track drift
+  -update-priority 0           Desired in-app update priority (0-5)
+  -user-fraction -1            Desired rollout user fraction (0-1)
+  -version-codes string        Comma-separated version codes for desired track state
 ```
 
 ## `gpc diff --help`
