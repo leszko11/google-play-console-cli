@@ -108,6 +108,7 @@ make generate-command-docs
 - `gpc release verify`
 - `gpc release alpha`
 - `gpc release full`
+- `gpc release rehearse`
 - `gpc release promote`
 - `gpc release rollback`
 - `gpc release rollback plan`
@@ -1755,6 +1756,7 @@ SUBCOMMANDS
   verify    Run non-mutating release readiness checks
   alpha     Build staging AAB and deploy to alpha track in one flow
   full      Deploy a release from a YAML or JSON manifest
+  rehearse  Compose a read-only release readiness rehearsal
   promote   Promote the latest releasable release from one track to another
   rollback  Read-only rollback planning for staged releases
 ```
@@ -1855,6 +1857,26 @@ FLAGS
   -package-name string            Target package name
   -vitals-gate string             Comma-separated vitals thresholds (for example: crashRate<2.0,anrRate<0.5)
   -vitals-wait 0s                 Monitor vitals after commit for the given duration
+```
+
+## `gpc release rehearse --help`
+
+```text
+DESCRIPTION
+  Compose a read-only release readiness rehearsal
+
+USAGE
+  rehearse
+
+FLAGS
+  -auto-halt-on-regression=false  Plan to halt an in-progress rollout if monitored vitals cross the configured thresholds
+  -manifest string                Path to release manifest (.json/.yaml/.yml)
+  -output string                  Output format: json or table
+  -package-name string            Target package name
+  -probe-track=false              Run the track probe during embedded release verify checks
+  -strict=false                   Treat warnings as blocking
+  -vitals-gate string             Comma-separated vitals thresholds (for example: crashRate<2.0,anrRate<0.5)
+  -vitals-wait 0s                 Planned post-release vitals monitoring duration
 ```
 
 ## `gpc release promote --help`
