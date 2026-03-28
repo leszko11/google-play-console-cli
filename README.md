@@ -253,6 +253,7 @@ gpc completion --help
 | `release alpha` | One-command staging release with build verification |
 | `release full` | Vitals-gated staged rollout with `--auto-halt-on-regression` |
 | `release promote` | Promote releases between tracks |
+| `release rollback plan` | Read-only incident planner before halting a rollout |
 | `rollback` | Revert a track to previous release |
 | `publish alpha/production` | Composite shortcut with built-in bundle processing wait |
 | `validate` | Pre-submission gate for listings, assets, and edit validation |
@@ -402,6 +403,17 @@ gpc release full \
   --auto-halt-on-regression \
   --confirm
 ```
+
+### Plan a rollback before halting a rollout
+
+```bash
+gpc release rollback plan \
+  --package-name com.example.app \
+  --track production \
+  --vitals-gate 'crashRate<2.0,anrRate<0.5'
+```
+
+`release rollback plan` is read-only. It inspects the live track through a transient edit, summarizes the active release and previous completed release, and tells you whether `gpc rollback --confirm` is the supported next step.
 
 ### Repeat internal or alpha releases
 
