@@ -31,6 +31,8 @@ type fakeReleaseClient struct {
 	updateTrackErr   error
 	getTrackInfo     gpc.TrackInfo
 	getTrackErr      error
+	listTracksInfo   []gpc.TrackInfo
+	listTracksErr    error
 	listProducts     gpc.OneTimeProductsListInfo
 	listSubs         gpc.SubscriptionsListInfo
 
@@ -113,6 +115,27 @@ func (f *fakeReleaseClient) GetTrack(_ context.Context, _, _, _ string) (gpc.Tra
 		}, nil
 	}
 	return f.getTrackInfo, nil
+}
+
+func (f *fakeReleaseClient) ListTracks(_ context.Context, _, _ string) ([]gpc.TrackInfo, error) {
+	if f.listTracksErr != nil {
+		return nil, f.listTracksErr
+	}
+	if len(f.listTracksInfo) > 0 {
+		return append([]gpc.TrackInfo(nil), f.listTracksInfo...), nil
+	}
+	if f.getTrackInfo.Name != "" {
+		return []gpc.TrackInfo{f.getTrackInfo}, nil
+	}
+	return []gpc.TrackInfo{{
+		Name: "internal",
+		Releases: []gpc.TrackReleaseInfo{
+			{
+				Status:       "completed",
+				VersionCodes: []int64{123},
+			},
+		},
+	}}, nil
 }
 
 func (f *fakeReleaseClient) ListOneTimeProducts(_ context.Context, _ string, _ int64, _ string, _ bool) (gpc.OneTimeProductsListInfo, error) {

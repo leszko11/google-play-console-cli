@@ -250,6 +250,7 @@ gpc completion --help
 | `deploy` | End-to-end: upload bundle &rarr; update track &rarr; validate &rarr; commit |
 | `release alpha` | One-command staging release with build verification |
 | `release full` | Vitals-gated staged rollout with `--auto-halt-on-regression` |
+| `release rehearse` | Read-only release readiness report before `release full` |
 | `release promote` | Promote releases between tracks |
 | `rollback` | Revert a track to previous release |
 | `publish alpha/production` | Composite shortcut with built-in bundle processing wait |
@@ -387,6 +388,18 @@ gpc release full \
   --auto-halt-on-regression \
   --confirm
 ```
+
+### Rehearse a release without writing anything
+
+```bash
+gpc release rehearse \
+  --package-name com.example.app \
+  --manifest ./play/release.yaml \
+  --probe-track \
+  --vitals-gate 'crashRate<2.0,anrRate<0.5'
+```
+
+`release rehearse` loads the release manifest, runs readiness checks, previews the live track against the planned release metadata, and returns one report with blockers, warnings, planned steps, and the next command.
 
 ### Repeat internal or alpha releases
 

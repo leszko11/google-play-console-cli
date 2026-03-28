@@ -37,6 +37,7 @@ type Client interface {
 	UploadAPK(ctx context.Context, packageName, editID, apkPath string) (gpc.APKInfo, error)
 	UploadDeobfuscationFile(ctx context.Context, packageName, editID string, versionCode int64, fileType, filePath string) (gpc.DeobfuscationFileInfo, error)
 	GetTrack(ctx context.Context, packageName, editID, trackName string) (gpc.TrackInfo, error)
+	ListTracks(ctx context.Context, packageName, editID string) ([]gpc.TrackInfo, error)
 	ListOneTimeProducts(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.OneTimeProductsListInfo, error)
 	ListSubscriptions(ctx context.Context, packageName string, pageSize int64, pageToken string, paginate bool) (gpc.SubscriptionsListInfo, error)
 }
@@ -79,6 +80,7 @@ func NewCommand(deps Deps) *ffcli.Command {
 			newVerifyCommand(deps),
 			newAlphaCommand(deps),
 			newFullCommand(deps),
+			newRehearseCommand(deps),
 			newPromoteCommand(deps),
 		},
 	}

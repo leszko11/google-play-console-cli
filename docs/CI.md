@@ -73,6 +73,7 @@ After the initial auth/package smoke step is green, the canonical next commands 
 ```bash
 gpc doctor --package-name "$GPC_TEST_PACKAGE"
 gpc release init --package-name "$GPC_TEST_PACKAGE" --dir ./play
+gpc release rehearse --package-name "$GPC_TEST_PACKAGE" --manifest ./play/release.yaml --probe-track
 gpc release verify --package-name "$GPC_TEST_PACKAGE" --track internal --aab ./app.aab --notes-file ./play/changelog/internal/en-US.txt
 gpc products sync --package-name "$GPC_TEST_PACKAGE" --dry-run
 gpc subscriptions sync --package-name "$GPC_TEST_PACKAGE" --dry-run
@@ -84,6 +85,8 @@ gpc notify webhook --url "$DEPLOY_WEBHOOK_URL" --event release.completed --input
 Keep CI stages read-only until credentials, package access, and artifact wiring are stable.
 
 Use `gpc release init` once per repo to generate `.gpc.yaml`, `./play/release.yaml`, `./play/appinit.yaml`, and the exported store state. After that, repeat releases can stay on `gpc release full --manifest ./play/release.yaml`.
+
+Use `gpc release rehearse --manifest ./play/release.yaml` as the canonical read-only preflight before any `release full` dry-run or confirm step. It keeps the whole readiness report in one command instead of stitching together `doctor`, `release verify`, and ad hoc track inspection.
 
 If the package is still in Play's draft bootstrap state, edit-only validations can fail with `Only releases with status draft may be created on draft app`. In that case, `gpc release full` handles the internal draft bootstrap release before continuing.
 
