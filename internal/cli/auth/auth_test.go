@@ -12,6 +12,7 @@ import (
 	"time"
 
 	authresolver "github.com/leszko11/google-play-console-cli/internal/auth"
+	"github.com/leszko11/google-play-console-cli/internal/cli/shared"
 	"github.com/leszko11/google-play-console-cli/internal/config"
 	"github.com/leszko11/google-play-console-cli/internal/gpc"
 )
@@ -323,6 +324,116 @@ func TestAuthStatusPrintsActiveProfileJSON(t *testing.T) {
 	}
 	if !bytes.Contains([]byte(out), []byte(`"developerId":"1234567890123456789"`)) {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestAuthExplainPrintsJSON(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			saPath := writeServiceAccountFile(t)
+			return config.Config{
+				ActiveProfile: "default",
+				Profiles: map[string]config.Profile{
+					"default": {
+						ServiceAccountPath: saPath,
+						Storage:            config.StoragePath,
+						DeveloperID:        "1234567890123456789",
+					},
+				},
+			}, nil
+		},
+		LookupEnv: func(name string) string {
+			switch name {
+			case authresolver.EnvBypassKeychain:
+				return "1"
+			case shared.EnvStrictAuth:
+				return "1"
+			default:
+				return ""
+			}
+		},
+	}
+
+	out := runAuth(t, deps, "explain", "--output", "json")
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("unmarshal explain output: %v", err)
+	}
+	if payload["finalSource"] != string(authresolver.SourceConfig) {
+		t.Fatalf("unexpected finalSource: %#v", payload["finalSource"])
+	}
+	if payload["ciRecommendation"] == "" {
+		t.Fatalf("expected ciRecommendation, got %#v", payload["ciRecommendation"])
+	}
+	status, ok := payload["status"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected status object, got %#v", payload["status"])
+	}
+	if status["health"] == "" {
+		t.Fatalf("expected status health, got %#v", status["health"])
+	}
+}
+
+func TestAuthExplainReportsStrictConflictRisk(t *testing.T) {
+	saPath := writeServiceAccountFile(t)
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			return config.Config{
+				ActiveProfile: "default",
+				Profiles: map[string]config.Profile{
+					"default": {
+						ServiceAccountPath: saPath,
+						Storage:            config.StoragePath,
+					},
+				},
+			}, nil
+		},
+		LookupEnv: func(name string) string {
+			switch name {
+			case shared.EnvServiceAccountPath:
+				return "/tmp/from-env.json"
+			case authresolver.EnvBypassKeychain:
+				return "1"
+			case shared.EnvStrictAuth:
+				return "1"
+			default:
+				return ""
+			}
+		},
+	}
+
+	out := runAuth(t, deps, "explain", "--output", "json")
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("unmarshal explain output: %v", err)
+	}
+	strictAuth, ok := payload["strictAuth"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected strictAuth object, got %#v", payload["strictAuth"])
+	}
+	if strictAuth["wouldFail"] != true {
+		t.Fatalf("expected strictAuth.wouldFail=true, got %#v", strictAuth["wouldFail"])
+	}
+}
+
+func TestAuthExplainPrintsTable(t *testing.T) {
+	deps := Deps{
+		LoadConfig: func() (config.Config, error) {
+			saPath := writeServiceAccountFile(t)
+			return config.Config{
+				ActiveProfile: "default",
+				Profiles: map[string]config.Profile{
+					"default": {ServiceAccountPath: saPath, Storage: config.StoragePath},
+				},
+			}, nil
+		},
+	}
+
+	out := runAuth(t, deps, "explain", "--output", "table")
+	for _, want := range []string{"FIELD\tVALUE", "source\tconfig", "ciRecommendation\t"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in explain table output, got %q", want, out)
+		}
 	}
 }
 
